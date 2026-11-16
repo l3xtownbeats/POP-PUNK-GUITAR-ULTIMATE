@@ -33,7 +33,7 @@ if errorlevel 1 (
   >>"%LOG%" echo ERROR: certutil not found.
   goto :finish
 )
-more +36 "%~f0" > "%TMPB64%"
+more +75 "%~f0" > "%TMPB64%"
 certutil -f -decode "%TMPB64%" "%TMPPY%" >nul 2>&1
 if errorlevel 1 (
   echo ERROR: Could not prepare the built-in Python script.
