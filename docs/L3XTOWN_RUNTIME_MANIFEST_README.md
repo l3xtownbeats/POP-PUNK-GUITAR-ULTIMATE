@@ -3,41 +3,34 @@
 File: `L3XTOWN_RUNTIME_MANIFEST.csv`
 
 ## Purpose
-Portable per-file source manifest for the 387 user-owned L3XTOWN GUITAR WAV recordings. It consolidates stable file identity from `L3XTOWN_SAMPLE_MAP.csv`, adds a relative path from the L3XTOWN library root, and imports technical fields from `L3XTOWN_INVENTORY.csv` only when the available metadata supports a safe match.
+Portable per-content runtime manifest for the user-owned L3XTOWN GUITAR WAV library. It consolidates stable identity from `L3XTOWN_SAMPLE_MAP.csv`, exact source paths and WAV technical metadata from `L3XTOWN_FULL_INVENTORY.csv`, and one canonical path per unique SHA-256 content hash.
 
-## Current reconciliation
-- Total manifest rows: 387.
-- Unique inventory matches: 126 (`MATCHED_UNIQUE`).
-- Ambiguous source matches with identical technical metadata across every candidate: 149 (`MATCHED_AMBIGUOUS_IDENTICAL_METADATA`). Technical values are safe to copy because every candidate has the same sample rate, channel count, bit depth, duration, and inventory size; the exact source-row identity remains unresolved.
-- Ambiguous matches with conflicting technical metadata: 112 (`AMBIGUOUS_METADATA_CONFLICT`). Technical fields remain blank; do not guess.
-- Missing inventory matches: 0.
-- Sum of source_bytes: 846,265,382 bytes.
-- Each sample_id is the first 16 lowercase hexadecimal characters of its source SHA-256.
+## Current reconciliation (2026-11-16)
+- Full inventory: 393 source path records.
+- Unique SHA-256 contents: 387.
+- Runtime manifest: 387 rows, one per unique content hash.
+- `MATCHED_SHA256_UNIQUE_PATH`: 381 rows.
+- `MATCHED_SHA256_DUPLICATE_CONTENT`: 6 rows. Each of these hashes exists at two source paths with identical bytes and identical WAV technical metadata.
+- Unresolved metadata rows: 0.
+- Missing hash matches: 0.
+- Source byte-count mismatches: 0.
+- All 112 previously conflicting metadata rows were resolved by exact SHA-256 matching.
+- All 149 previously ambiguous-but-identical metadata rows were upgraded to exact hash matches.
+- Two stale runtime paths were corrected against the full inventory.
 
-## Why ambiguity remains
-The inventory's Folder column is flattened and omits the full parent guitar-family path. Some leaf-folder + filename pairs therefore match multiple inventory rows. The reconciliation distinguishes harmless ambiguity (all candidate metadata values identical) from conflicting ambiguity (candidate metadata differs).
+## Matching authority
+The full inventory is authoritative for:
+- exact relative source path and original filename;
+- sample rate, channel count, bit depth, duration, and file size;
+- WAV header readability.
 
-## How to clear the remaining 112 conflicts
-Preferred source correction: regenerate the inventory with a full relative path from the L3XTOWN GUITAR root, e.g. `Гитары - Квинты/01 ENGL/Квинты/filename.wav`, instead of a leaf-folder-only value such as `Квинты`.
+The SHA-256 hash is the join key. Do not join by filename or leaf folder alone. For duplicate-content hashes, the manifest keeps one canonical path; alternate paths remain recorded in the full inventory for traceability.
 
-Alternative: read each WAV header to obtain sample rate, channels, and bit depth, and measure exact duration from the file itself. Do not assign duration or size from a sibling recording.
+## Status values
+- `MATCHED_SHA256_UNIQUE_PATH`: the hash resolves to exactly one source path.
+- `MATCHED_SHA256_DUPLICATE_CONTENT`: the hash resolves to multiple paths with identical file bytes and matching technical metadata.
 
-## Path convention
-`relative_path_from_library_root` is relative to the root folder `L3XTOWN GUITAR`. It uses forward slashes and contains no machine-specific drive letter or absolute PC path. Preserve original filename and source category.
+## Preservation and development gate
+This is a metadata manifest, not an audio-quality certification. Original WAV files are immutable: do not move, rename, delete, or modify them during metadata processing. No plugin, preset, audio-engine, sound-quality, or final-build tests may run until audio-library intake and BASIC LIBRARY integration (10–12 GB) are complete and all 500 core factory presets have been created and integrated using BASIC LIBRARY alone.
 
-## Immutable source identity
-- `source_bytes` and `sha256` come from SAMPLE_MAP.
-- Do not edit or overwrite original WAV files.
-- If future analysis produces trimmed, normalized, looped, or otherwise processed audio, store it as a separate derived asset with a reference to the original sample_id and SHA-256.
-
-## Status semantics
-- `MATCHED_UNIQUE`: exactly one inventory row matched; technical fields copied.
-- `MATCHED_AMBIGUOUS_IDENTICAL_METADATA`: multiple candidate inventory rows matched, but every candidate has identical technical fields; technical values copied while source-row identity remains unresolved.
-- `AMBIGUOUS_METADATA_CONFLICT`: multiple candidate rows disagree; technical fields intentionally blank.
-- `MISSING_INVENTORY_MATCH`: no inventory row matched (none in current manifest).
-
-## Not an audio-analysis result
-The manifest contains no measured pitch, tuning, articulation, chord type, tempo, transient, usable-region, loop, or velocity-layer analysis. Those fields must be populated only from actual audio inspection. Filename-derived labels remain provisional.
-
-## Development gate
-Creating or reconciling this manifest does not constitute audio-library integration and does not authorize plugin, preset, engine, sound-quality, or final-build testing. The existing gate remains: collect and integrate the required libraries and create/integrate all 500 core factory presets before any such testing.
+See `docs/L3XTOWN_RUNTIME_METADATA_RESOLUTION_2026-11-16.md` for the detailed reconciliation record.
