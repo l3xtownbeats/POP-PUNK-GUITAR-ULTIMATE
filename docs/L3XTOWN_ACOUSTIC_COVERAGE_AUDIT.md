@@ -41,6 +41,17 @@ Folder labels such as `сус` are retained as source-folder labels only. They d
 - Кода: none; A maj has two takes.
 - Сус: A maj is absent.
 
+## User-confirmed coverage notes (2026-11-16)
+
+The project owner has separately confirmed the following filename-level gaps and variation candidate:
+- ALL MARTIN / 7: C min7 absent.
+- ALL MARTIN / Вверх: A# maj, D# maj, D# min absent.
+- ALL TAYLOR / вверх: D# maj and D# min absent.
+- ALL TAYLOR / Сус: A maj absent.
+- ALL TAYLOR / Кода: two A maj takes are present and should be retained as separate candidates for performance variation.
+
+These confirmations agree with the filename audit above. They do not change the source files or establish audio-verified chord content. The two A maj takes remain candidates only until their waveforms/audio are compared; if genuinely distinct and musically usable, they can be mapped as round-robin or alternate takes.
+
 ## Engineering implications
 1. Do not synthesize missing coverage by simply relabelling another chord or assuming transposition is safe. First verify the source audio and decide whether pitch-shifted variants are musically acceptable.
 2. Keep original file names and SHA-256 hashes immutable. Store normalized root/quality fields in a separate manifest.
