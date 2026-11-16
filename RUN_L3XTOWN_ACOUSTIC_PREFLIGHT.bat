@@ -5,11 +5,12 @@ title L3XTOWN Acoustic Local Preflight
 set "PROJECT_ROOT=%~dp0"
 set "LIBRARY_ROOT=F:\POP PUNK GUITAR ULTIMATE\Samples\SourceLibraries\L3XTOWN GUITAR"
 set "INVENTORY=%PROJECT_ROOT%L3XTOWN_FULL_INVENTORY.csv"
-set "SCRIPT=%PROJECT_ROOT%tools\preflight_l3xtown_acoustic_sources.py"
+set "SCRIPT=%TEMP%\preflight_l3xtown_acoustic_sources.py"
 set "OUTPUT=F:\POP PUNK GUITAR ULTIMATE\Reports\AcousticPreflight"
+set "SCRIPT_URL=https://raw.githubusercontent.com/l3xtownbeats/POP-PUNK-GUITAR-ULTIMATE/tool/library-manager-mvp/tools/preflight_l3xtown_acoustic_sources.py"
 
 echo ================================================
-echo   L3XTOWN ACOUSTIC LOCAL PREFLIGHT 1.0.1
+echo   L3XTOWN ACOUSTIC LOCAL PREFLIGHT 1.0.2
 echo ================================================
 echo.
 if not exist "%LIBRARY_ROOT%\" (
@@ -28,15 +29,23 @@ if not exist "%INVENTORY%" (
   pause
   exit /b 1
 )
+
 if not exist "%SCRIPT%" (
-  echo ERROR: Python script is missing:
+  echo Python checker is not present locally. Downloading it automatically...
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing -Uri '%SCRIPT_URL%' -OutFile '%SCRIPT%'; exit 0 } catch { Write-Host $_; exit 1 }"
+  if errorlevel 1 (
+    echo.
+    echo ERROR: Automatic download failed.
+    echo Check your internet connection or download the Python script manually.
+    echo.
+    echo https://github.com/l3xtownbeats/POP-PUNK-GUITAR-ULTIMATE/blob/tool/library-manager-mvp/tools/preflight_l3xtown_acoustic_sources.py
+    pause
+    exit /b 1
+  )
+)
+if not exist "%SCRIPT%" (
+  echo ERROR: Python script download did not create the expected file:
   echo "%SCRIPT%"
-  echo.
-  echo Create a folder named tools beside this BAT file, then place
-  echo preflight_l3xtown_acoustic_sources.py inside that tools folder.
-  echo Download:
-  echo https://github.com/l3xtownbeats/POP-PUNK-GUITAR-ULTIMATE/blob/tool/library-manager-mvp/tools/preflight_l3xtown_acoustic_sources.py
-  echo.
   pause
   exit /b 1
 )
