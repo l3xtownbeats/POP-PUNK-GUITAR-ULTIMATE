@@ -1,6 +1,5 @@
 @echo off
 setlocal
-chcp 65001 >nul
 title L3XTOWN Acoustic Local Preflight
 
 set "PROJECT_ROOT=%~dp0"
@@ -10,44 +9,55 @@ set "SCRIPT=%PROJECT_ROOT%tools\preflight_l3xtown_acoustic_sources.py"
 set "OUTPUT=F:\POP PUNK GUITAR ULTIMATE\Reports\AcousticPreflight"
 
 echo ================================================
-echo   L3XTOWN ACOUSTIC LOCAL PREFLIGHT 1.0.0
+echo   L3XTOWN ACOUSTIC LOCAL PREFLIGHT 1.0.1
 echo ================================================
 echo.
 if not exist "%LIBRARY_ROOT%\" (
   echo ERROR: Library folder not found:
   echo "%LIBRARY_ROOT%"
+  echo Check that the acoustic library is extracted to the expected location.
   echo.
   pause
   exit /b 1
 )
 if not exist "%INVENTORY%" (
   echo ERROR: L3XTOWN_FULL_INVENTORY.csv is missing beside this BAT file.
-  echo Download it from the project repository root.
+  echo Download the inventory from the project repository and place it here:
+  echo "%PROJECT_ROOT%"
   echo.
   pause
   exit /b 1
 )
 if not exist "%SCRIPT%" (
-  echo ERROR: Preflight Python script is missing:
+  echo ERROR: Python script is missing:
   echo "%SCRIPT%"
-  echo Keep the tools folder beside this BAT file.
+  echo.
+  echo Create a folder named tools beside this BAT file, then place
+  echo preflight_l3xtown_acoustic_sources.py inside that tools folder.
+  echo Download:
+  echo https://github.com/l3xtownbeats/POP-PUNK-GUITAR-ULTIMATE/blob/tool/library-manager-mvp/tools/preflight_l3xtown_acoustic_sources.py
   echo.
   pause
   exit /b 1
 )
 
-py -3 --version
-if errorlevel 1 (
-  echo.
-  echo Python 3 was not found. Install Python 3.10+ and enable the py launcher.
-  pause
-  exit /b 1
+where py >nul 2>nul
+if not errorlevel 1 (
+  py -3 --version
+  if errorlevel 1 goto NO_PYTHON
+  set "PYTHON_CMD=py -3"
+) else (
+  where python >nul 2>nul
+  if errorlevel 1 goto NO_PYTHON
+  python --version
+  if errorlevel 1 goto NO_PYTHON
+  set "PYTHON_CMD=python"
 )
 
 echo.
 echo Source WAV files will only be read. No originals will be changed.
 echo.
-py -3 "%SCRIPT%" --library-root "%LIBRARY_ROOT%" --inventory "%INVENTORY%" --output-dir "%OUTPUT%" --family acoustic
+%PYTHON_CMD% "%SCRIPT%" --library-root "%LIBRARY_ROOT%" --inventory "%INVENTORY%" --output-dir "%OUTPUT%" --family acoustic
 set "RESULT=%ERRORLEVEL%"
 
 echo.
@@ -64,3 +74,9 @@ echo "%OUTPUT%"
 echo.
 pause
 exit /b %RESULT%
+
+:NO_PYTHON
+echo.
+echo ERROR: Python 3.10+ was not found. Install Python and enable Add Python to PATH.
+pause
+exit /b 1
