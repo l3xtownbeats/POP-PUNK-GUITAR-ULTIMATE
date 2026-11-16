@@ -5,7 +5,8 @@ title POP PUNK GUITAR ULTIMATE - L3XTOWN FULL INVENTORY
 set "PROJECT_ROOT=F:\POP PUNK GUITAR ULTIMATE"
 set "LIBRARY_ROOT=%PROJECT_ROOT%\Samples\SourceLibraries\L3XTOWN GUITAR"
 set "SAMPLE_MAP=%~dp0L3XTOWN_SAMPLE_MAP.csv"
-set "SCRIPT=%~dp0BUILD_L3XTOWN_INVENTORY.py"
+set "SCRIPT=%TEMP%\BUILD_L3XTOWN_INVENTORY.py"
+set "SCRIPT_URL=https://raw.githubusercontent.com/l3xtownbeats/POP-PUNK-GUITAR-ULTIMATE/main/BUILD_L3XTOWN_INVENTORY.py"
 set "PYTHON=%LOCALAPPDATA%\PythonPortable\python.exe"
 
 echo.
@@ -15,13 +16,9 @@ echo   READ-ONLY SOURCE SCAN - NO AUDIO OR PLUGIN TESTS
 echo ============================================================
 echo.
 
-if not exist "%SCRIPT%" (
-  echo ERROR: BUILD_L3XTOWN_INVENTORY.py is missing beside this BAT:
-  echo "%SCRIPT%"
-  goto :fail
-)
 if not exist "%SAMPLE_MAP%" (
-  echo ERROR: L3XTOWN_SAMPLE_MAP.csv is missing beside this BAT.
+  echo ERROR: L3XTOWN_SAMPLE_MAP.csv is missing beside this BAT:
+  echo "%SAMPLE_MAP%"
   goto :fail
 )
 if not exist "%LIBRARY_ROOT%" (
@@ -29,6 +26,18 @@ if not exist "%LIBRARY_ROOT%" (
   echo "%LIBRARY_ROOT%"
   goto :fail
 )
+
+echo Downloading the inventory script automatically...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing -Uri '%SCRIPT_URL%' -OutFile '%SCRIPT%' -ErrorAction Stop } catch { Write-Host $_.Exception.Message; exit 1 }"
+if errorlevel 1 (
+  echo ERROR: Could not download the inventory script from GitHub.
+  goto :fail
+)
+if not exist "%SCRIPT%" (
+  echo ERROR: Download did not create the inventory script.
+  goto :fail
+)
+
 if not exist "%PYTHON%" (
   where py >nul 2>nul
   if errorlevel 1 (
