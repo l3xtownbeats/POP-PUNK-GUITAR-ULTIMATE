@@ -3,8 +3,8 @@
 Status: deterministic filename/manifest audit only. No audio was auditioned or analyzed. This report identifies coverage and naming gaps; it does not certify the sounding pitch, chord voicing, or articulation.
 
 ## Scope and source
-- Source: `L3XTOWN_SAMPLE_MAP.csv`, 387 rows.
-- Acoustic families: ALL MARTIN (120 after the owner-confirmed additions) and ALL TAYLOR (121 after the owner-confirmed additions), 241 files total. The committed source-map snapshot predates these additions. The committed source-map snapshot predates these additions.
+- Source: `L3XTOWN_FULL_INVENTORY.csv` and reconciled `L3XTOWN_SAMPLE_MAP.csv`, 393 source path records / 387 unique SHA-256 contents.
+- Acoustic families: ALL MARTIN (120 after the owner-confirmed additions) and ALL TAYLOR (121 after the owner-confirmed additions), 241 files total. The current full inventory contains 393 path records; six exact duplicate-content pairs are retained as aliases.
 - Chord roots normalized for comparison: A, A#, B, C, C#, D, D#, E, F, F#, G, G#.
 - Cyrillic `С` at the beginning of a filename was treated as Latin `C` for analysis only. Original filenames remain unchanged.
 
