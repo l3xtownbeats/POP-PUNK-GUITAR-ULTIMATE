@@ -1,23 +1,3 @@
-﻿& "$env:LOCALAPPDATA\PythonPortable\python.exe" $scriptPath
-
-
-$scriptPath = "$env:USERPROFILE\Desktop\acoustic_signal_audit.py"
-New-Item -ItemType File -Path $scriptPath -Force
-Write-Host "SCRIPT FILE CREATED: $scriptPath" -ForegroundColor Green
-
-
-$scriptPath = "$env:USERPROFILE\Desktop\acoustic_signal_audit.py"
-New-Item -ItemType File -Path $scriptPath -Force
-Write-Host "SCRIPT FILE CREATED: $scriptPath" -ForegroundColor Green
-
-
-
-
-$scriptPath = "$env:USERPROFILE\Desktop\acoustic_signal_audit.py"
-Write-Host "Desktop exists:" (Test-Path "$env:USERPROFILE\Desktop")
-Write-Host "Script exists:" (Test-Path $scriptPath)
-Write-Host "Desktop path:" "$env:USERPROFILE\Desktop"
-[16.11.2026 19:53] NWOTX3L: $script = @'
 import wave
 import math
 import csv
@@ -165,7 +145,6 @@ for library, folder in ROOTS.items():
         all_files.append((library, path))
 
 total = len(all_files)
-[16.11.2026 19:53] NWOTX3L: print(f"FILES FOUND: {total}")
 print("Starting local PCM analysis...")
 
 for index, (library, path) in enumerate(all_files, 1):
