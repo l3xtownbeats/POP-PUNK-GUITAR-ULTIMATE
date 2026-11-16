@@ -5,7 +5,7 @@ title POP PUNK GUITAR ULTIMATE - L3XTOWN FULL INVENTORY
 set "PROJECT_ROOT=F:\POP PUNK GUITAR ULTIMATE"
 set "LIBRARY_ROOT=%PROJECT_ROOT%\Samples\SourceLibraries\L3XTOWN GUITAR"
 set "SAMPLE_MAP=%~dp0L3XTOWN_SAMPLE_MAP.csv"
-set "SCRIPT=%~dp0tools\build_l3xtown_full_inventory.py"
+set "SCRIPT=%~dp0BUILD_L3XTOWN_INVENTORY.py"
 set "PYTHON=%LOCALAPPDATA%\PythonPortable\python.exe"
 
 echo.
@@ -16,7 +16,7 @@ echo ============================================================
 echo.
 
 if not exist "%SCRIPT%" (
-  echo ERROR: Inventory script is missing:
+  echo ERROR: BUILD_L3XTOWN_INVENTORY.py is missing beside this BAT:
   echo "%SCRIPT%"
   goto :fail
 )
