@@ -1,73 +1,37 @@
-# L3XTOWN GUITAR — Filename-Based Technical Classification
+# L3XTOWN GUITAR — Filename Classification (Historical Snapshot Superseded)
 
-Status: preliminary metadata classification from `L3XTOWN_INVENTORY.csv` (387 rows). This is not audio analysis. No sample was auditioned, waveform-inspected, pitch-detected, or altered. All musical labels below are inferred from folder/file names and must be verified later.
+> **Status: HISTORICAL / DO NOT USE AS THE CURRENT COUNT AUTHORITY.**  
+> This document records an earlier 387-record inventory snapshot. It is retained for history only because the library was subsequently re-inventoried with full paths, SHA-256 hashes, and WAV-header metadata.
 
-## Ownership and preservation
-- Source: user-confirmed original guitar recordings made by the user on their own guitars.
-- Preserve original WAV files and recorded SHA-256 values unchanged.
-- Use portable relative paths in all future manifests; do not use the original absolute `F:\...` paths as runtime references.
+## Current authoritative sources
 
-## Technical format snapshot
-- 387 WAV files.
-- Inventory reports 44,100 Hz, stereo, 24-bit.
-- The inventory reports approximately 6.86 seconds for the standard chord/note files and approximately 10.29 seconds for many coda files. These are metadata values, not confirmed usable loop lengths.
+Use these current artifacts instead:
 
-## Filename/folder classification
+- `L3XTOWN_FULL_INVENTORY.csv` — 393 source path records, 387 unique SHA-256 contents, full relative paths and WAV metadata.
+- `L3XTOWN_RUNTIME_MANIFEST.csv` — 387 unique-content runtime records, exact SHA-256 joins, 0 unresolved metadata rows.
+- `L3XTOWN_FACTORY_INTEGRATION_PLAN.csv` — 393 proposed source-to-FACTORY routing records.
+- `docs/L3XTOWN_ACOUSTIC_COVERAGE_AUDIT.md` — current filename-level acoustic coverage.
+- `docs/L3XTOWN_ELECTRIC_FILENAME_AUDIT.md` — current filename-level electric coverage.
+- `docs/L3XTOWN_BASIC_LIBRARY_INTEGRATION_READINESS.md` — current integration status and gates.
 
-### Acoustic — ALL MARTIN (117 files)
-| Subfolder label | Count | Preliminary interpretation |
-|---|---:|---|
-| Root / ALL MARTIN | 25 | Chord-labelled recordings; filenames include major/minor chords and one C minor 7 label |
-| 7 | 47 | Seventh-chord-labelled recordings |
-| Вверх | 21 | Upstroke-labelled chord recordings |
-| кода | 24 | Coda-labelled chord recordings |
-| сус | 24 | Sus-labelled chord recordings |
+## Current source counts
 
-### Acoustic — ALL TAYLOR (118 files)
-| Subfolder label | Count | Preliminary interpretation |
-|---|---:|---|
-| Root / ALL TAYLOR | 24 | Major/minor chord-labelled recordings |
-| 7 | 24 | Seventh-chord-labelled recordings |
-| вверх | 22 | Upstroke-labelled chord recordings |
-| Кода | 25 | Coda-labelled chord recordings; includes two A major coda takes |
-| Сус | 23 | Sus-labelled chord recordings |
+| Source group | Path records |
+|---|---:|
+| Acoustic — ALL MARTIN | 121 |
+| Acoustic — ALL TAYLOR | 120 |
+| Electric — 01 ENGL | 43 |
+| Electric — 02 MESA | 43 |
+| Electric — 03 EVH | 12 |
+| Electric — 04 MARSHALL GIBSON | 49 |
+| FX — 05 FX | 5 |
+| **Total source paths** | **393** |
+| **Unique SHA-256 contents** | **387** |
 
-### Electric / fifths and related material (152 files)
-| Folder family | Subfolder label | Count | Preliminary interpretation |
-|---|---|---:|---|
-| 01 ENGL | Квинты | 45 | Fifth/power-chord-labelled recordings |
-| 02 MESA | Квинты | 43 | Fifth/power-chord-labelled recordings |
-| 03 EVH | Переборы 75 bpm | 12 | Arpeggio/picking-labelled recordings with 75 BPM folder label |
-| 04 MARSHALL GIBSON | Ноты | 45 | Note-labelled recordings |
-| 04 MARSHALL GIBSON | Слайды | 6 | Slide-labelled recordings |
-| 05 FX | Root / FX | 5 | Transition/slide-labelled effects |
+The 6 duplicate-content pairs are byte-identical aliases and must not be interpreted as separate performances or round-robin takes.
 
-## Immediate observations / mapping cautions
-1. Filename labels are not proof of the sounding pitch or chord voicing. Treat all root notes, chord qualities, and articulation labels as `UNVERIFIED` until audio-derived verification.
-2. Some labels use Cyrillic `С` (visually similar to Latin C). Normalize for analysis only; never rename or overwrite original files.
-3. Naming and whitespace are inconsistent (for example, extra spaces, `верх` vs `вверх`, and duplicate take suffixes). Keep the original filename as immutable source metadata and add normalized fields separately.
-4. The two acoustic families have broadly parallel categories, but their counts and coverage differ. Do not silently fill missing chord/technique combinations by relabelling or stretching another sample.
-5. The `Переборы 75 bpm` folder label is a tempo hint only; verify actual tempo and timing from audio before using tempo-synced playback.
-6. `Квинты`, `Ноты`, `Слайды`, and `FX` are provisional semantic roles, not confirmed articulation mappings.
+## Interpretation boundary
 
-## Required next metadata fields
-For every source asset, add separate fields without changing the source file:
-- `source_relative_path`
-- `source_sha256`
-- `instrument_family` (acoustic/electric/unknown)
-- `source_folder_label`
-- `filename_original`
-- `filename_normalized`
-- `root_note_detected` and `root_note_confidence`
-- `chord_quality_detected` and `chord_confidence`
-- `articulation_detected` and `articulation_confidence`
-- `tempo_bpm_detected` and `tempo_confidence`
-- `duration_sec`, `sample_rate_hz`, `channels`, `bit_depth`
-- `peak_dbfs`, `rms_dbfs`, leading/trailing silence
-- `review_status` (UNREVIEWED / AUDIO_REVIEWED / APPROVED_FOR_MAPPING / EXCLUDED)
-- `notes`
+Folder names and filenames remain provisional labels. They do not verify actual pitch, chord voicing, tuning, articulation, tempo, transient, loop boundaries, or musical usability. Those properties require non-destructive audio analysis and listening review.
 
-## Processing constraints
-- Non-destructive analysis only; original WAVs remain untouched.
-- Do not run plugin, preset, sound-engine, sound-quality, or final-build tests yet.
-- Continue library intake and metadata work first. The release gate remains: all audio libraries integrated and all 500 core factory presets created/integrated before any such testing.
+Do not rename, move, delete, overwrite, or modify original WAV files during intake. Do not run plugin, preset, sound-engine, sound-quality, or final-build tests until BASIC LIBRARY (10–12 GB) is integrated and all 500 core factory presets are created and integrated using BASIC LIBRARY alone.
