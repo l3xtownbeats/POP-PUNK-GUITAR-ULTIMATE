@@ -25,7 +25,7 @@ L3XTOWN GUITAR is a user-owned source library according to the owner's confirmat
 
 The six duplicate-content pairs are aliases, not six additional independent performances. Keep both original path records for traceability, but never treat identical bytes as round-robin or separate takes.
 
-## Routing-plan validation
+## Acoustic coverage correction (inventory cross-check)\n\nA targeted re-check of `L3XTOWN_FULL_INVENTORY.csv` corrected two earlier gap flags:\n\n- `ALL MARTIN/7/C min7`: filename exists as `С min 7.wav`, but its SHA-256 is identical to the ROOT `С min7.wav` asset. It is a path alias, not a separate performance. Do not treat it as a unique seventh-folder take.\n- `ALL TAYLOR/Сус/A maj`: filename exists as `A maj cус.wav`; the filename includes a mixed Latin/Cyrillic suffix. Size and SHA-256 match the inventory. Audio voicing remains unverified.\n\nTherefore neither item is currently `MISSING_SOURCE` at the filename/path level. The Martin unique-take question remains unresolved pending audio review. Details: `L3XTOWN_ACOUSTIC_COVERAGE_GAPS.csv`.\n\n## Routing-plan validation
 
 A deterministic route was generated for every row in `L3XTOWN_FULL_INVENTORY.csv`, using the same folder-label routing rules documented in `tools/prepare_l3xtown_factory_staging.py`.
 
