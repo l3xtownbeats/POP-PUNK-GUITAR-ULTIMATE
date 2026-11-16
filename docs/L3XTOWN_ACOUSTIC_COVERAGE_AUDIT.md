@@ -4,7 +4,7 @@ Status: deterministic filename/manifest audit only. No audio was auditioned or a
 
 ## Scope and source
 - Source: `L3XTOWN_SAMPLE_MAP.csv`, 387 rows.
-- Acoustic families: ALL MARTIN (117) and ALL TAYLOR (118), 235 files total.
+- Acoustic families: ALL MARTIN (117) and ALL TAYLOR (119 after the owner-confirmed addition), 236 files total. The committed source-map snapshot predates that addition.
 - Chord roots normalized for comparison: A, A#, B, C, C#, D, D#, E, F, F#, G, G#.
 - Cyrillic `С` at the beginning of a filename was treated as Latin `C` for analysis only. Original filenames remain unchanged.
 
