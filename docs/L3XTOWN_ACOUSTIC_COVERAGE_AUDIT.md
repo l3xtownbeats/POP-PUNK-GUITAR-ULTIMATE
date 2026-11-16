@@ -13,7 +13,7 @@ Status: deterministic filename/manifest audit only. No audio was auditioned or a
 | Family | Folder label | Files | Filename-labelled coverage |
 |---|---|---:|---|
 | ALL MARTIN | ROOT | 25 | 12 major + 12 minor roots, plus one C minor 7-labelled file |
-| ALL MARTIN | 7 | 23 | 12 maj7 roots; 11 min7 roots |
+| ALL MARTIN | 7 | 24 path records / 23 unique hashes | 12 maj7 labels + 12 min7 labels; C min7 is an exact-content alias of the ROOT C min7 file |
 | ALL MARTIN | Вверх | 24* | 12 major + 12 minor labels (owner-confirmed correction) |
 | ALL MARTIN | кода | 24 | 12 major + 12 minor labels |
 | ALL MARTIN | сус | 24 | 12 major + 12 minor labels |
@@ -21,7 +21,7 @@ Status: deterministic filename/manifest audit only. No audio was auditioned or a
 | ALL TAYLOR | 7 | 24 | 12 maj7 + 12 min7 roots |
 | ALL TAYLOR | вверх | 24* | 12 major + 12 minor labels (owner-confirmed correction) |
 | ALL TAYLOR | Кода | 25 | 13 major + 12 minor labels; A major has two takes |
-| ALL TAYLOR | Сус | 23 | 11 major + 12 minor labels |
+| ALL TAYLOR | Сус | 24 | 12 major + 12 minor labels (A maj filename is `A maj cус.wav`) |
 
 Folder labels such as `сус` are retained as source-folder labels only. They do not prove that the recordings contain sus2/sus4 voicings; filenames in these folders are predominantly labelled maj/min.
 
@@ -29,7 +29,7 @@ Folder labels such as `сус` are retained as source-folder labels only. They d
 
 ### ALL MARTIN
 - ROOT: none in the 12-root major/minor set; one additional C min7-labelled file is present.
-- 7: C min7 is absent.
+- 7: C min7 filename is present as `ALL MARTIN/7/С min 7.wav`; however, its SHA-256 is identical to `ALL MARTIN/С min7.wav` in ROOT. This is a path alias, not an independent seventh-folder recording. Keep the label match, but do not count it as a unique performance or independent variation.
 - Вверх: none; A# maj, D# maj, and D# min are now present (owner-confirmed correction).
 - кода: none in the 12-root major/minor set.
 - сус: none in the 12-root major/minor set.
@@ -39,18 +39,18 @@ Folder labels such as `сус` are retained as source-folder labels only. They d
 - 7: none in the 12-root maj7/min7 set.
 - вверх: none; D# maj and D# min are now present (owner-confirmed correction).
 - Кода: none; A maj has two takes.
-- Сус: A maj is absent.
+- Сус: A maj filename is present as `ALL TAYLOR/Сус/A maj cус.wav` (mixed Latin/Cyrillic spelling in the filename). Its inventory record has matching size and SHA-256; audio voicing remains unverified.
 
 ## User-confirmed coverage notes (2026-11-16)
 
 The project owner has separately confirmed the following filename-level gaps and variation candidate:
-- ALL MARTIN / 7: C min7 absent.
+- ALL MARTIN / 7: C min7 is present by filename; exact SHA-256 duplicates the ROOT C min7 asset, so it is not an independent take.
 - ALL MARTIN / Вверх: A# maj, D# maj, and D# min are now present; the previous missing-coverage entries are closed.
 - ALL TAYLOR / вверх: D# maj and D# min are now present; the previous missing-coverage entries are closed.
-- ALL TAYLOR / Сус: A maj absent.
+- ALL TAYLOR / Сус: A maj is present by filename as `A maj cус.wav`; the mixed-script suffix is preserved.
 - ALL TAYLOR / Кода: two A maj takes are present and should be retained as separate candidates for performance variation.
 
-These confirmations agree with the filename audit above. They do not change the source files or establish audio-verified chord content. The two A maj takes remain candidates only until their waveforms/audio are compared; if genuinely distinct and musically usable, they can be mapped as round-robin or alternate takes.
+The inventory cross-check corrects the two earlier missing-label conclusions: both filenames are present in the requested folders. The ALL MARTIN C min7 path is byte-identical to the ROOT C min7 file, while the ALL TAYLOR A maj entry is a distinct hash in the Сус folder. These are filename/hash findings only; they do not establish audio-verified chord content. See `L3XTOWN_ACOUSTIC_COVERAGE_GAPS.csv` for the corrected statuses. The two A maj takes remain candidates only until their waveforms/audio are compared; if genuinely distinct and musically usable, they can be mapped as round-robin or alternate takes.
 
 ## Engineering implications
 1. Do not synthesize missing coverage by simply relabelling another chord or assuming transposition is safe. First verify the source audio and decide whether pitch-shifted variants are musically acceptable.
