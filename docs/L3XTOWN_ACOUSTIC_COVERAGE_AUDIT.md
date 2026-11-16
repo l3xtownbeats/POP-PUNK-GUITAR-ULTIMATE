@@ -4,7 +4,7 @@ Status: deterministic filename/manifest audit only. No audio was auditioned or a
 
 ## Scope and source
 - Source: `L3XTOWN_SAMPLE_MAP.csv`, 387 rows.
-- Acoustic families: ALL MARTIN (117) and ALL TAYLOR (121 after the owner-confirmed additions), 238 files total. The committed source-map snapshot predates these additions.
+- Acoustic families: ALL MARTIN (120 after the owner-confirmed additions) and ALL TAYLOR (121 after the owner-confirmed additions), 241 files total. The committed source-map snapshot predates these additions. The committed source-map snapshot predates these additions.
 - Chord roots normalized for comparison: A, A#, B, C, C#, D, D#, E, F, F#, G, G#.
 - Cyrillic `С` at the beginning of a filename was treated as Latin `C` for analysis only. Original filenames remain unchanged.
 
@@ -14,7 +14,7 @@ Status: deterministic filename/manifest audit only. No audio was auditioned or a
 |---|---|---:|---|
 | ALL MARTIN | ROOT | 25 | 12 major + 12 minor roots, plus one C minor 7-labelled file |
 | ALL MARTIN | 7 | 23 | 12 maj7 roots; 11 min7 roots |
-| ALL MARTIN | Вверх | 21 | 10 major + 11 minor labels |
+| ALL MARTIN | Вверх | 24* | 12 major + 12 minor labels (owner-confirmed correction) |
 | ALL MARTIN | кода | 24 | 12 major + 12 minor labels |
 | ALL MARTIN | сус | 24 | 12 major + 12 minor labels |
 | ALL TAYLOR | ROOT | 24 | 12 major + 12 minor labels |
@@ -30,7 +30,7 @@ Folder labels such as `сус` are retained as source-folder labels only. They d
 ### ALL MARTIN
 - ROOT: none in the 12-root major/minor set; one additional C min7-labelled file is present.
 - 7: C min7 is absent.
-- Вверх: A# maj, D# maj, and D# min are absent.
+- Вверх: none; A# maj, D# maj, and D# min are now present (owner-confirmed correction).
 - кода: none in the 12-root major/minor set.
 - сус: none in the 12-root major/minor set.
 
@@ -45,7 +45,7 @@ Folder labels such as `сус` are retained as source-folder labels only. They d
 
 The project owner has separately confirmed the following filename-level gaps and variation candidate:
 - ALL MARTIN / 7: C min7 absent.
-- ALL MARTIN / Вверх: A# maj, D# maj, D# min absent.
+- ALL MARTIN / Вверх: A# maj, D# maj, and D# min are now present; the previous missing-coverage entries are closed.
 - ALL TAYLOR / вверх: D# maj and D# min are now present; the previous missing-coverage entries are closed.
 - ALL TAYLOR / Сус: A maj absent.
 - ALL TAYLOR / Кода: two A maj takes are present and should be retained as separate candidates for performance variation.
