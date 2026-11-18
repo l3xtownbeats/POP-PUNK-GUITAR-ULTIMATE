@@ -73,3 +73,18 @@ The planned extraction/mapping stage must:
 The Manager's output is consumed by the plugin's per-key playback engine: MIDI key → pitch-specific approved note clip → independent voice playback. The plugin handles real-time note-on/note-off, polyphony and release; the Manager handles source analysis, extraction, metadata, review and mapping preparation.
 
 **Safety:** this is a target capability, not part of the current 0.2.0 scanner. The current scanner remains read-only inventory/SFZ audit until the extraction stage is implemented and tested. Derived audio must stay in staging pending approval; never modify or move source files automatically.
+
+
+## Extract meaningful guitar patterns; keep full recordings optional
+
+The Manager must not simply add every full WAV as the default asset. It must inspect the recording and identify coherent guitar sections by musical role and changing rhythm/articulation.
+
+- Extract each useful, internally coherent rhythmic guitar passage or pattern as a separate derived WAV clip.
+- When the rhythm or articulation changes, create separate candidates at reliable musical boundaries rather than bundling unlike sections into one asset.
+- Preserve complete phrases and their natural attack/decay; do not arbitrarily chop a pattern into tiny events.
+- Also derive child note/chord events where boundaries and pitch estimates are reliable, retaining parent/child provenance.
+- Retain the complete original recording as an optional whole-take asset/reference. It may be offered as a separate user-selectable item, but it is not the default substitute for extracted patterns.
+- The user must be able to choose the exact extracted pattern/phrase, an individual note asset, or the complete recording where that is deliberately wanted.
+- Store extracted candidates in staging for preview and approval. Do not copy them into FACTORY automatically.
+
+This does not make a full pattern or whole WAV the payload for ordinary MELODY MODE/PATTERN MODE key presses: those modes continue to use their individual pitch-specific note mappings. Full rhythm excerpts and whole takes remain separately selectable library assets for preview or other explicitly supported uses.
