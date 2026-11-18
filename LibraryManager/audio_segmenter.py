@@ -110,6 +110,14 @@ def extract_segments(report: dict[str, Any], staging_root: Path) -> list[dict[st
     clips_dir.mkdir(parents=True, exist_ok=True)
     manifest_dir = root / "manifests"
     manifest_dir.mkdir(parents=True, exist_ok=True)
+    # A pre-existing symlink inside staging must not redirect writes outside it.
+    for directory in (clips_dir, manifest_dir):
+        resolved_directory = directory.resolve()
+        try:
+            resolved_directory.relative_to(root)
+            resolved_directory.relative_to(STAGING_BASE)
+        except ValueError as exc:
+            raise ValueError("Staging subdirectories must not resolve outside staging") from exc
     results = []
     with wave.open(str(source), "rb") as reader:
         params = reader.getparams()
