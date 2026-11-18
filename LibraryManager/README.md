@@ -206,3 +206,20 @@ python pitch_events.py "path\\to\\guitar.wav" --output reports\\pitch_events.jso
 This stage is deliberately monophonic. It is useful for isolated notes and some clean single-note passages, but it is not chord recognition or reliable transcription of dense/distorted guitar. Octave errors, harmonics, overlapping notes and frame-boundary uncertainty must be reviewed. It does not classify palm mute, picking direction, string, velocity layer or instrument role. It never changes source audio; only the separate reviewed extraction tool may create derived files in staging.
 
 Regression coverage: `test_pitch_events.py` checks a 440 Hz tone, a two-note pitch change, silence and invalid parameters. GitHub Actions runs the full `test_*.py` suite on push and pull request.
+
+
+## Experimental polyphonic pitch candidates (0.1.0)
+
+`polyphonic_candidates.py` adds a dependency-free spectral candidate stage:
+- evaluates MIDI-range fundamentals with weighted harmonic support using a bounded Goertzel analysis;
+- tracks simultaneous pitch hypotheses across overlapping frames;
+- exports time-bounded pitch-event candidates with salience/confidence and provenance;
+- marks every event `NEEDS_MUSICAL_REVIEW` and every source license `UNREVIEWED`.
+
+Run from `LibraryManager`:
+
+```bat
+python polyphonic_candidates.py "path\\to\\guitar.wav" --output reports\\polyphonic_candidates.json
+```
+
+This is **not chord recognition or verified polyphonic transcription**. Spectral peaks and harmonic support can be misleading on distorted guitars, dense mixes, detuned notes and phase-cancelled recordings. The module does not assign chord names, inversions, strings, frets, articulations, velocity layers or engine roles. All results require listening and human review. It reads source WAV only and never extracts, moves or modifies audio. Regression tests use synthetic simultaneous tones and silence.
