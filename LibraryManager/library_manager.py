@@ -17,6 +17,13 @@ VELOCITY_RE = re.compile(r"(?i)(?:vel|velocity|v)(?:ocity)?[_\-\s]*(\d{1,3})")
 STRING_RE = re.compile(r"(?i)(?:string|str|s)[_\-\s]*([1-6])")
 ARTICULATION_WORDS = ("palm", "mute", "pm", "harmonic", "slide", "pick", "finger",
                       "sustain", "release", "staccato", "legato", "choke", "up", "down")
+# Exclude clearly non-guitar instrument labels from the guitar-library scan.
+EXCLUDED_LABELS = {"piano", "bell", "drum"}
+EXCLUDED_LABEL_RE = re.compile(r"(?i)(?<![a-z0-9])(piano|bell|drum)(?![a-z0-9])")
+
+def is_excluded_label(path: Path) -> bool:
+    """Return True when any path component contains a standalone excluded label."""
+    return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -112,7 +119,9 @@ def main():
         print("ERROR: incoming folder not found:", incoming)
         print("Expected: Samples/Import Sample Guitar")
         return 2
-    files = sorted(p for p in incoming.rglob("*") if p.is_file())
+    all_files = sorted(p for p in incoming.rglob("*") if p.is_file())
+    excluded_files = [p for p in all_files if is_excluded_label(p.relative_to(incoming))]
+    files = [p for p in all_files if not is_excluded_label(p.relative_to(incoming))]
     con = None if args.no_cache else load_cache(reports / "scan_cache.sqlite3")
     jobs = []
     for p in files:
@@ -158,7 +167,8 @@ def main():
     write_csv(reports / "sfz_sample_references.csv", sfz_rows)
     (reports / "exact_duplicates.json").write_text(json.dumps(duplicates, ensure_ascii=False, indent=2), encoding="utf-8")
     summary = {"version":"0.2.0", "samples_root":str(samples), "incoming_folder":str(incoming),
-               "files_scanned":len(rows), "wav_files":sum(r["extension"] in AUDIO_EXT for r in rows),
+               "files_scanned":len(rows), "files_excluded_by_label":len(excluded_files),
+               "excluded_labels":sorted(EXCLUDED_LABELS), "wav_files":sum(r["extension"] in AUDIO_EXT for r in rows),
                "sfz_files":sum(r["extension"] in SFZ_EXT for r in rows),
                "archives_for_manual_review":sum(r["extension"] in ARCHIVE_EXT for r in rows),
                "exact_duplicate_groups":len(duplicates), "sfz_sample_references":len(sfz_rows),
@@ -167,7 +177,7 @@ def main():
                "sfz_missing_includes":sum(r["status"]=="INCLUDE_MISSING" for r in sfz_rows),
                "sfz_include_cycles":sum(r["status"]=="INCLUDE_CYCLE" for r in sfz_rows),
                "sfz_read_errors":sum(str(r["status"]).startswith("SFZ_READ_ERROR") for r in sfz_rows),
-               "note":"Scan-only. No source files were moved, renamed, deleted, or overwritten."}
+               "note":"Scan-only. Piano/Bell/Drum-labeled paths are excluded; no source files were moved, renamed, deleted, or overwritten."}
     (reports / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print("Reports:", reports)
