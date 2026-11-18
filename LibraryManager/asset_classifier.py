@@ -32,7 +32,7 @@ def _onsets(env, dt):
 
 def _regularity(onsets):
     intervals=[b-a for a,b in zip(onsets,onsets[1:])]
-    if len(intervals)<3: return 0.0
+    if len(intervals)<2: return 0.0
     mean=statistics.fmean(intervals)
     return max(0.0,min(1.0,1.0-statistics.pstdev(intervals)/mean)) if mean else 0.0
 
@@ -79,7 +79,7 @@ def classify_wav(path: Path, short_max_seconds: float=1.25,
         evidence=["Short duration and few envelope attacks support a one-shot candidate."]
     elif duration>=long_min_seconds:
         kind="SAMPLE"
-        if len(onsets)>=4 and regularity>=0.55:
+        if len(onsets)>=3 and regularity>=0.55:
             if distinct>=3 and pitch_event_count>=4:
                 subtype="RHYTHMIC_MELODY"
                 confidence=min(0.90,0.68+regularity*0.15)
@@ -92,13 +92,13 @@ def classify_wav(path: Path, short_max_seconds: float=1.25,
                 subtype="RHYTHMIC_UNRESOLVED"
                 confidence=0.60
                 evidence=["Regular attack pattern detected, but pitch evidence is insufficient to distinguish a fixed rhythm pattern from a melodic rhythm."]
-        elif len(onsets)>=3:
-            subtype="MULTI_HIT"; confidence=0.68
-            evidence=["Long recording contains several separated attack candidates without stable rhythmic periodicity."]
         elif distinct>=3 and pitch_event_count>=3:
             subtype="MELODIC"
             confidence=0.65
             evidence=["Several changing pitch candidates detected; a clear repeated rhythmic pulse was not established."]
+        elif len(onsets)>=3:
+            subtype="MULTI_HIT"; confidence=0.68
+            evidence=["Long recording contains several separated attack candidates without stable rhythmic periodicity."]
         elif _median(env[-max(1,round(0.15/dt)):]) / max(peak,1e-9)>=0.35:
             subtype="SUSTAIN"; confidence=0.70
             evidence=["Long sustained energy without a clear repeated attack pattern."]
