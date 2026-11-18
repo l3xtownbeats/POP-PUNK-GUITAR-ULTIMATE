@@ -56,6 +56,12 @@ The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compil
 - Copy/sort mode remains a separate future stage requiring preview, collision checks, checksum verification, a transaction journal and rollback.
 
 
+## Critical rule: duplicates are not the same as similar sounds
+
+The Library Manager must distinguish exact file duplicates from similar guitar tones, performances and musical sequences. **It is forbidden to delete, merge or suppress files because their timbre, notes, chords, rhythm, riff or melody is similar.** Same riff in a different tone, take, articulation, velocity layer, voicing, octave or performance is a separate valuable asset. Similarity is for tagging, linking, filtering and auditioning only.
+
+The current exact-duplicate report uses SHA-256 identity and reports identical bytes; it does not delete anything. Any future perceptual near-duplicate detector must produce review-only candidates and must not perform automatic cleanup. Timbre similarity, rhythmic similarity, melodic/interval similarity, chord-sequence similarity and performance similarity must be represented as separate relationship dimensions. See [DUPLICATE_AND_SIMILARITY_POLICY.md](../docs/DUPLICATE_AND_SIMILARITY_POLICY.md) for the mandatory rules.
+
 ## Required preparation for MELODY MODE and PATTERN MODE
 
 The Library Manager is responsible for preparing pitch-specific playable note material for the plugin; it must not merely catalogue a long source recording or assign one identical clip to every MIDI key.
