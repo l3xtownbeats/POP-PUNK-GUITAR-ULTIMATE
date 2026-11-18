@@ -297,3 +297,22 @@ Compare a new WAV against a previously generated fingerprint JSON:
 `python audio_fingerprint.py "path/to/other.wav" --compare reports/fingerprint.json`
 
 **Important boundary:** this is an experimental fingerprint foundation, not a production-grade Shazam implementation. It is intended to find possible shared recorded material or derivatives. It does not identify that two different performances play the same riff, and it does not calculate timbre/rhythm/melody/chord/riff similarity. Those remain separate analysis dimensions. A fingerprint match is never permission to delete, merge, suppress or automatically route assets. Originals remain untouched.
+
+
+## Read-only batch fingerprint index (0.1.0)
+
+`fingerprint_index.py` applies the experimental landmark fingerprint stage to an incoming folder:
+- recursively discovers WAV/WAVE files;
+- fingerprints files in parallel with a bounded worker count;
+- builds an inverted landmark index to shortlist possible shared-recording candidates without comparing every file pair;
+- reports exact SHA-256 duplicate groups separately from possible audio-passage relationships;
+- records per-file analysis errors and a safety declaration;
+- never changes, moves, deletes, merges or routes source files.
+
+Run from `LibraryManager`:
+
+```bat
+python fingerprint_index.py "..\\Samples\\Import Sample Guitar" --output reports\\fingerprint_relationships.json
+```
+
+The index currently uses in-memory candidate generation and has a hard cap of 100,000 candidate pairs. It is an initial batch foundation, not yet a persistent/resumable fingerprint database. Fingerprint relationships remain review-only. Similar riffs, tones, rhythms, melodies and performances are not duplicates; musical similarity analysis is a separate future subsystem.
