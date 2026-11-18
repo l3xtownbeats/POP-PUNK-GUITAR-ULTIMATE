@@ -88,3 +88,16 @@ The Manager must not simply add every full WAV as the default asset. It must ins
 - Store extracted candidates in staging for preview and approval. Do not copy them into FACTORY automatically.
 
 This does not make a full pattern or whole WAV the payload for ordinary MELODY MODE/PATTERN MODE key presses: those modes continue to use their individual pitch-specific note mappings. Full rhythm excerpts and whole takes remain separately selectable library assets for preview or other explicitly supported uses.
+
+## Approved instrument architecture reference
+
+The approved product direction follows the broad player-facing workflow of Native Instruments SESSION GUITARIST — ELECTRIC SUNBURST DELUXE, implemented with original code and legally distributable source material. The architecture has two complementary engines:
+
+- **PATTERN INSTRUMENT:** chord input drives a selected guitar rhythm/pattern performance; chord changes adapt the harmony while retaining the selected pattern identity wherever mappings support it.
+- **MELODY INSTRUMENT:** ordinary MIDI keys play pitch-specific individual note clips. The already-approved note-playable PATTERN MODE remains distinct: one key triggers one note clip with the selected articulation/performance character.
+
+Do not create a third standalone CHORD/PERFORMANCE instrument: chord-driven pattern performance belongs to PATTERN INSTRUMENT. Do not confuse that chord-driven engine with the existing one-key/one-note PATTERN MODE contract. Pattern Browser, documented MIDI Key Switches, articulation/performance controls, host-tempo sync where supported, and the project's own effects/tone section are planned player-facing capabilities.
+
+The Manager must prepare both kinds of content: pitch-specific note assets/mappings for MELODY INSTRUMENT and note-playable PATTERN MODE; coherent rhythm/pattern/phrase assets plus reviewed chord/performance mapping candidates for PATTERN INSTRUMENT. It must preserve provenance, confidence and license/review state, and keep derived audio in staging until approval.
+
+**This is an approved target architecture, not a statement that the chord-performance engine, chord recognition, Pattern Browser, Key Switches or extraction pipeline are implemented.** See docs/KEYBOARD_PLAYBACK_SPEC.md, section 14, for the full requirements and acceptance criteria.
