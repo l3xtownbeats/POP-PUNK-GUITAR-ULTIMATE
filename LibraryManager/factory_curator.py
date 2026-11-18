@@ -112,15 +112,19 @@ def promote_asset(manifest_path: Path, factory_root: Path, staging_root: Path,
     destination_dir.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite existing FACTORY asset: {destination}")
+    sidecar = destination.with_suffix(destination.suffix + ".json")
+    if sidecar.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FACTORY manifest: {sidecar}")
+    created_destination = False
     # Exclusive creation prevents accidental replacement of an existing file.
     try:
         with source.open("rb") as src, destination.open("xb") as dst:
+            created_destination = True
             shutil.copyfileobj(src, dst, length=1024 * 1024)
         copied_hash = sha256_file(destination)
         if copied_hash != plan["source_sha256"]:
             destination.unlink()
             raise IOError("Copied asset hash mismatch; incomplete copy was removed")
-        sidecar = destination.with_suffix(destination.suffix + ".json")
         sidecar_record = {
             "factory_asset_path": str(destination),
             "factory_sha256": copied_hash,
@@ -139,7 +143,7 @@ def promote_asset(manifest_path: Path, factory_root: Path, staging_root: Path,
                 "factory_sha256": copied_hash, "sidecar_path": str(sidecar)}
     except Exception:
         # Remove only a partial file created by this invocation, never the source.
-        if destination.exists() and destination.stat().st_size != source.stat().st_size:
+        if created_destination and destination.exists():
             destination.unlink()
         raise
 
