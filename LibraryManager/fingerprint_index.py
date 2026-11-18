@@ -15,6 +15,12 @@ from audio_fingerprint import FINGERPRINT_VERSION, compare_fingerprints, fingerp
 AUDIO_EXTENSIONS = {".wav", ".wave"}
 MIN_SHARED_HASHES = 8
 MAX_CANDIDATE_PAIRS = 100_000
+EXCLUDED_LABELS = {"piano", "bell", "drum"}
+EXCLUDED_LABEL_RE = __import__("re").compile(r"(?i)(?<![a-z0-9])(piano|bell|drum)(?![a-z0-9])")
+
+def is_excluded_label(path: Path) -> bool:
+    """Exclude non-guitar labels in any path component, case-insensitively."""
+    return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
 
 
 def sha256_file(path: Path) -> str:
@@ -30,8 +36,14 @@ def build_fingerprint_index(root: Path, workers: int | None = None) -> dict:
     root = root.expanduser().resolve(strict=True)
     if not root.is_dir():
         raise ValueError("Input root must be a directory")
-    paths = sorted((p for p in root.rglob("*")
-                    if p.is_file() and p.suffix.lower() in AUDIO_EXTENSIONS),
+    all_paths = sorted((p for p in root.rglob("*")
+                        if p.is_file() and p.suffix.lower() in AUDIO_EXTENSIONS),
+                       key=lambda p: str(p).casefold())
+    excluded_count = sum(1 for p in all_paths if is_excluded_label(p.relative_to(root)))
+    paths = [p for p in all_paths if not is_excluded_label(p.relative_to(root))]
+    paths.sort(key=lambda p: str(p).casefold())
+    # Piano, Bell and Drum labels are intentionally outside the guitar scan.
+    #
                    key=lambda p: str(p).casefold())
     worker_count = max(1, workers or min(8, os.cpu_count() or 2))
     records = []
@@ -93,6 +105,8 @@ def build_fingerprint_index(root: Path, workers: int | None = None) -> dict:
         "fingerprint_version": FINGERPRINT_VERSION,
         "root": str(root),
         "files_discovered": len(paths),
+        "files_excluded_by_label": excluded_count,
+        "excluded_labels": sorted(EXCLUDED_LABELS),
         "files_fingerprinted": len(records),
         "files_with_errors": len(errors),
         "exact_duplicate_groups": exact_duplicates,
