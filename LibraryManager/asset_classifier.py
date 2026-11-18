@@ -111,12 +111,42 @@ def classify_wav(path: Path, short_max_seconds: float=1.25,
     loop_candidate=bool(kind=="SAMPLE" and subtype in ("RHYTHM_PATTERN","RHYTHMIC_MELODY") and regularity>=0.75 and len(onsets)>=5)
     evidence += [f"Duration {duration:.3f}s; {len(onsets)} envelope attack candidates; rhythmic regularity {regularity:.2f}.",
                  f"Pitch tracker: {pitch['pitch_tracker']}; {pitch_event_count} pitch events; {distinct} distinct pitch candidates."]
+    # Metadata-only note cut suggestions. No audio is physically split here.
+    fragment_candidates = []
+    for event in pitch.get("events", []):
+        fragment_candidates.append({
+            "fragment_id": f"NOTE-{len(fragment_candidates)+1:04d}",
+            "fragment_type_candidate": "NOTE",
+            "start_seconds": event["start_seconds"],
+            "end_seconds": event["end_seconds"],
+            "duration_seconds": event["duration_seconds"],
+            "midi_note_candidate": event["midi_note_candidate"],
+            "note_name_candidate": event["note_name_candidate"],
+            "confidence": event["mean_confidence"],
+            "review_status": "NEEDS_MUSICAL_REVIEW"
+        })
+    if subtype == "RHYTHM_PATTERN":
+        content_type = "REPEATING_GUITAR_RHYTHM"
+    elif subtype == "RHYTHMIC_MELODY":
+        content_type = "GUITAR_MELODY_WITH_RHYTHMIC_PULSE"
+    elif subtype == "MELODIC":
+        content_type = "GUITAR_MELODY"
+    elif subtype == "SUSTAIN":
+        content_type = "SUSTAINED_TONE_OR_CHORD"
+    elif subtype == "MULTI_HIT":
+        content_type = "MULTIPLE_GUITAR_HITS"
+    else:
+        content_type = "UNRESOLVED_GUITAR_AUDIO"
     return {
-        "classifier_version":"0.2.0",
+        "classifier_version":"0.3.0",
         "source":str(path.resolve()),"duration_seconds":round(duration,6),
         "asset_kind_candidate":kind,"sample_subtype_candidate":subtype,
+        "content_type_candidate":content_type,
         "rhythm_behavior_candidate":("REPEATING_STABLE_PATTERN" if subtype=="RHYTHM_PATTERN" else
                                      "RHYTHMIC_PITCH_SEQUENCE" if subtype=="RHYTHMIC_MELODY" else "UNRESOLVED"),
+        "fragment_candidates": fragment_candidates,
+        "fragment_count": len(fragment_candidates),
+        "fragment_policy": "METADATA_CUT_PROPOSALS_ONLY",
         "loop_candidate":loop_candidate,
         "loop_status":"CANDIDATE_ONLY" if loop_candidate else "NOT_ESTABLISHED",
         "classification_confidence":round(confidence,3),"evidence":evidence,
