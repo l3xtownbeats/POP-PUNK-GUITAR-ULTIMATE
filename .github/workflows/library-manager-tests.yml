@@ -19,6 +19,6 @@ jobs:
           python-version: "3.11"
       - name: Compile Python modules
         run: python -m compileall -q LibraryManager
-      - name: Run SFZ parser regression tests
+      - name: Run Library Manager regression tests
         working-directory: LibraryManager
-        run: python -m unittest -v test_sfz_parser.py
+        run: python -m unittest discover -v -p "test_*.py"
