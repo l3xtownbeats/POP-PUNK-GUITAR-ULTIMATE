@@ -23,7 +23,9 @@ def _onsets(env, dt):
     floor=max(0.006,max(env)*0.10)
     rises=[max(0.0,env[i]-env[i-1]) for i in range(1,len(env))]
     positive=[x for x in rises if x>0]
-    threshold=max(0.008,_median(positive)*2.5,max(rises,default=0)*0.18)
+    # Use a lower robust threshold: median positive slope can be large for
+    # decaying one-shot pulses, so multiplying it by 2.5 suppresses real attacks.
+    threshold=max(0.004,_median(positive)*0.70,max(rises,default=0)*0.12)
     result=[]; last=-10**9
     for i,rise in enumerate(rises,1):
         if rise>=threshold and env[i]>=floor and (i-last)*dt>=0.075:
