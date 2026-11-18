@@ -104,7 +104,7 @@ def analyze_pitch_events(path: Path, *, frame_ms: int = 40,
     for item in frames:
         midi = item["midi_note"]
         if midi is None:
-            if groups and groups[-1][-1]["midi_note"] is not None:
+            if groups and groups[-1] and groups[-1][-1]["midi_note"] is not None:
                 groups.append([])
             continue
         if not groups or not groups[-1] or groups[-1][-1]["midi_note"] != midi:
