@@ -1,116 +1,72 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "POP PUNK GUITAR LIBRARY MANAGER ULTIMATE",
-  "profiles": [
-    {
-      "profile_id": "punk_rock_guitars_priority_001",
-      "display_name": "PUNK ROCK GUITARS™",
-      "priority": 1,
-      "scan_order": 1,
-      "status": "REGISTERED_PENDING_LOCAL_SCAN",
-      "source_location": null,
-      "source_location_note": "Resolve the actual folder or archive on the user's PC at first local scan. Do not assume a path or that source audio is present in this repository.",
-      "scan_policy": {
-        "preserve_originals": true,
-        "read_only_source_scan": true,
-        "extract_to_staging_only": true,
-        "require_review_before_factory": true,
-        "require_license_review_before_redistribution": true,
-        "do_not_auto_promote_to_factory": true
-      },
-      "analysis_targets": [
-        "single_notes",
-        "one_shots",
-        "open_strings",
-        "power_chords",
-        "open_chords",
-        "chord_progressions",
-        "palm_mute",
-        "downstroke_patterns",
-        "upstroke_patterns",
-        "alternate_strumming",
-        "rhythm_patterns",
-        "articulation_patterns",
-        "short_riffs",
-        "multi_bar_riffs",
-        "loops",
-        "intros",
-        "verse_parts",
-        "chorus_parts",
-        "bridges",
-        "fills",
-        "transitions",
-        "slides",
-        "harmonics",
-        "sustains",
-        "guitar_fx",
-        "whole_take_references"
-      ],
-      "sound_character_tags": [
-        "acoustic",
-        "clean",
-        "crunch",
-        "overdrive",
-        "distortion",
-        "high_gain",
-        "ambient",
-        "lo_fi",
-        "unknown"
-      ],
-      "musical_metadata": [
-        "tempo_bpm_with_confidence",
-        "meter_with_confidence",
-        "key_with_confidence",
-        "note_or_chord_estimates_with_confidence",
-        "articulation",
-        "phrase_length_bars_if_reliable",
-        "source_start_end_time",
-        "source_sample_rate",
-        "source_channels",
-        "source_bit_depth"
-      ],
-      "plugin_mapping": {
-        "purpose": "Build source material candidates for POP PUNK GUITAR ULTIMATE factory presets and sub-presets.",
-        "style_references_are_tags_not_identity_claims": true,
-        "allow_one_asset_in_multiple_preset_categories": true,
-        "store_audio_asset_once_and_link_categories_in_metadata": true
-      },
-      "output_policy": {
-        "preferred_audio_format": "WAV",
-        "encoding": "PCM",
-        "default_bit_depth": 24,
-        "sample_rate_policy": "Preserve source rate unless an explicitly approved conversion is required.",
-        "retain_original_phrase_context": true,
-        "multi_level_segmentation": [
-          "onset_and_transient_events",
-          "individual_note_or_chord_shots",
-          "articulation_and_rhythm_patterns",
-          "musically_coherent_riffs_and_phrases",
-          "whole_take_reference"
+  "profiles": [{
+    "profile_id": "punk_rock_guitars_priority_001",
+    "display_name": "PUNK ROCK GUITARS™",
+    "priority": 1,
+    "scan_order": 1,
+    "status": "REGISTERED_PENDING_LOCAL_SCAN",
+    "source_location": null,
+    "source_location_note": "Resolve the actual folder or archive on the user's PC at first local scan. Do not assume a path or that source audio is present in this repository.",
+    "scan_policy": {
+      "preserve_originals": true,
+      "read_only_source_scan": true,
+      "extract_to_staging_only": true,
+      "require_review_before_factory": true,
+      "require_license_review_before_redistribution": true,
+      "do_not_auto_promote_to_factory": true
+    },
+    "analysis_targets": ["single_notes","one_shots","open_strings","power_chords","open_chords","chord_progressions","palm_mute","downstroke_patterns","upstroke_patterns","alternate_strumming","rhythm_patterns","articulation_patterns","short_riffs","multi_bar_riffs","loops","intros","verse_parts","chorus_parts","bridges","fills","transitions","slides","harmonics","sustains","guitar_fx","whole_take_references"],
+    "sound_character_tags": ["acoustic","clean","crunch","overdrive","distortion","high_gain","ambient","lo_fi","unknown"],
+    "musical_metadata": ["tempo_bpm_with_confidence","meter_with_confidence","key_with_confidence","note_or_chord_estimates_with_confidence","articulation","phrase_length_bars_if_reliable","source_start_end_time","source_sample_rate","source_channels","source_bit_depth"],
+    "plugin_mapping": {
+      "purpose": "Build source material candidates for POP PUNK GUITAR ULTIMATE factory presets and sub-presets.",
+      "style_references_are_tags_not_identity_claims": true,
+      "allow_one_asset_in_multiple_preset_categories": true,
+      "store_audio_asset_once_and_link_categories_in_metadata": true,
+      "plugin_loads_selected_derived_clip_not_entire_source_recording": true,
+      "parent_loop_and_child_clip_relationships_must_be_preserved": true
+    },
+    "output_policy": {
+      "preferred_audio_format": "WAV",
+      "encoding": "PCM",
+      "default_bit_depth": 24,
+      "sample_rate_policy": "Preserve source rate unless an explicitly approved conversion is required.",
+      "retain_original_phrase_context": true,
+      "staging_directory": "LibraryManager/staging",
+      "factory_destination": "Samples/FACTORY",
+      "multi_resolution_extraction": {
+        "enabled": true,
+        "strategy": "Create linked candidate levels from each source; do not choose only one segmentation size.",
+        "levels": [
+          {"id":"whole_take","purpose":"Keep full performance as reference."},
+          {"id":"musical_phrase","purpose":"Extract coherent riffs, loops, progressions and multi-bar phrases."},
+          {"id":"rhythm_or_articulation_pattern","purpose":"Extract useful rhythmic passages, palm-mute patterns, strumming and chord-hit sequences."},
+          {"id":"note_or_chord_event","purpose":"Extract individual notes, chord hits, slides and harmonics when boundaries are reliable."},
+          {"id":"micro_event","purpose":"Detect attacks for analysis; do not publish automatically without review."}
         ],
-        "staging_directory": "LibraryManager/staging",
-        "factory_destination": "Samples/FACTORY"
+        "loop_decomposition": {
+          "enabled": true,
+          "create_parent_loop_asset": true,
+          "create_child_note_and_chord_candidates": true,
+          "create_child_rhythm_and_phrase_candidates": true,
+          "preserve_parent_child_timing_and_source_offsets": true,
+          "do_not_discard_original_loop_after_child_extraction": true
+        },
+        "boundary_rules": [
+          "Use onset detection as evidence, not as the sole segmentation rule.",
+          "Prefer musical boundaries, beat/bar alignment and phrase coherence when confidence supports them.",
+          "Preserve natural attack and decay; handle boundaries to avoid clicks.",
+          "Do not split a chord or sustained note in the middle merely because its waveform changes.",
+          "Do not split a coherent riff into isolated notes by default; retain both phrase and optional child events.",
+          "Keep uncertain boundaries as review candidates with confidence and editable start/end markers.",
+          "Detect repetitions and suggest representative takes while retaining meaningful performance variations."
+        ]
       },
-      "provenance_required": [
-        "source_relative_path",
-        "source_sha256",
-        "source_start_sample",
-        "source_end_sample",
-        "source_start_seconds",
-        "source_end_seconds",
-        "derived_clip_sha256",
-        "extractor_name_and_version",
-        "classification_and_confidence",
-        "review_status",
-        "license_status"
-      ],
-      "factory_approval_requirements": [
-        "audio_preview_reviewed",
-        "clip_boundaries_checked",
-        "classification_reviewed",
-        "duplicate_check_completed",
-        "license_allows_intended_use_and_distribution"
-      ]
-    }
-  ]
+      "plugin_asset_rule": "Each approved preset assignment points to a specific derived WAV clip or deliberately selected phrase/loop. The plugin must not play the full source recording unless explicitly selected as the asset."
+    },
+    "provenance_required": ["asset_id","parent_asset_id","source_relative_path","source_sha256","source_start_sample","source_end_sample","source_start_seconds","source_end_seconds","derived_clip_sha256","extractor_name_and_version","classification_and_confidence","review_status","license_status"],
+    "factory_approval_requirements": ["audio_preview_reviewed","clip_boundaries_checked","classification_reviewed","duplicate_check_completed","license_allows_intended_use_and_distribution"]
+  }]
 }
