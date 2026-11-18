@@ -44,7 +44,24 @@
         "harmonics",
         "sustains",
         "guitar_fx",
-        "whole_take_references"
+        "whole_take_references",
+        "lead_guitar_lines",
+        "lead_guitar_phrases",
+        "lead_single_note_runs",
+        "palm_muted_single_notes",
+        "palm_muted_chord_hits",
+        "palm_muted_rhythm_patterns",
+        "open_and_muted_mixed_patterns",
+        "guitar_one_shots",
+        "complete_guitar_loops",
+        "loop_phrase_segments",
+        "loop_rhythm_segments",
+        "lead_fills",
+        "bends",
+        "vibrato",
+        "pick_scrapes",
+        "feedback",
+        "swells"
       ],
       "sound_character_tags": [
         "acoustic",
@@ -55,7 +72,12 @@
         "high_gain",
         "ambient",
         "lo_fi",
-        "unknown"
+        "unknown",
+        "lead_guitar",
+        "rhythm_guitar",
+        "palm_muted",
+        "open",
+        "mixed_muted_open"
       ],
       "musical_metadata": [
         "tempo_bpm_with_confidence",
@@ -151,7 +173,74 @@
         "classification_reviewed",
         "duplicate_check_completed",
         "license_allows_intended_use_and_distribution"
-      ]
+      ],
+      "content_analysis": {
+        "required_content_families": [
+          {
+            "id": "one_shots",
+            "label": "One-shots",
+            "inspect": "Detect and catalogue every useful isolated hit or short playable sound; preserve attack, body and natural decay."
+          },
+          {
+            "id": "loops",
+            "label": "Loops",
+            "inspect": "Identify complete musical loops and retain each parent loop while creating linked phrase and event candidates."
+          },
+          {
+            "id": "lead_guitar",
+            "label": "Lead Guitar",
+            "inspect": "Identify lead lines, melodic phrases, single-note runs, hooks, fills, bends, slides, vibrato, harmonics and sustained lead notes."
+          },
+          {
+            "id": "palm_muted",
+            "label": "Palm-muted guitar",
+            "inspect": "Distinguish palm-muted single notes, chord hits, repeated-note patterns, tight rhythmic parts and mixed muted/open passages."
+          },
+          {
+            "id": "rhythm_guitar",
+            "label": "Rhythm Guitar",
+            "inspect": "Identify downstrokes, upstrokes, alternate strumming, chugging, open chords, power chords, syncopation and full rhythm passages."
+          },
+          {
+            "id": "chords_and_progressions",
+            "label": "Chords and progressions",
+            "inspect": "Identify individual chord hits, chord changes, progressions and coherent multi-bar chord parts without destroying their musical context."
+          },
+          {
+            "id": "transitions_and_fx",
+            "label": "Transitions and guitar FX",
+            "inspect": "Identify slides, swells, pick scrapes, feedback, harmonics, noise effects, transitions, endings and fills."
+          }
+        ],
+        "articulation_detail": [
+          "palm_muted",
+          "fully_open",
+          "partially_muted",
+          "downstroke",
+          "upstroke",
+          "alternate_picking",
+          "chugging",
+          "staccato",
+          "sustain",
+          "slide",
+          "bend",
+          "vibrato",
+          "harmonic",
+          "pick_attack",
+          "feedback",
+          "scrape",
+          "unknown"
+        ],
+        "content_relationship_rules": [
+          "Classify each useful item by both content family and musical role; a single asset may carry multiple verified tags.",
+          "Keep one-shot, loop, lead-guitar and palm-muted material as distinct searchable classifications; do not merge them into a generic guitar category.",
+          "For every detected loop, retain the full parent loop and create linked phrase, rhythm-pattern, chord-event and note-event candidates only where boundaries are reliable.",
+          "For lead-guitar recordings, preserve complete melodic lines and coherent phrases as well as optional individual note candidates.",
+          "For palm-muted material, distinguish muted notes/chords from open or mixed articulation passages.",
+          "Record classification confidence and require listening review when the class or articulation is uncertain.",
+          "Do not infer musical key, tempo, chord identity or articulation solely from a filename; analyse audio and retain confidence/unknown when uncertain."
+        ]
+      }
     },
     {
       "profile_id": "future_loops_mosh_punk_guitar_riff_priority_002",
@@ -195,7 +284,24 @@
         "harmonics",
         "sustains",
         "guitar_fx",
-        "whole_take_references"
+        "whole_take_references",
+        "lead_guitar_lines",
+        "lead_guitar_phrases",
+        "lead_single_note_runs",
+        "palm_muted_single_notes",
+        "palm_muted_chord_hits",
+        "palm_muted_rhythm_patterns",
+        "open_and_muted_mixed_patterns",
+        "guitar_one_shots",
+        "complete_guitar_loops",
+        "loop_phrase_segments",
+        "loop_rhythm_segments",
+        "lead_fills",
+        "bends",
+        "vibrato",
+        "pick_scrapes",
+        "feedback",
+        "swells"
       ],
       "sound_character_tags": [
         "acoustic",
@@ -206,7 +312,12 @@
         "high_gain",
         "ambient",
         "lo_fi",
-        "unknown"
+        "unknown",
+        "lead_guitar",
+        "rhythm_guitar",
+        "palm_muted",
+        "open",
+        "mixed_muted_open"
       ],
       "musical_metadata": [
         "tempo_bpm_with_confidence",
@@ -302,7 +413,74 @@
         "classification_reviewed",
         "duplicate_check_completed",
         "license_allows_intended_use_and_distribution"
-      ]
+      ],
+      "content_analysis": {
+        "required_content_families": [
+          {
+            "id": "one_shots",
+            "label": "One-shots",
+            "inspect": "Detect and catalogue every useful isolated hit or short playable sound; preserve attack, body and natural decay."
+          },
+          {
+            "id": "loops",
+            "label": "Loops",
+            "inspect": "Identify complete musical loops and retain each parent loop while creating linked phrase and event candidates."
+          },
+          {
+            "id": "lead_guitar",
+            "label": "Lead Guitar",
+            "inspect": "Identify lead lines, melodic phrases, single-note runs, hooks, fills, bends, slides, vibrato, harmonics and sustained lead notes."
+          },
+          {
+            "id": "palm_muted",
+            "label": "Palm-muted guitar",
+            "inspect": "Distinguish palm-muted single notes, chord hits, repeated-note patterns, tight rhythmic parts and mixed muted/open passages."
+          },
+          {
+            "id": "rhythm_guitar",
+            "label": "Rhythm Guitar",
+            "inspect": "Identify downstrokes, upstrokes, alternate strumming, chugging, open chords, power chords, syncopation and full rhythm passages."
+          },
+          {
+            "id": "chords_and_progressions",
+            "label": "Chords and progressions",
+            "inspect": "Identify individual chord hits, chord changes, progressions and coherent multi-bar chord parts without destroying their musical context."
+          },
+          {
+            "id": "transitions_and_fx",
+            "label": "Transitions and guitar FX",
+            "inspect": "Identify slides, swells, pick scrapes, feedback, harmonics, noise effects, transitions, endings and fills."
+          }
+        ],
+        "articulation_detail": [
+          "palm_muted",
+          "fully_open",
+          "partially_muted",
+          "downstroke",
+          "upstroke",
+          "alternate_picking",
+          "chugging",
+          "staccato",
+          "sustain",
+          "slide",
+          "bend",
+          "vibrato",
+          "harmonic",
+          "pick_attack",
+          "feedback",
+          "scrape",
+          "unknown"
+        ],
+        "content_relationship_rules": [
+          "Classify each useful item by both content family and musical role; a single asset may carry multiple verified tags.",
+          "Keep one-shot, loop, lead-guitar and palm-muted material as distinct searchable classifications; do not merge them into a generic guitar category.",
+          "For every detected loop, retain the full parent loop and create linked phrase, rhythm-pattern, chord-event and note-event candidates only where boundaries are reliable.",
+          "For lead-guitar recordings, preserve complete melodic lines and coherent phrases as well as optional individual note candidates.",
+          "For palm-muted material, distinguish muted notes/chords from open or mixed articulation passages.",
+          "Record classification confidence and require listening review when the class or articulation is uncertain.",
+          "Do not infer musical key, tempo, chord identity or articulation solely from a filename; analyse audio and retain confidence/unknown when uncertain."
+        ]
+      }
     }
   ]
 }
