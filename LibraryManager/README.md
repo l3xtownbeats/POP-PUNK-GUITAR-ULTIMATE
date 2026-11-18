@@ -158,3 +158,20 @@ The PATTERN MODE player workflow must be designed and implemented to follow the 
 - rejects invalid ranges, unsupported engines and unsupported compressed WAV input.
 
 This is intentionally a **reviewed-boundary extraction primitive**, not automatic musical segmentation. It does not yet detect notes, chords, bars, loops, tempo, articulation or phrase boundaries by listening to audio. Those require subsequent analysis modules and dedicated test fixtures. Source files remain unchanged, and staged clips are not promoted to FACTORY.
+
+
+## 18. First-pass acoustic WAV analysis (0.1.0)
+
+`audio_analysis.py` adds a dependency-free first-pass analysis report for uncompressed PCM WAV:
+- decodes 8/16/24/32-bit PCM and down-samples analysis workload for long files;
+- reports duration, sample format, peak and frame-RMS level statistics;
+- reports zero-crossing-rate evidence;
+- estimates a dominant monophonic pitch candidate with confidence when the signal supports it;
+- reports onset/energy-change timestamps as **evidence only**;
+- reports an approximate tempo candidate when the onset envelope supports one;
+- writes JSON to stdout or a requested report path.
+
+Run:
+`python audio_analysis.py "path/to/guitar.wav" --output reports/audio_analysis.json`
+
+**Limitations:** this is not yet polyphonic guitar transcription, chord recognition, key detection, reliable meter/bar inference, articulation classification, musical phrase segmentation or automatic clip extraction. Distorted/polyphonic material can confuse pitch estimation. Onsets are not automatically treated as phrase boundaries. Results are candidates and must carry confidence/review status. No source audio is modified.
