@@ -359,3 +359,26 @@ Implement an original, legally independent instrument that follows the same high
 **Reference boundary:** SESSION GUITARIST is a workflow/mechanics benchmark only. Do not copy proprietary code, samples, protected assets, or exact UI artwork. Build original code, mappings, samples with valid redistribution rights, and original UI.
 
 **Acceptance test:** choose a pattern, play a varied sequence of MIDI pitches and note lengths, and confirm that the pitches follow the keys while the chosen rhythmic/playing identity remains recognizable; switch patterns/key-switch articulations and confirm the expected change without breaking note control or triggering a fixed riff.
+
+
+## 18. Locked PATTERN MODE performance-preservation contract
+
+**User confirmation — 2026-11-18: approved and fixed.** PATTERN MODE must preserve and respond to the full musical performance character, not merely retain a rough rhythm label. The implementation and asset-preparation pipeline must account for all of the following dimensions wherever supported by the source material:
+
+1. **Loudness and dynamics:** MIDI velocity layers and response, note-to-note accents, dynamic intensity, and supported expression controls. Velocity must select or shape an appropriate performance layer; do not treat it as only a crude volume knob. Where a source has a real palm-muted/soft-picked velocity transition, preserve and map it rather than inventing one.
+2. **Phrasing:** note grouping, accents, rests, articulation lengths, phrase direction, attack/release character and musical continuity. Preserve phrase context when preparing pattern assets.
+3. **Rhythmic identity:** subdivision, groove, timing feel, swing/shuffle where present, syncopation, gallop, straight/even feel, strumming/picking motion, stops and accents. Do not flatten meaningful rhythmic differences into one generic pattern.
+4. **Selected articulation:** palm mute, open, downstroke, upstroke, alternate picking, tremolo, slides, bends, harmonics, sustain and other articulations only when supported by mapped source material. Switching articulation must change the relevant performance characteristic, not merely its UI label.
+5. **Performance dynamics and nuances:** pick attack, note emphasis, muting, sustain, decay, transitions and other audible playing details that can be reliably identified and mapped.
+6. **Pitch and note identity:** the MIDI key determines the requested pitch; each playable key must use its corresponding pitch-specific guitar note/sample or an explicitly disclosed, bounded and quality-controlled fallback.
+7. **Specific note timbre:** retain the appropriate note's recorded tone, velocity layer, articulation, string/fret/source-note identity and round-robin variation when available. Do not replace every key with the same unrelated recording or erase meaningful note-to-note timbral differences.
+8. **Musical consistency:** changing pitch must not accidentally reset or alter the selected groove, phrasing, articulation, dynamic character or playing style. Conversely, changing the selected pattern/articulation/dynamics must produce the expected audible change while preserving the player's control of note sequence and timing.
+
+**Control and mapping requirements**
+- Keep pattern/feel selection, articulation selection, velocity/dynamics, expression, note pitch, note length and release as distinct but coordinated dimensions.
+- Store per-asset metadata and mapping coverage for pitch, velocity, articulation, string/fret (when known), timing/phrase, source provenance and confidence.
+- Never fabricate missing performance layers or claim an articulation/technique that the audio or trustworthy source metadata does not support.
+- If a dimension is unavailable for a particular note, mark that mapping as missing/limited and report it; use only explicitly documented fallback behavior.
+- This contract applies to PATTERN MODE's note-by-note keyboard workflow and must remain distinct from the chord-driven PATTERN INSTRUMENT.
+
+**Acceptance test:** select a pattern and articulation; play a sequence across different pitches, velocities and note lengths. Verify that pitch and appropriate note timbre change per key, while groove, phrasing, articulation and performance identity remain consistent; verify that velocity/dynamics produce the mapped changes; verify that changing the selected pattern or articulation produces a deliberate audible change; verify missing layers/notes are reported rather than silently fabricated.
