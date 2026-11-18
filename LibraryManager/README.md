@@ -187,3 +187,22 @@ Run after acoustic analysis:
 `python candidate_builder.py reports/audio_analysis.json --output reports/region_candidates.json`
 
 No source audio is modified, no candidate is automatically extracted, and nothing is promoted to FACTORY.
+
+
+## Monophonic pitch-event candidates (0.3.0 development stage)
+
+`pitch_events.py` adds a bounded frame-based YIN-style pitch tracker for WAV review:
+- estimates a pitch hypothesis for short overlapping frames;
+- groups stable adjacent estimates into time-bounded note-event candidates;
+- exports MIDI-note candidates, note names, timing and confidence to JSON;
+- marks every event `NEEDS_MUSICAL_REVIEW` and every source license `UNREVIEWED`.
+
+Run from `LibraryManager`:
+
+```bat
+python pitch_events.py "path\\to\\guitar.wav" --output reports\\pitch_events.json
+```
+
+This stage is deliberately monophonic. It is useful for isolated notes and some clean single-note passages, but it is not chord recognition or reliable transcription of dense/distorted guitar. Octave errors, harmonics, overlapping notes and frame-boundary uncertainty must be reviewed. It does not classify palm mute, picking direction, string, velocity layer or instrument role. It never changes source audio; only the separate reviewed extraction tool may create derived files in staging.
+
+Regression coverage: `test_pitch_events.py` checks a 440 Hz tone, a two-note pitch change, silence and invalid parameters. GitHub Actions runs the full `test_*.py` suite on push and pull request.
