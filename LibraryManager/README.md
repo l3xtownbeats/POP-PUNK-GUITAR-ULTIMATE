@@ -344,3 +344,17 @@ The module classification_schema.py defines a controlled multi-axis metadata sch
 7. Human review confirms musical labels, loop boundaries, tonalities, style and license before a staging asset can be considered for FACTORY.
 
 A loop is not confirmed just because attacks repeat. A key/scale or chord is not confirmed from one uncertain pitch estimate. Structure labels require change/boundary evidence. Similarity helps find and group candidates but never authorizes deletion or merging. Original files are never moved, renamed, overwritten or deleted.
+
+
+## Rhythm evidence analyzer (0.1.0)
+
+`rhythm_analysis.py` adds a separate rhythm-analysis stage that consumes the onset evidence from `audio_analysis.py`:
+- calculates inter-onset intervals and a rhythmic-regularity candidate;
+- ranks plausible BPM hypotheses, retaining half-time/double-time ambiguity instead of asserting one definitive tempo;
+- creates a quantized interval-contour descriptor for search and grouping;
+- marks stable pulse patterns as candidates only, with musical review required.
+
+Run:
+`python rhythm_analysis.py reports/audio_analysis.json --output reports/rhythm_analysis.json`
+
+The descriptor is **not a duplicate identifier** and must never be used to delete, merge or suppress assets. Repeated attacks do not prove a loop seam, meter, downbeat, groove, riff or identical performance. Results inherit the limitations of onset detection and remain review-pending and license-unreviewed. This module reads reports only and does not alter audio.
