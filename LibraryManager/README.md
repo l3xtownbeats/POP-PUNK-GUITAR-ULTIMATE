@@ -101,3 +101,42 @@ Do not create a third standalone CHORD/PERFORMANCE instrument: chord-driven patt
 The Manager must prepare both kinds of content: pitch-specific note assets/mappings for MELODY INSTRUMENT and note-playable PATTERN MODE; coherent rhythm/pattern/phrase assets plus reviewed chord/performance mapping candidates for PATTERN INSTRUMENT. It must preserve provenance, confidence and license/review state, and keep derived audio in staging until approval.
 
 **This is an approved target architecture, not a statement that the chord-performance engine, chord recognition, Pattern Browser, Key Switches or extraction pipeline are implemented.** See docs/KEYBOARD_PLAYBACK_SPEC.md, section 14, for the full requirements and acceptance criteria.
+
+## 15. Two distinct playable content sets — PATTERN INSTRUMENT and MELODY INSTRUMENT
+
+The Manager must prepare and classify source material according to the actual playback job it can serve. It is not enough to put every guitar WAV into one generic folder or make one universal mapping.
+
+### A. PATTERN INSTRUMENT — chord-driven guitar patterns
+
+Prepare coherent, musically useful performances for the chord-driven Pattern Instrument:
+- full rhythm patterns, riffs, strumming figures, arpeggios and multi-bar phrases;
+- power-chord and open-chord performances, chord progressions and chord changes;
+- palm-muted, open, partially muted and mixed muted/open parts;
+- downstroke, upstroke, alternate picking, chugging, syncopation, gallop, stops, accents and other verified rhythmic feels;
+- genre/style tags across pop-punk and related guitar styles, plus tone and articulation tags;
+- phrase boundaries, tempo/meter estimates, chord-event timelines and confidence where analysis supports them.
+
+Keep the coherent pattern/phrase as a selectable asset. Where reliable, also create linked child chord, note and articulation events. Preserve the parent phrase and exact source offsets. Pattern Instrument mappings must identify which patterns can adapt to which chord qualities/voicings. Do not claim a pattern is chord-adaptable merely because it has a chord label; flag unsupported or uncertain chord mappings for review.
+
+### B. MELODY INSTRUMENT — individual guitar notes
+
+Prepare a separate pitch-specific playable note collection:
+- each MIDI key maps to one appropriate individual recorded guitar note/zone;
+- include clean, crunch, overdrive, distortion, acoustic and other available tone families;
+- include verified articulation variants such as palm-muted, open, downstroke, alternate-picked, slide, bend, harmonic and sustain where actual samples exist;
+- retain velocity/dynamic layers, round robins, string/fret/source-note information when present or reliably detectable;
+- generate key-zone maps and explicit missing-note/articulation reports.
+
+The Melody Instrument must not receive a whole riff, chord progression or rhythm loop as the payload for an ordinary note key. A key press plays one mapped guitar note only. Do not fill the keyboard by repeating one unrelated sample across all keys; any bounded pitch-shift fallback must be explicit and quality-controlled.
+
+### C. Cross-library organization
+
+A source recording may contribute to both engines, but the derived assets and mappings must remain distinct and linked to the same source provenance. One audio asset may have multiple verified style/category tags without making duplicate physical copies. Keep the user's single approved Samples root and its three folders unchanged. All newly derived assets remain in LibraryManager/staging until review and license approval.
+
+### Acceptance checks
+
+1. Pattern Instrument browser exposes coherent rhythm/phrase assets and their verified chord/performance compatibility.
+2. Melody Instrument mapping exposes pitch-specific individual guitar notes, not full patterns or chord progressions.
+3. The same source may produce linked assets for both engines without losing parent/child provenance.
+4. Missing pitch zones or unsupported chord adaptations are reported, never silently fabricated.
+5. Pattern and Melody assets can be previewed independently and are routed to the correct engine.
