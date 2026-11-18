@@ -242,3 +242,15 @@ Run:
 The classifier returns confidence, evidence, onset timestamps, review status and license status. It does not infer melody/chord labels or guitar articulations; those require their dedicated analysis stages. All classifications remain `NEEDS_MUSICAL_REVIEW`, all licenses remain `UNREVIEWED`, and source audio is read-only. Thresholds can be adjusted with `--short-max` and `--long-min`.
 
 Regression tests cover a short decaying note, a long repeated pulse train, a sustained tone, silence and source-file immutability.
+
+
+### Rhythm patterns, guitar melodies and note-fragment proposals
+
+The asset classifier now keeps the fact that a file is a `SAMPLE` separate from the musical content inside it:
+
+- `RHYTHM_PATTERN` / `REPEATING_GUITAR_RHYTHM`: repeated, relatively stable pitch content with recurring attacks.
+- `RHYTHMIC_MELODY` / `GUITAR_MELODY_WITH_RHYTHMIC_PULSE`: recurring rhythmic attacks while the detected pitch sequence changes.
+- `MELODIC` / `GUITAR_MELODY`: changing note candidates without a sufficiently stable repeated pulse.
+- `SUSTAIN`, `MULTI_HIT` and `UNKNOWN`: retained as separate content candidates.
+
+Where the monophonic pitch tracker detects note events, the report includes `fragment_candidates`: suggested start/end times, note names, MIDI candidates and confidence. These are cut-point proposals for later library preparation, not exported audio clips yet. The next processing stage must validate boundaries, preserve tails/decays, avoid cutting attacks, and write derived clips only into the approved staging area while leaving originals untouched. Polyphonic chords and distorted guitar phrases must remain review candidates until a suitable polyphonic/segmentation stage can validate them.
