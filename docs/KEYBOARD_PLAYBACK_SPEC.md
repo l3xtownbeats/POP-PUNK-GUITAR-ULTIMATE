@@ -1,0 +1,81 @@
+# Keyboard Playback Specification — MELODY MODE & PATTERN MODE
+
+**Status:** APPROVED / CANONICAL PRODUCT REQUIREMENT  
+**Approved:** 2026-11-18  
+**Project:** POP PUNK GUITAR ULTIMATE
+
+## 1. Core interaction rule
+
+The instrument follows the playable, sample-based guitar-instrument workflow associated with Native Instruments Session Guitarist as a usability and realism reference, while following the project's explicit keyboard rule:
+
+**In BOTH MELODY MODE and PATTERN MODE, one MIDI key press plays one individual note.**
+
+A key must never unexpectedly launch an entire source recording, Guitar Sample, LOOP, RIFF, or multi-bar phrase.
+
+This rule takes precedence over any interpretation of the word “Pattern”.
+
+## 2. MELODY MODE
+
+- Each playable MIDI key addresses an individual note sample or a properly mapped note zone.
+- Pressing one key triggers that note only.
+- Different keys address their corresponding pitches/recorded note variants.
+- Note-on/note-off, release behaviour, velocity layers, round robins and articulation selection are handled per note.
+- Polyphony is supported according to the instrument's voice limit.
+- No full-loop playback is triggered by an ordinary note key.
+
+## 3. PATTERN MODE
+
+PATTERN MODE is also a keyboard-playable note instrument, **not an automatic loop or phrase launcher**.
+
+- Each MIDI key press triggers one individual note event/sample only.
+- The note material may be derived from analyzed rhythm patterns, riffs, loops or phrase recordings.
+- The extraction/analysis system must create independently addressable note-level or event-level WAV clips where appropriate.
+- Pattern-derived notes retain useful performance character: attack, palm mute, pick articulation, note length, dynamics and other verified metadata.
+- The key mapping may select different note articulations, velocity layers or performance variants, but one ordinary key press still produces one note.
+- A complete source loop or riff must not play merely because a key was pressed.
+- No whole-loop pitch shifting, tempo scaling or playback is allowed as a substitute for individual note mapping.
+
+## 4. Source recordings, loops and derived assets
+
+- Original Guitar Samples, WAV files, SFZ banks, loops and riffs remain preserved as source material.
+- The analysis system may retain a whole-take/parent-loop asset for reference and preview.
+- It may derive child assets at multiple resolutions: musical phrase, rhythm/articulation segment, individual note or chord event, and micro-event.
+- Every derived clip must retain provenance: source asset ID/hash, parent asset ID, source start/end sample positions and times, derived clip hash, extractor version, confidence and review state.
+- A derived note clip is loaded and triggered as its own asset. The plugin must not load and play the entire parent recording for an ordinary note mapping.
+- A phrase or whole loop may be auditioned in the library browser as a separate preview action. Such preview behaviour is not the keyboard behaviour of MELODY MODE or PATTERN MODE.
+- Uncertain note boundaries or classifications require confidence metadata and review; do not silently invent precise musical labels.
+
+## 5. Separation of responsibilities
+
+| Component | Responsibility |
+|---|---|
+| MELODY MODE | Play individual mapped guitar notes from the melodic note pool. |
+| PATTERN MODE | Play individual mapped guitar notes/events sourced from pattern/riff-oriented material, retaining their articulation and performance character. |
+| Library preview | Audition a selected whole take, phrase, loop or derived clip outside ordinary keyboard note triggering. |
+| Extraction engine | Preserve parent recordings and create independently addressable derived clips without destructive edits. |
+| Preset mapping | Assign explicit note assets, velocity layers, articulations and variants to MIDI keys. |
+
+A future dedicated phrase/loop playback feature, if ever approved, must be a separate clearly named function (for example, RIFF/LOOP PLAYER) with its own controls. It must not change the one-key/one-note contract of these two modes.
+
+## 6. Acceptance criteria
+
+The implementation is not accepted unless all of the following pass:
+
+1. In MELODY MODE, pressing one MIDI key triggers one note, not a whole loop.
+2. In PATTERN MODE, pressing one MIDI key triggers one note, not a whole loop or phrase.
+3. Different MIDI keys can trigger different mapped notes independently.
+4. Releasing a key follows the mapped note's release behaviour without restarting or continuing an unrelated source recording.
+5. Pattern-derived notes preserve their intended articulation and sample character.
+6. No ordinary note mapping references a full source recording as its playback payload unless that recording was explicitly and intentionally approved as a single note asset.
+7. Full loops and phrases remain available for separate library preview and future separately approved features.
+8. Tests cover both modes and explicitly fail if a key mapping launches a multi-event source loop.
+
+## 7. Non-goals / prohibited behaviour
+
+- Do not turn PATTERN MODE into a one-key-per-loop trigger system.
+- Do not play the complete Guitar Sample/LOOP on every key press.
+- Do not pitch-shift a heterogeneous loop across the keyboard to simulate individual guitar notes.
+- Do not force a variable-tempo or changing-melody loop into one fixed BPM or one note mapping.
+- Do not discard the parent loop after extracting child notes or phrases.
+
+**This document records the user's explicit approval of the one-key/one-note rule for BOTH MELODY MODE and PATTERN MODE. It is a product requirement; it does not claim that the corresponding plugin playback engine has already been implemented or tested.**
