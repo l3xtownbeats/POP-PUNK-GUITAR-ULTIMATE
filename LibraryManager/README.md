@@ -358,3 +358,25 @@ Run:
 `python rhythm_analysis.py reports/audio_analysis.json --output reports/rhythm_analysis.json`
 
 The descriptor is **not a duplicate identifier** and must never be used to delete, merge or suppress assets. Repeated attacks do not prove a loop seam, meter, downbeat, groove, riff or identical performance. Results inherit the limitations of onset detection and remain review-pending and license-unreviewed. This module reads reports only and does not alter audio.
+
+
+## Explicit musical-tag review bridge (0.1.0)
+
+`manifest_reviewer.py` connects staged clip manifests to the FACTORY curator without inventing missing classification data. A human must listen to/review the clip and explicitly supply all three primary folder tags: instrument family, asset role and tone family.
+
+Example (run from `LibraryManager`):
+
+```bat
+python manifest_reviewer.py "staging\\clips\\<asset-id>.json" --instrument ELECTRIC_GUITAR --role RHYTHM_PATTERN --tone DISTORTION --reviewed-by "your reviewer ID" --confirm-musical-review
+```
+
+The command:
+- validates the manifest and derived WAV are inside staging and that the WAV SHA-256 matches;
+- accepts only the controlled FACTORY folder vocabulary;
+- preserves all existing musical metadata and adds the three explicitly supplied primary tags;
+- marks musical review complete only after the explicit confirmation flag;
+- records who reviewed the tags and when;
+- **does not change license_status**. A separate license review must set `LICENSE_APPROVED` before the curator will accept the asset;
+- writes the manifest atomically and never edits the staged WAV or original source.
+
+Then run `factory_curator.py` in dry-run mode to inspect the proposed folder and gates. Actual copying still requires a separate explicit `--approve`. No automatic promotion or overwrite is allowed.
