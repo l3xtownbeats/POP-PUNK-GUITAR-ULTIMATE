@@ -31,6 +31,18 @@ class SfzParserTests(unittest.TestCase):
             rows=parse_sfz_file(main,root)
             self.assertTrue(any(r["status"]=="INCLUDE_CYCLE" for r in rows))
 
+    def test_multiple_regions_keep_individual_ranges(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"a.wav").write_bytes(b"a")
+            (root/"b.wav").write_bytes(b"b")
+            sfz=root/"multi.sfz"
+            sfz.write_text('<region> sample="a.wav" lokey=40 hikey=45\\n<region> sample="b.wav" lokey=46 hikey=50\\n',encoding="utf-8")
+            rows=parse_sfz_file(sfz,root)
+            self.assertEqual(len(rows),2)
+            self.assertEqual([r["sample_opcode"] for r in rows],["a.wav","b.wav"])
+            self.assertEqual(rows[1]["lokey"],46)
+
     def test_missing_sample(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
