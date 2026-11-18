@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -16,7 +17,7 @@ AUDIO_EXTENSIONS = {".wav", ".wave"}
 MIN_SHARED_HASHES = 8
 MAX_CANDIDATE_PAIRS = 100_000
 EXCLUDED_LABELS = {"piano", "bell", "drum"}
-EXCLUDED_LABEL_RE = __import__("re").compile(r"(?i)(?<![a-z0-9])(piano|bell|drum)(?![a-z0-9])")
+EXCLUDED_LABEL_RE = re.compile(r"(?i)(?<![a-z0-9])(piano|bell|drum)(?![a-z0-9])")
 
 def is_excluded_label(path: Path) -> bool:
     """Exclude non-guitar labels in any path component, case-insensitively."""
@@ -43,8 +44,6 @@ def build_fingerprint_index(root: Path, workers: int | None = None) -> dict:
     paths = [p for p in all_paths if not is_excluded_label(p.relative_to(root))]
     paths.sort(key=lambda p: str(p).casefold())
     # Piano, Bell and Drum labels are intentionally outside the guitar scan.
-    #
-                   key=lambda p: str(p).casefold())
     worker_count = max(1, workers or min(8, os.cpu_count() or 2))
     records = []
     errors = []
