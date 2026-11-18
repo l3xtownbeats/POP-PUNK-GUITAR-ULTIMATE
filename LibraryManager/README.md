@@ -145,3 +145,16 @@ A source recording may contribute to both engines, but the derived assets and ma
 ## 16. Mandatory PATTERN MODE product workflow reference
 
 The PATTERN MODE player workflow must be designed and implemented to follow the high-level interaction mechanics of Native Instruments SESSION GUITARIST – ELECTRIC SUNBURST DELUXE Pattern mode. This is a mandatory functional benchmark, not merely a visual reference. The selected pattern/playing feel remains consistent while the player's MIDI notes determine the changing pitches. Pattern selection, playable keys, key switches, dynamics, note lengths/release and articulation changes must work as one coherent playable instrument. Do not trigger a fixed prerecorded riff on every key. Prepare pitch-specific note assets and mappings for the playable range, report missing notes, and disclose any bounded pitch-shift fallback. Keep this separate from the chord-driven PATTERN INSTRUMENT workflow. Use only original implementation, original UI and properly licensed audio; do not copy proprietary code or protected assets. See `docs/KEYBOARD_PLAYBACK_SPEC.md`, section 17, for acceptance criteria.
+
+
+## 17. First implemented extraction primitive — reviewed WAV ranges (0.1.0)
+
+`asset_pipeline.py` now provides a real, tested foundation for creating derived audio clips without touching the source:
+- extracts an explicitly reviewed sample-frame range from uncompressed PCM WAV;
+- preserves source sample rate, channels and sample width;
+- writes the derived clip only to `LibraryManager/staging/clips`;
+- creates a JSON sidecar with source/derived SHA-256, exact sample/time offsets, parent ID, asset kind, engine targets, extractor version and review/license status;
+- allows one derived clip to target more than one engine without making duplicate audio copies;
+- rejects invalid ranges, unsupported engines and unsupported compressed WAV input.
+
+This is intentionally a **reviewed-boundary extraction primitive**, not automatic musical segmentation. It does not yet detect notes, chords, bars, loops, tempo, articulation or phrase boundaries by listening to audio. Those require subsequent analysis modules and dedicated test fixtures. Source files remain unchanged, and staged clips are not promoted to FACTORY.
