@@ -149,8 +149,11 @@ def main():
                   for h, paths in by_hash.items() if len(paths) > 1]
     def write_csv(path, data):
         if not data: path.write_text("", encoding="utf-8-sig"); return
+        fieldnames = list(dict.fromkeys(key for row in data for key in row.keys()))
         with path.open("w", newline="", encoding="utf-8-sig") as f:
-            w = csv.DictWriter(f, fieldnames=list(data[0].keys())); w.writeheader(); w.writerows(data)
+            w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            w.writeheader()
+            w.writerows(data)
     write_csv(reports / "inventory.csv", sorted(rows, key=lambda x: x["relative_path"].lower()))
     write_csv(reports / "sfz_sample_references.csv", sfz_rows)
     (reports / "exact_duplicates.json").write_text(json.dumps(duplicates, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -161,6 +164,9 @@ def main():
                "exact_duplicate_groups":len(duplicates), "sfz_sample_references":len(sfz_rows),
                "sfz_missing_references":sum(r["status"]=="MISSING" for r in sfz_rows),
                "sfz_outside_library_references":sum(r["status"]=="OUTSIDE_LIBRARY" for r in sfz_rows),
+               "sfz_missing_includes":sum(r["status"]=="INCLUDE_MISSING" for r in sfz_rows),
+               "sfz_include_cycles":sum(r["status"]=="INCLUDE_CYCLE" for r in sfz_rows),
+               "sfz_read_errors":sum(str(r["status"]).startswith("SFZ_READ_ERROR") for r in sfz_rows),
                "note":"Scan-only. No source files were moved, renamed, deleted, or overwritten."}
     (reports / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
