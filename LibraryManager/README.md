@@ -140,3 +140,8 @@ A source recording may contribute to both engines, but the derived assets and ma
 3. The same source may produce linked assets for both engines without losing parent/child provenance.
 4. Missing pitch zones or unsupported chord adaptations are reported, never silently fabricated.
 5. Pattern and Melody assets can be previewed independently and are routed to the correct engine.
+
+
+## 16. Mandatory PATTERN MODE product workflow reference
+
+The PATTERN MODE player workflow must be designed and implemented to follow the high-level interaction mechanics of Native Instruments SESSION GUITARIST – ELECTRIC SUNBURST DELUXE Pattern mode. This is a mandatory functional benchmark, not merely a visual reference. The selected pattern/playing feel remains consistent while the player's MIDI notes determine the changing pitches. Pattern selection, playable keys, key switches, dynamics, note lengths/release and articulation changes must work as one coherent playable instrument. Do not trigger a fixed prerecorded riff on every key. Prepare pitch-specific note assets and mappings for the playable range, report missing notes, and disclose any bounded pitch-shift fallback. Keep this separate from the chord-driven PATTERN INSTRUMENT workflow. Use only original implementation, original UI and properly licensed audio; do not copy proprietary code or protected assets. See `docs/KEYBOARD_PLAYBACK_SPEC.md`, section 17, for acceptance criteria.
