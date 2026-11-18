@@ -342,3 +342,20 @@ One source recording may supply both Pattern and Melody assets. The Manager stor
 - If the selected feel cannot be represented at a particular pitch because the required note sample is missing, report the missing mapping or use only an explicitly documented quality-controlled fallback.
 
 **Acceptance test:** select one pattern/feel, play a sequence of different MIDI pitches, and verify that the notes change to the requested pitches while the same rhythmic articulation/feel is retained; verify that each key triggers one note only.
+
+
+## 17. Mandatory Session Guitarist-inspired PATTERN MODE interaction
+
+**User requirement — 2026-11-18:** PATTERN MODE must follow the recognizable player workflow and playing mechanics of the Pattern mode in Native Instruments SESSION GUITARIST – ELECTRIC SUNBURST DELUXE. This is a mandatory product-level reference, not an optional visual inspiration.
+
+Implement an original, legally independent instrument that follows the same high-level interaction principles:
+- Select/browse a playing pattern or performance style, then play it from the keyboard using the instrument's defined playable-key and key-switch layout.
+- The selected rhythmic identity must remain consistent as the player changes the played pitch: rhythm/feel and selected articulation stay; the actual guitar pitch follows the MIDI note.
+- The user remains in control of the notes and their timing. Do not turn an ordinary playable-key press into an unrelated fixed prerecorded riff or melody.
+- Pattern selection, playable-note range, key switches, velocity/dynamics, note-off/release and transitions must behave coherently as one playable instrument, not as a disconnected sample audition list.
+- Use suitable pitch-specific source material/mappings for each playable note. Missing mappings must be reported; any pitch-shift fallback must be bounded, quality-controlled and disclosed.
+- Preserve the separate PATTERN INSTRUMENT chord-driven workflow specified elsewhere. Do not conflate it with this note-by-note PATTERN MODE.
+
+**Reference boundary:** SESSION GUITARIST is a workflow/mechanics benchmark only. Do not copy proprietary code, samples, protected assets, or exact UI artwork. Build original code, mappings, samples with valid redistribution rights, and original UI.
+
+**Acceptance test:** choose a pattern, play a varied sequence of MIDI pitches and note lengths, and confirm that the pitches follow the keys while the chosen rhythmic/playing identity remains recognizable; switch patterns/key-switch articulations and confirm the expected change without breaking note control or triggering a fixed riff.
