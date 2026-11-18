@@ -207,3 +207,19 @@ The Library Manager must prepare the actual source material needed by the instru
 **Responsibility split:** Library Manager = analyse, extract, label, validate and prepare pitch-specific note assets/mappings. Plugin = load the approved mappings and play the corresponding individual note voice. Both are required for the intended behaviour.
 
 The user explicitly confirmed this combined requirement on 2026-11-18. This is an approved specification only; it does not claim the extraction, mapping, or plugin playback implementation is complete or tested.
+
+
+## 13. Selectable extracted rhythm segments versus the complete source recording
+
+The user clarifies that the Library Manager must identify and extract the guitar part or rhythmic passage that is actually useful, rather than automatically treating the entire source WAV as one playable asset.
+
+- Analyse the full source recording and locate coherent sections with a specific guitar role, rhythm, articulation or musical pattern.
+- Extract each useful section as its own standalone derived WAV asset, using musical boundaries and preserving the complete rhythmic figure/phrase where possible.
+- If the rhythmic figure changes within the source, split it into separate meaningful sections at reliable musical boundaries; do not combine different patterns into one misleading asset.
+- Do not cut a coherent pattern arbitrarily or reduce it to isolated notes unless useful child note events can be identified without destroying the pattern's musical context.
+- The complete original WAV/whole take may also be retained as a separate selectable asset or library preview, but it must not be forced into every preset or keyboard mapping.
+- In the library browser/preset assignment workflow, the user must be able to choose between an extracted rhythm/pattern segment, another extracted phrase/clip, an individual note asset, or the complete recording when deliberately desired.
+- Every selectable derived segment retains its exact source offsets, parent relationship, hash, classification confidence and review/license state.
+- The plugin loads the exact asset selected for that assignment. A selected rhythm segment is not silently replaced by the entire source WAV; a whole recording is loaded only when the user explicitly chooses it for a separately supported playback/preview use.
+
+This selection rule does not change the MELODY MODE/PATTERN MODE keyboard contract: ordinary key presses in those modes still trigger one mapped individual note clip each, not a full rhythm segment or complete recording. Full rhythm segments and whole takes are selectable library/preset assets for separate preview or any separately approved playback feature.
