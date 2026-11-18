@@ -223,3 +223,70 @@ The user clarifies that the Library Manager must identify and extract the guitar
 - The plugin loads the exact asset selected for that assignment. A selected rhythm segment is not silently replaced by the entire source WAV; a whole recording is loaded only when the user explicitly chooses it for a separately supported playback/preview use.
 
 This selection rule does not change the MELODY MODE/PATTERN MODE keyboard contract: ordinary key presses in those modes still trigger one mapped individual note clip each, not a full rhythm segment or complete recording. Full rhythm segments and whole takes are selectable library/preset assets for separate preview or any separately approved playback feature.
+
+## 14. Approved overall instrument architecture — SESSION GUITARIST workflow reference
+
+**User approval: confirmed and fixed on 2026-11-18.** The primary workflow and usability reference for POP PUNK GUITAR ULTIMATE is Native Instruments SESSION GUITARIST — ELECTRIC SUNBURST DELUXE. The project should follow the same broad instrument organization and player-facing logic, adapted to pop-punk guitar and implemented with original code, original UI assets and legally distributable source recordings. This is a functional/product reference only; it does not authorize copying proprietary samples, code, protected UI assets or other content.
+
+### 14.1 Two complementary instrument engines
+
+The product is organized around two complementary playing engines, not an arbitrary collection of unrelated modes:
+
+**A. PATTERN INSTRUMENT — chord-driven guitar performance**
+- The player selects a rhythm/pattern/performance style in the Pattern Browser.
+- The player supplies chord input on the MIDI keyboard (or uses the supported chord-input/Auto Chord workflow).
+- The engine interprets the incoming chord and performs it using the selected guitar pattern, preserving the pattern's rhythmic identity while adapting the notes/voicing to the played chord.
+- Pattern performance is synchronized to the host DAW tempo where the selected pattern and source material support reliable synchronization.
+- The engine must support appropriate pattern variations, chord changes, transitions/endings and performance articulations when corresponding approved material and mappings exist.
+- This is the chord-triggered performance workflow. It is distinct from the one-key/one-note keyboard contract defined for MELODY MODE and the note-playable PATTERN MODE below.
+
+**B. MELODY INSTRUMENT — note-by-note guitar performance**
+- The player performs individual notes directly from MIDI keys.
+- Each key triggers its own pitch-appropriate mapped note asset/zone, with independent note-on/note-off and voice handling.
+- The player can perform freely chosen melodies, riffs and arpeggios; the instrument must not substitute a fixed prerecorded melody for the player's note sequence.
+- Articulations and playing styles can be selected using the supported performance controls and MIDI Key Switches.
+
+### 14.2 Keep the already-approved keyboard PATTERN MODE contract
+
+The existing MELODY MODE and PATTERN MODE requirements in sections 1–13 remain in force and are not silently redefined by the new PATTERN INSTRUMENT engine:
+- In both keyboard note-playable modes, one ordinary MIDI note key triggers one pitch-specific individual note clip only.
+- In note-playable PATTERN MODE, the selected note articulation/performance character remains consistent across different pitches wherever suitable mappings exist; the player's MIDI notes determine the sequence.
+- The chord-driven PATTERN INSTRUMENT is a separate engine/workflow that interprets chord input and performs a selected pattern. It must not be confused with the note-playable PATTERN MODE contract.
+- Do not add a third standalone CHORD/PERFORMANCE instrument merely to represent chord-driven pattern playing. That capability belongs inside PATTERN INSTRUMENT.
+
+### 14.3 Player-facing workflow and controls
+
+The product architecture must provide, subject to available approved content:
+- a Pattern Browser for discovering and selecting guitar patterns and performance styles;
+- MIDI Key Switches or an equivalent clearly documented MIDI control scheme for pattern selection, articulation changes and supported special performance commands;
+- chord input and chord/voicing interpretation for PATTERN INSTRUMENT;
+- articulation/performance controls for the MELODY INSTRUMENT;
+- dynamics and expressive performance controls;
+- host-tempo synchronization for compatible patterns;
+- an effects and tone section for the project's own guitar processing, amp/cabinet and effects design.
+
+Controls must have explicit MIDI mappings, documented ranges/defaults and visible state. Do not claim a control is implemented until it exists and passes tests. Do not assume proprietary internal behaviour of the reference product where public documentation does not establish it; implement and document our own technically sound equivalent.
+
+### 14.4 Library Manager preparation responsibilities
+
+The Library Manager must prepare the content and mappings required by both engines:
+- For MELODY INSTRUMENT and note-playable PATTERN MODE: extract and validate pitch-specific individual note clips, articulation variants, velocity/dynamic layers where detectable, and key-zone mapping candidates.
+- For PATTERN INSTRUMENT: identify coherent guitar rhythm/pattern/phrase candidates, chord changes and chord-event candidates where reliably detectable, phrase boundaries, tempo/meter estimates with confidence, performance style/articulation and suitable transposition/voicing metadata.
+- Preserve each parent recording and maintain exact source offsets, parent/child relationships, hashes, extractor version, confidence and review/license status.
+- Prepare pattern/chord mapping candidates that allow the performance engine to adapt the selected rhythmic identity to incoming chord input. Do not claim automatic chord recognition is reliable until measured and tested; uncertain chord labels must be marked for review.
+- Keep derived assets in staging. Promotion to Samples/FACTORY requires the established human review, audio validation, duplicate checks and license approval. Never modify or relocate source recordings automatically.
+- If a source recording cannot safely support a requested note, chord, pattern or articulation mapping, report the missing/uncertain content instead of fabricating it or silently substituting an unrelated clip.
+
+### 14.5 Product acceptance criteria
+
+1. PATTERN INSTRUMENT accepts chord input and performs the selected compatible guitar pattern using the corresponding chord tones/voicing mapping.
+2. A chord change changes the harmonic content while retaining the selected pattern identity wherever the mapping supports it.
+3. Compatible patterns follow host tempo without destroying their musical phrasing; unsupported/uncertain tempo behaviour is reported.
+4. MELODY INSTRUMENT plays independently mapped pitch-specific notes from ordinary MIDI keys.
+5. The existing note-playable PATTERN MODE still plays one mapped note per ordinary MIDI key and retains the selected articulation across pitches where mapped.
+6. Pattern selection and articulation commands use documented controls/Key Switches and do not accidentally trigger ordinary notes.
+7. Missing chord, pitch, articulation or pattern mappings are reported; no silent unrelated sample substitution.
+8. Library Manager outputs preserve source provenance and remain staged until review and license approval.
+9. Tests distinguish chord-triggered pattern performance from note-triggered single-note playback and verify that neither workflow accidentally invokes the other.
+
+**Status note:** This section records the user's approved product architecture and requirements. It is not a claim that the chord engine, MIDI controls, browser, chord recognition, extraction pipeline, plugin playback or acceptance tests have already been implemented or passed.
