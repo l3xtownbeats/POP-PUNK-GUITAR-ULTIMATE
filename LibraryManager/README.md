@@ -254,3 +254,23 @@ The asset classifier now keeps the fact that a file is a `SAMPLE` separate from 
 - `SUSTAIN`, `MULTI_HIT` and `UNKNOWN`: retained as separate content candidates.
 
 Where the monophonic pitch tracker detects note events, the report includes `fragment_candidates`: suggested start/end times, note names, MIDI candidates and confidence. These are cut-point proposals for later library preparation, not exported audio clips yet. The next processing stage must validate boundaries, preserve tails/decays, avoid cutting attacks, and write derived clips only into the approved staging area while leaving originals untouched. Polyphonic chords and distorted guitar phrases must remain review candidates until a suitable polyphonic/segmentation stage can validate them.
+
+## Conservative Audio Segmenter (0.1.0)
+
+`audio_segmenter.py` is the first opt-in extraction stage for monophonic note-event candidates.
+
+- Dry-run is the default: it reports proposed source sample ranges and creates no audio files.
+- It consumes the existing pitch-event candidates and adds configurable pre-roll/post-roll so the pick attack and note decay are less likely to be cut off.
+- Extraction requires the explicit `--extract` flag and is restricted to `LibraryManager/staging`.
+- Derived PCM WAV clips preserve the source sample rate, channel count and sample width. Each clip receives a JSON sidecar with exact sample/time offsets, source and derived SHA-256, pitch candidate, confidence, parent provenance and review/license status.
+- Stable content-derived IDs make a repeated extraction refuse to overwrite an existing clip or manifest.
+- Source hashes are checked before and after extraction. Originals are never modified and staged material is never promoted to FACTORY.
+
+Dry-run:
+`python audio_segmenter.py "path/to/guitar.wav" --output reports/segment_proposals.json`
+
+Explicit staging extraction:
+`python audio_segmenter.py "path/to/guitar.wav" --extract`
+
+**Important limitations:** this is a conservative monophonic note-event segmenter, not complete musical transcription. It does not yet identify polyphonic chord boundaries, reliable reverb-tail endpoints, bars, coherent rhythm phrases, repeated riffs, strings, frets, palm mute or picking articulation. Pre-roll/post-roll are safeguards, not proof that every attack or effect tail is preserved. All outputs remain `NEEDS_MUSICAL_REVIEW` and `UNREVIEWED`; listen before approval. Use the reviewed-range extraction workflow when exact musical boundaries have been approved.
+
