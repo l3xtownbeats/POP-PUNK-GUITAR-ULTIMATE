@@ -54,3 +54,22 @@ The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compil
 - Archives are inventoried only; they are not extracted.
 - Unsupported files are skipped, not deleted.
 - Copy/sort mode remains a separate future stage requiring preview, collision checks, checksum verification, a transaction journal and rollback.
+
+
+## Required preparation for MELODY MODE and PATTERN MODE
+
+The Library Manager is responsible for preparing pitch-specific playable note material for the plugin; it must not merely catalogue a long source recording or assign one identical clip to every MIDI key.
+
+The planned extraction/mapping stage must:
+
+- identify individual note events inside WAV/SFZ-backed recordings, riffs, loops and longer phrases where boundaries are reliable;
+- export each approved candidate as an independently addressable derived WAV clip in staging, preserving the source recording untouched;
+- record exact source start/end sample positions, source and derived SHA-256, estimated MIDI pitch/note and confidence, articulation/performance character, velocity/dynamic layer where detectable, parent asset and review/license status;
+- prepare distinct pitch-specific note-zone candidates for both MELODY MODE and PATTERN MODE;
+- for PATTERN MODE, associate compatible pitch-specific notes with the same selected articulation/performance style (for example palm mute or downstroke), so changing MIDI pitch changes the note sound without changing the selected playing character;
+- retain whole takes, parent loops and coherent phrases as parent/reference assets, with child note clips linked to their exact source offsets;
+- report uncertain boundaries, uncertain note estimates and missing pitch/articulation zones for human review rather than inventing labels or silently reusing unrelated sounds.
+
+The Manager's output is consumed by the plugin's per-key playback engine: MIDI key → pitch-specific approved note clip → independent voice playback. The plugin handles real-time note-on/note-off, polyphony and release; the Manager handles source analysis, extraction, metadata, review and mapping preparation.
+
+**Safety:** this is a target capability, not part of the current 0.2.0 scanner. The current scanner remains read-only inventory/SFZ audit until the extraction stage is implemented and tested. Derived audio must stay in staging pending approval; never modify or move source files automatically.
