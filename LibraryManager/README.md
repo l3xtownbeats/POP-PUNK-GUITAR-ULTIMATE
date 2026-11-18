@@ -316,3 +316,31 @@ python fingerprint_index.py "..\\Samples\\Import Sample Guitar" --output reports
 ```
 
 The index currently uses in-memory candidate generation and has a hard cap of 100,000 candidate pairs. It is an initial batch foundation, not yet a persistent/resumable fingerprint database. Fingerprint relationships remain review-only. Similar riffs, tones, rhythms, melodies and performances are not duplicates; musical similarity analysis is a separate future subsystem.
+
+
+## Primary organization target: sound, musical content and guitar identity
+
+The Manager's main job is to prepare a deeply classified, searchable and playable guitar sample library—not merely to find duplicate files. Classification is multi-axis: one asset may carry several verified tags without creating duplicate copies.
+
+Required independent dimensions:
+- **Asset/content:** one-shot, individual note, chord, note sequence, melody phrase, rhythmic melody, rhythm pattern, riff, loop candidate/confirmed loop, multi-hit, sustain, full take and ambience/effect.
+- **Instrument:** electric guitar, acoustic guitar, nylon guitar, steel-string guitar, bass guitar and unknown/other.
+- **Tone:** clean, edge-of-breakup, crunch, overdrive, distortion, fuzz, natural acoustic, processed and DI.
+- **Playing/articulation:** open, palm mute, muted, downstroke, upstroke, alternate/tremolo picking, chugging, arpeggio, strum, finger-picked, slide, bend, harmonic, legato, staccato and sustain.
+- **Musical role and style:** rhythm guitar, lead, melody, chords, arpeggio, bass line, texture; pop-punk, punk rock, skate punk, alternative rock, power pop, pop rock, emo and related styles.
+- **Musical coordinates:** note/pitch, chord/root/quality, key and mode candidates, tuning, BPM/range, meter, beat unit and groove.
+- **Arrangement structure:** intro, verse, pre-chorus, chorus, post-chorus, bridge, breakdown, solo, interlude, outro, fill and turnaround, each with exact source time bounds when evidence supports them.
+
+The module classification_schema.py defines a controlled multi-axis metadata schema. Unknown or unverified fields stay explicitly UNKNOWN/null; it is forbidden to invent a key, chord, tempo, guitar type, style or song section merely to fill a folder. Every proposed label carries confidence/evidence and remains review-pending until checked. The schema validates source provenance, review/license states and the no-destructive-action rule.
+
+### Segmentation and library preparation order
+
+1. Preserve and inventory the incoming original; calculate SHA-256 and retain provenance.
+2. Analyze the complete recording before cutting: instrument/tone evidence, attacks, notes, simultaneous pitches, rhythm, tempo, tonal center/key, chord candidates and arrangement changes.
+3. Identify coherent musical regions: individual sounds/notes, chords, rhythmic hits, riffs, melody phrases, rhythm patterns, loops and larger song sections.
+4. Propose boundaries with pre-roll and natural decay/reverb tails; preserve full parent recording and exact sample/time offsets.
+5. Generate child clips/manifests only in LibraryManager/staging; link every child to its parent and retain hashes, confidence, analyzer version and license state.
+6. Tag and group assets by all verified dimensions. Do not make physical copies merely to place one sound in several searches/categories.
+7. Human review confirms musical labels, loop boundaries, tonalities, style and license before a staging asset can be considered for FACTORY.
+
+A loop is not confirmed just because attacks repeat. A key/scale or chord is not confirmed from one uncertain pitch estimate. Structure labels require change/boundary evidence. Similarity helps find and group candidates but never authorizes deletion or merging. Original files are never moved, renamed, overwritten or deleted.
