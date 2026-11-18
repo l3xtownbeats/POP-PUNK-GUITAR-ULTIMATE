@@ -26,8 +26,8 @@ class SfzParserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)/"Samples"; root.mkdir()
             main=root/"main.sfz"; child=root/"child.sfz"
-            main.write_text('#include "child.sfz"\\n',encoding="utf-8")
-            child.write_text('#include "main.sfz"\\n',encoding="utf-8")
+            main.write_text('#include "child.sfz"\n',encoding="utf-8")
+            child.write_text('#include "main.sfz"\n',encoding="utf-8")
             rows=parse_sfz_file(main,root)
             self.assertTrue(any(r["status"]=="INCLUDE_CYCLE" for r in rows))
 
@@ -35,7 +35,7 @@ class SfzParserTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
             sfz=root/"test.sfz"
-            sfz.write_text('<region> sample="absent.wav" lovel=20 hivel=80\\n',encoding="utf-8")
+            sfz.write_text('<region> sample="absent.wav" lovel=20 hivel=80\n',encoding="utf-8")
             rows=parse_sfz_file(sfz,root)
             self.assertEqual(rows[0]["status"],"MISSING")
             self.assertEqual(rows[0]["hivel"],80)
