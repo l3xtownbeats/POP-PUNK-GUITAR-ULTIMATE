@@ -187,3 +187,23 @@ The user clarifies that the instrument must do more than trigger a selected sour
 6. Confirm missing pitch/articulation zones are reported rather than silently mapped to an unrelated sound.
 
 **This section clarifies and strengthens the existing one-key/one-note and pitch-responsive PATTERN MODE requirements. It is a specification, not a claim that the sampler engine or tests are already implemented.**
+
+
+## 12. Explicit confirmation and Library Manager responsibility
+
+**User-approved and fixed requirement:** the pitch-specific, independent note extraction and mapping described in this specification is a responsibility of BOTH the plugin architecture and POP PUNK GUITAR LIBRARY MANAGER ULTIMATE.
+
+The Library Manager must prepare the actual source material needed by the instrument; this is not solely a plugin-side feature.
+
+- Analyse source recordings, loops, riffs and phrases to identify individual note events and their exact source sample ranges wherever reliable.
+- Produce independently addressable derived WAV note clips in staging, with pitch/note estimate, confidence, articulation, velocity/dynamic layer where detectable, source provenance and review state.
+- Build pitch-specific note-zone/mapping candidates for MELODY MODE and PATTERN MODE. The mapping must not assign the same unrelated audio clip to every key.
+- For PATTERN MODE, group compatible pitch-specific note assets under a shared performance-style/articulation definition so the playing character remains consistent while MIDI pitch changes.
+- Preserve parent recordings, complete loops and musical phrases; extracted note clips are linked children, not destructive replacements.
+- Flag uncertain boundaries, uncertain pitch/chord estimates and missing pitch/articulation zones for review. Do not fabricate note identities or silently fill missing zones with unrelated samples.
+- Keep extraction outputs in staging until the user reviews and approves them. Promotion into Samples/FACTORY requires the established audio, classification, duplicate and license checks.
+- The plugin consumes the Manager's approved note assets and mappings, then performs per-key, per-voice playback with independent note-on/note-off and release handling.
+
+**Responsibility split:** Library Manager = analyse, extract, label, validate and prepare pitch-specific note assets/mappings. Plugin = load the approved mappings and play the corresponding individual note voice. Both are required for the intended behaviour.
+
+The user explicitly confirmed this combined requirement on 2026-11-18. This is an approved specification only; it does not claim the extraction, mapping, or plugin playback implementation is complete or tested.
