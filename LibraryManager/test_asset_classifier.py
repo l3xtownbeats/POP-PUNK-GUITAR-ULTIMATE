@@ -40,8 +40,30 @@ class AssetClassifierTests(unittest.TestCase):
             write_signal(p, 4.0, pulse_train)
             result=classify_wav(p)
             self.assertEqual(result["asset_kind_candidate"], "SAMPLE")
-            self.assertEqual(result["sample_subtype_candidate"], "RHYTHMIC")
+            self.assertEqual(result["sample_subtype_candidate"], "RHYTHM_PATTERN")
+            self.assertEqual(result["content_type_candidate"], "REPEATING_GUITAR_RHYTHM")
             self.assertGreaterEqual(result["features"]["onset_count"], 4)
+
+
+    def test_long_guitar_melody_is_sample_and_proposes_note_fragments(self):
+        pitches = [220.0, 277.18, 329.63, 392.0]
+        def melody(t):
+            slot = int(t / 0.8)
+            if slot >= len(pitches):
+                return 0.0
+            local = t - slot * 0.8
+            if local >= 0.62:
+                return 0.0
+            return 0.55 * math.sin(2 * math.pi * pitches[slot] * local)
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/"guitar_melody.wav"
+            write_signal(p, 3.4, melody)
+            result=classify_wav(p)
+            self.assertEqual(result["asset_kind_candidate"], "SAMPLE")
+            self.assertIn(result["sample_subtype_candidate"], ("RHYTHMIC_MELODY", "MELODIC"))
+            self.assertEqual(result["content_type_candidate"], "GUITAR_MELODY_WITH_RHYTHMIC_PULSE" if result["sample_subtype_candidate"] == "RHYTHMIC_MELODY" else "GUITAR_MELODY")
+            self.assertGreater(result["fragment_count"], 0)
+            self.assertEqual(result["fragment_policy"], "METADATA_CUT_PROPOSALS_ONLY")
 
     def test_long_sustain_is_sample_but_not_loop(self):
         with tempfile.TemporaryDirectory() as tmp:
