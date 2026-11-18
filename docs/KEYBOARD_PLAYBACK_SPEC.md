@@ -159,3 +159,31 @@ The user explicitly reconfirmed and approved the PATTERN MODE behaviour in this 
 - no ordinary key press launches a prerecorded melody, riff, loop or multi-note recording.
 
 This is a confirmed product requirement. It does not imply that the playback engine, sample mappings or acceptance tests have already been implemented or passed.
+
+
+## 11. Independent note playback and pitch-specific keyboard mapping in BOTH modes
+
+The user clarifies that the instrument must do more than trigger a selected source fragment in either mode. **MELODY MODE and PATTERN MODE must both behave as genuinely playable note-by-note instruments: each MIDI key must trigger its own mapped note, not make every key play the same sound.**
+
+### Required behaviour
+
+- A selected source passage/fragment may be used as source material for extraction and mapping, but ordinary keyboard performance must trigger the individual note asset mapped to the pressed MIDI key.
+- Each MIDI key maps to a specific musical pitch and its own suitable recorded note clip/zone, with its own source range and playback metadata.
+- Pressing C, D, E, F, etc. must produce the corresponding different notes and pitch-appropriate guitar sounds. Do not trigger the same unpitched recording identically on every key.
+- Do not treat a whole multi-note phrase, riff or loop as the note asset for every key. A phrase may be retained as a library asset/preview reference, while its verified child note assets are mapped for keyboard play.
+- In MELODY MODE, the note mappings provide the playable melodic range.
+- In PATTERN MODE, the selected performance style/articulation (such as palm mute or downstroke character) remains consistent across the pitch-specific note mappings, while the player chooses the note sequence and timing.
+- Use actual pitch-appropriate multisamples and velocity/articulation layers wherever available. Do not disguise a single sample repeated across keys as independent recorded notes. Any pitch-shift fallback must be explicit, bounded, quality-controlled and reported in mapping metadata.
+- If a pitch has no suitable note asset for the selected mode/style, report the missing key zone or documented fallback. Never silently substitute the same unrelated sample or trigger a whole phrase.
+- Note-on and note-off must be handled per voice so independently played notes can overlap and release correctly according to the instrument's polyphony/voice settings.
+
+### Acceptance tests for both modes
+
+1. Press several different MIDI keys in MELODY MODE: each selects and plays its own pitch-appropriate note asset.
+2. Repeat in PATTERN MODE with one selected articulation: pitches change with the keys while the selected playing character remains consistent wherever mapped.
+3. Confirm that two different keys do not merely replay the identical same-pitch source clip unless the mapping explicitly identifies a documented fallback.
+4. Confirm each key event plays one note voice, not an entire multi-note source passage.
+5. Confirm overlapping notes have independent voice state and note-off/release handling.
+6. Confirm missing pitch/articulation zones are reported rather than silently mapped to an unrelated sound.
+
+**This section clarifies and strengthens the existing one-key/one-note and pitch-responsive PATTERN MODE requirements. It is a specification, not a claim that the sampler engine or tests are already implemented.**
