@@ -37,7 +37,7 @@ class SfzParserTests(unittest.TestCase):
             (root/"a.wav").write_bytes(b"a")
             (root/"b.wav").write_bytes(b"b")
             sfz=root/"multi.sfz"
-            sfz.write_text('<region> sample="a.wav" lokey=40 hikey=45\\n<region> sample="b.wav" lokey=46 hikey=50\\n',encoding="utf-8")
+            sfz.write_text('<region> sample="a.wav" lokey=40 hikey=45\n<region> sample="b.wav" lokey=46 hikey=50\\n',encoding="utf-8")
             rows=parse_sfz_file(sfz,root)
             self.assertEqual(len(rows),2)
             self.assertEqual([r["sample_opcode"] for r in rows],["a.wav","b.wav"])
