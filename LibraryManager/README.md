@@ -280,3 +280,20 @@ Explicit staging extraction:
 
 **Important limitations:** this is a conservative monophonic note-event segmenter, not complete musical transcription. It does not yet identify polyphonic chord boundaries, reliable reverb-tail endpoints, bars, coherent rhythm phrases, repeated riffs, strings, frets, palm mute or picking articulation. Pre-roll/post-roll are safeguards, not proof that every attack or effect tail is preserved. All outputs remain `NEEDS_MUSICAL_REVIEW` and `UNREVIEWED`; listen before approval. Use the reviewed-range extraction workflow when exact musical boundaries have been approved.
 
+
+
+## Experimental spectral landmark fingerprints (0.1.0)
+
+`audio_fingerprint.py` adds the first deterministic, dependency-free fingerprint foundation:
+- computes windowed FFT spectral peaks and pairs nearby peaks into versioned time-frequency landmark hashes;
+- compares landmark hashes and estimates a coarse time offset;
+- reports a possible shared recorded passage only when there is sufficient aligned evidence;
+- keeps every result in `NEEDS_MUSICAL_REVIEW` and explicitly marks comparison as report-only.
+
+Run:
+`python audio_fingerprint.py "path/to/guitar.wav" --output reports/fingerprint.json`
+
+Compare a new WAV against a previously generated fingerprint JSON:
+`python audio_fingerprint.py "path/to/other.wav" --compare reports/fingerprint.json`
+
+**Important boundary:** this is an experimental fingerprint foundation, not a production-grade Shazam implementation. It is intended to find possible shared recorded material or derivatives. It does not identify that two different performances play the same riff, and it does not calculate timbre/rhythm/melody/chord/riff similarity. Those remain separate analysis dimensions. A fingerprint match is never permission to delete, merge, suppress or automatically route assets. Originals remain untouched.
