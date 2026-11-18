@@ -290,3 +290,42 @@ The Library Manager must prepare the content and mappings required by both engin
 9. Tests distinguish chord-triggered pattern performance from note-triggered single-note playback and verify that neither workflow accidentally invokes the other.
 
 **Status note:** This section records the user's approved product architecture and requirements. It is not a claim that the chord engine, MIDI controls, browser, chord recognition, extraction pipeline, plugin playback or acceptance tests have already been implemented or passed.
+
+## 15. Explicit library preparation split for the two instrument engines
+
+**User-confirmed requirement — 2026-11-18:** the most important Library Manager outcome is to prepare the material so the chord-driven PATTERN INSTRUMENT can perform the available guitar patterns and chord-based parts, while the MELODY INSTRUMENT plays individual guitar notes across the keyboard.
+
+These are two different playback jobs and must have distinct asset mappings.
+
+### 15.1 PATTERN INSTRUMENT content
+
+The Manager must identify and prepare coherent playable guitar patterns, riffs, rhythm parts, arpeggios, chord performances and progressions. It must analyse all supported and relevant guitar styles and techniques, not only pop-punk. Tags may include genre/subgenre, rhythmic feel, chord type/quality, articulation, guitar role and recorded tone.
+
+Where reliable, the Manager must identify chord events and changes within a phrase, record timestamps and confidence, and prepare compatibility metadata for chord-driven performance. It must preserve the musical phrase as a coherent asset and must not reduce every pattern to disconnected notes. Child note/chord events may be extracted as linked analysis/mapping assets where boundaries are reliable.
+
+A pattern may be adapted to incoming chord input only when its recorded/mapped material and voicing metadata support that adaptation. Unsupported chord qualities or uncertain analysis must be reported for review rather than fabricated.
+
+### 15.2 MELODY INSTRUMENT content
+
+The Manager must separately prepare a playable library of individual guitar notes:
+- each ordinary MIDI key maps to one pitch-appropriate individual recorded guitar note/zone;
+- notes are grouped by available tone family and verified articulation/performance character;
+- available velocity/dynamic layers, round robins, string/fret/source-note details are retained;
+- missing pitch/articulation zones are explicitly reported.
+
+An ordinary Melody key press plays one individual guitar note only. It must not launch a riff, chord, progression, pattern or whole source recording. Do not fill missing keys by silently repeating an unrelated sample or using uncontrolled transposition.
+
+### 15.3 Shared source, separate engine mappings
+
+One source recording may supply both Pattern and Melody assets. The Manager stores the audio only once where possible, creates linked derived assets with exact source offsets and parent-child provenance, and exposes separate engine-specific mappings. A single derived asset may carry multiple verified descriptive tags, but it must never be routed to an incompatible playback job merely to fill a category.
+
+### 15.4 Acceptance criteria
+
+1. Pattern Instrument receives coherent pattern/phrase assets and reviewed chord/performance compatibility metadata.
+2. Melody Instrument receives pitch-specific single-note assets and key-zone mappings.
+3. Pattern content is not substituted for individual Melody notes; individual note assets are not mistaken for complete chord-driven patterns.
+4. Both engines can use suitable derived material from the same parent recording while retaining source hashes, offsets, confidence, review and license state.
+5. Unsupported chord adaptation and missing Melody key zones are reported clearly.
+6. Preview and mapping tools identify which engine each asset is intended for.
+
+**This section records the user's approved product requirement. It does not claim that the extraction, chord analysis, mapping or playback functions are implemented yet.**
