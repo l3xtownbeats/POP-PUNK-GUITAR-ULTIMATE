@@ -175,3 +175,15 @@ Run:
 `python audio_analysis.py "path/to/guitar.wav" --output reports/audio_analysis.json`
 
 **Limitations:** this is not yet polyphonic guitar transcription, chord recognition, key detection, reliable meter/bar inference, articulation classification, musical phrase segmentation or automatic clip extraction. Distorted/polyphonic material can confuse pitch estimation. Onsets are not automatically treated as phrase boundaries. Results are candidates and must carry confidence/review status. No source audio is modified.
+
+
+## 19. Conservative preview-region candidate builder (0.1.0)
+
+`candidate_builder.py` converts onset timestamps from an `audio_analysis.py` JSON report into bounded preview-region candidates. Nearby onset evidence is grouped; each region receives a short pre-roll and tail. Very long groups are split only to cap preview duration.
+
+This is a real candidate-generation step, but it is deliberately **not musical segmentation**. The output uses `kind=audio_region_candidate`, `review_status=NEEDS_MUSICAL_REVIEW`, `license_status=UNREVIEWED`, and no fabricated confidence score. It may miss sustained/legato passages that have no detected onset evidence. Candidate boundaries must be listened to and approved before passing exact sample offsets to `asset_pipeline.extract_reviewed_wav`.
+
+Run after acoustic analysis:
+`python candidate_builder.py reports/audio_analysis.json --output reports/region_candidates.json`
+
+No source audio is modified, no candidate is automatically extracted, and nothing is promoted to FACTORY.
