@@ -121,3 +121,28 @@ MELODY MODE remains a playable note-by-note instrument: each key triggers its ma
 5. Automated tests verify pitch-dependent asset selection, consistent articulation selection across mapped pitches, and rejection of whole-loop/multi-note playback on an ordinary key event.
 
 **The user explicitly approved SESSION GUITARIST — ELECTRIC SUNBURST DELUXE as the primary product reference and confirmed this playable-instrument behaviour as a fixed project requirement. This approval records the specification only; it does not claim the plugin engine has already implemented or passed these behaviours.**
+
+
+## 9. PATTERN MODE — same rhythmic feel across changing notes
+
+The user further confirms this exact behaviour:
+
+**When the player changes between different MIDI notes in PATTERN MODE, the selected rhythmic performance character must stay the same, while the actual guitar note/pitch and its corresponding sound change.**
+
+- The selected pattern defines the consistent rhythmic/playing feel and articulation behaviour (for example palm-muted punk rhythm, tight downstroke feel, or another selected performance style).
+- The player can perform different notes while that same feel remains active.
+- Each key press still plays only one individual note segment at the pitch requested by that key. The key does not start a prerecorded riff, melody, loop or multi-note sequence.
+- The note's sound changes naturally with its pitch and pitch-appropriate recorded sample; the common rhythmic feel/articulation remains consistent across the mapped notes.
+- The rhythm of the player's performed sequence follows the timing of the MIDI notes being played. PATTERN MODE must not impose a fixed prerecorded melody or override the player's note sequence.
+- This is not merely one sample transposed to every key: use corresponding pitch-specific recordings/round robins/velocity layers for the selected articulation wherever available, with documented fallbacks for missing zones.
+- If a selected performance style cannot be maintained at a particular pitch because no suitable source recording exists, flag the missing mapping or use a clearly defined quality-controlled fallback; do not silently change to an unrelated articulation.
+
+### Acceptance tests
+
+1. Select one PATTERN MODE performance style and play a sequence of different MIDI pitches: every key triggers its own pitch-appropriate single note clip.
+2. The selected articulation/rhythmic character remains consistent across those notes wherever corresponding samples are mapped.
+3. Changing pitch changes the note and its recorded tonal character; it does not change the selected rhythmic feel.
+4. The timing and order of notes follow the incoming MIDI performance, not a prerecorded loop.
+5. A single key event never triggers a multi-note recording or fixed melody.
+
+**This requirement supplements and does not replace the one-key/one-note rule or the approved SESSION GUITARIST — ELECTRIC SUNBURST DELUXE reference.**
