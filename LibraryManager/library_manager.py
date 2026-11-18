@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""POP PUNK GUITAR LIBRARY MANAGER ULTIMATE — safe inventory engine 0.1.0.
+"""POP PUNK GUITAR LIBRARY MANAGER ULTIMATE — safe inventory engine 0.2.0.
 Scan-only: never moves, renames, deletes, or overwrites source files.
 """
 from __future__ import annotations
 import argparse, csv, hashlib, json, os, re, sqlite3, struct, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from sfz_parser import parse_sfz_file
 
 AUDIO_EXT = {".wav", ".wave"}
 SFZ_EXT = {".sfz"}
@@ -75,30 +76,9 @@ def infer_labels(path: Path) -> dict:
             "string_candidate": sm.group(1) if sm else "", "articulation_candidates": ";".join(arts)}
 
 def parse_sfz(path: Path, root: Path) -> list[dict]:
-    rows = []
-    try: text = path.read_text(encoding="utf-8-sig", errors="replace")
-    except Exception as e:
-        return [{"sfz_file": str(path), "region": "", "sample_opcode": "", "resolved_sample": "",
-                 "status": "SFZ_READ_ERROR:" + type(e).__name__}]
-    current, region_no = {}, 0
-    def emit():
-        sample = current.get("sample", "")
-        if not sample: return
-        candidate = (path.parent / Path(sample.replace("\\", "/"))).resolve()
-        try: candidate.relative_to(root.resolve()); inside = True
-        except Exception: inside = False
-        rows.append({"sfz_file": str(path), "region": region_no, "sample_opcode": sample,
-                     "resolved_sample": str(candidate),
-                     "status": "FOUND" if candidate.is_file() else ("OUTSIDE_LIBRARY" if not inside else "MISSING")})
-    for line in text.splitlines():
-        line = line.split("//", 1)[0].strip()
-        if not line: continue
-        if re.search(r"<\s*region\s*>", line, re.I):
-            emit(); current = {}; region_no += 1
-        for key, value in re.findall(r'([A-Za-z][A-Za-z0-9_]*)\s*=\s*("[^"]*"|\'[^\']*\'|[^\s]+)', line):
-            current[key.lower()] = value.strip('"\'')
-    emit()
-    return rows
+    """Compatibility wrapper around the structured SFZ parser."""
+    return parse_sfz_file(path, root)
+
 
 def load_cache(db: Path):
     con = sqlite3.connect(db)
@@ -174,7 +154,7 @@ def main():
     write_csv(reports / "inventory.csv", sorted(rows, key=lambda x: x["relative_path"].lower()))
     write_csv(reports / "sfz_sample_references.csv", sfz_rows)
     (reports / "exact_duplicates.json").write_text(json.dumps(duplicates, ensure_ascii=False, indent=2), encoding="utf-8")
-    summary = {"version":"0.1.0", "samples_root":str(samples), "incoming_folder":str(incoming),
+    summary = {"version":"0.2.0", "samples_root":str(samples), "incoming_folder":str(incoming),
                "files_scanned":len(rows), "wav_files":sum(r["extension"] in AUDIO_EXT for r in rows),
                "sfz_files":sum(r["extension"] in SFZ_EXT for r in rows),
                "archives_for_manual_review":sum(r["extension"] in ARCHIVE_EXT for r in rows),
