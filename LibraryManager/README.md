@@ -223,3 +223,22 @@ python polyphonic_candidates.py "path\\to\\guitar.wav" --output reports\\polypho
 ```
 
 This is **not chord recognition or verified polyphonic transcription**. Spectral peaks and harmonic support can be misleading on distorted guitars, dense mixes, detuned notes and phase-cancelled recordings. The module does not assign chord names, inversions, strings, frets, articulations, velocity layers or engine roles. All results require listening and human review. It reads source WAV only and never extracts, moves or modifies audio. Regression tests use synthetic simultaneous tones and silence.
+
+
+## Conservative WAV asset-kind classifier (0.1.0)
+
+`asset_classifier.py` adds a first-pass distinction between short one-shot sounds and longer sample assets using duration plus frame-RMS envelope evidence.
+
+- Short recording + one/few attacks + decaying tail → `ONE_SHOT / NOTE_ONE_SHOT` candidate.
+- Longer recording + repeated reasonably regular envelope attacks → `SAMPLE / RHYTHMIC` candidate.
+- Longer recording with several separated attacks → `SAMPLE / MULTI_HIT` candidate.
+- Longer sustained energy without repeated attacks → `SAMPLE / SUSTAIN` candidate.
+- Ambiguous or silent material → `UNKNOWN`.
+- `loop_candidate` is separate from `SAMPLE`; it is only raised for strongly repeated rhythmic evidence and never means a seamless loop has been confirmed.
+
+Run:
+`python asset_classifier.py "path/to/guitar.wav" --output reports/asset_classification.json`
+
+The classifier returns confidence, evidence, onset timestamps, review status and license status. It does not infer melody/chord labels or guitar articulations; those require their dedicated analysis stages. All classifications remain `NEEDS_MUSICAL_REVIEW`, all licenses remain `UNREVIEWED`, and source audio is read-only. Thresholds can be adjusted with `--short-max` and `--long-min`.
+
+Regression tests cover a short decaying note, a long repeated pulse train, a sustained tone, silence and source-file immutability.
