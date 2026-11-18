@@ -133,9 +133,10 @@ def extract_segments(report: dict[str, Any], staging_root: Path) -> list[dict[st
             if len(frames) != expected:
                 raise IOError("Incomplete PCM frame range read from source")
             # Exclusive creation protects against collisions/races.
-            with wave.open(str(clip), "xb") as writer:
-                writer.setparams(params)
-                writer.writeframes(frames)
+            with clip.open("xb") as raw_clip:
+                with wave.open(raw_clip, "wb") as writer:
+                    writer.setparams(params)
+                    writer.writeframes(frames)
             record = {
                 "schema_version": 1,
                 "asset_id": identity,
