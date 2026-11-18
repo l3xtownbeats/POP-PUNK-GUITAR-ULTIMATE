@@ -87,3 +87,37 @@ The implementation is not accepted unless all of the following pass:
 - Do not discard the parent loop after extracting child notes or phrases.
 
 **This document records the user's explicit approval of the one-key/one-note rule for BOTH MELODY MODE and PATTERN MODE, clarified as playback of one specific extracted source segment per key. It is a product requirement; it does not claim that the corresponding extraction or plugin playback engine has already been implemented or tested.**
+
+
+## 8. Primary product reference: SESSION GUITARIST — ELECTRIC SUNBURST DELUXE
+
+**User-approved primary reference:** Native Instruments SESSION GUITARIST — ELECTRIC SUNBURST DELUXE.
+
+This is the project's principal reference for the feel and quality of a playable, realistic sampled electric-guitar instrument: expressive guitar performance, convincing recorded articulations, responsive keyboard playability and coherent musical phrasing. It is a design and quality benchmark, not permission to copy proprietary samples, code, UI assets or protected content.
+
+The user's explicit product distinction is essential: POP PUNK GUITAR ULTIMATE must not be reduced to a basic sampler in which a key merely starts a prerecorded melody or complete riff.
+
+### PATTERN MODE — playable performance, not a fixed recording
+
+- The user plays the notes. MIDI input determines which notes are performed and in what order.
+- Each key press triggers one specific pitch-appropriate, independently mapped note segment.
+- Changing the key changes the note/pitch and its corresponding recorded guitar sound.
+- The selected playing character remains consistent across notes wherever matching source material exists: for example palm-muted, open, picked/downstroke or another selected articulation.
+- The same performance style can therefore be played as different note sequences chosen by the user. It is not one prerecorded melody assigned to a key.
+- Use matching recorded multisamples/note zones for different pitches and articulations wherever available. Do not rely on crude transposition of one unrelated sample or a heterogeneous loop to fake natural guitar notes.
+- Preserve note-specific attack, dynamics, duration, release and verified articulation. Velocity may select dynamics/articulation layers according to the approved mapping.
+- If a suitable pitch/articulation recording is missing, report the missing zone or use a documented, quality-controlled fallback. Never silently launch a whole riff or unrelated recording.
+
+### MELODY MODE
+
+MELODY MODE remains a playable note-by-note instrument: each key triggers its mapped individual note clip, with pitch-appropriate samples and expressive note behaviour. It does not launch a prerecorded melody.
+
+### Additional acceptance criteria
+
+1. In PATTERN MODE, a player can hold the selected playing style and perform a freely chosen sequence of different MIDI pitches.
+2. Changing pitch selects the corresponding pitch-appropriate note asset/zone while retaining the selected articulation/performance character where mapped.
+3. The resulting notes follow the player's MIDI sequence; they do not continue a fixed prerecorded melody or loop.
+4. Both modes remain note-triggered: one key press selects and plays one mapped note segment only.
+5. Automated tests verify pitch-dependent asset selection, consistent articulation selection across mapped pitches, and rejection of whole-loop/multi-note playback on an ordinary key event.
+
+**The user explicitly approved SESSION GUITARIST — ELECTRIC SUNBURST DELUXE as the primary product reference and confirmed this playable-instrument behaviour as a fixed project requirement. This approval records the specification only; it does not claim the plugin engine has already implemented or passed these behaviours.**
