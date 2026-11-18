@@ -329,3 +329,16 @@ One source recording may supply both Pattern and Melody assets. The Manager stor
 6. Preview and mapping tools identify which engine each asset is intended for.
 
 **This section records the user's approved product requirement. It does not claim that the extraction, chord analysis, mapping or playback functions are implemented yet.**
+
+
+## 16. Explicit PATTERN MODE confirmation — preserve the rhythmic pattern while changing pitch
+
+**User clarification — 2026-11-18:** in the keyboard-playable PATTERN MODE, the selected rhythmic/playing pattern must remain recognizably the same while the played guitar note changes according to the MIDI key.
+
+- The selected pattern defines the repeated/consistent rhythmic feel, articulation and performance character (for example a tight palm-muted eighth-note feel or a downstroke punk rhythm).
+- When the player presses a different MIDI key, the pitch and corresponding pitch-specific guitar note sound change; the selected rhythmic feel and articulation remain consistent wherever mapped.
+- The player's MIDI note sequence determines which pitches are played. The engine must not replace the player's sequence with a fixed prerecorded melody or riff.
+- Each ordinary MIDI key still triggers one pitch-specific note event/clip. Pattern identity is expressed through consistent timing/feel/articulation across the player's notes, not by launching a multi-note loop on every key.
+- If the selected feel cannot be represented at a particular pitch because the required note sample is missing, report the missing mapping or use only an explicitly documented quality-controlled fallback.
+
+**Acceptance test:** select one pattern/feel, play a sequence of different MIDI pitches, and verify that the notes change to the requested pitches while the same rhythmic articulation/feel is retained; verify that each key triggers one note only.
