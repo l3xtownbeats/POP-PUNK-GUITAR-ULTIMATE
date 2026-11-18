@@ -146,3 +146,16 @@ The user further confirms this exact behaviour:
 5. A single key event never triggers a multi-note recording or fixed melody.
 
 **This requirement supplements and does not replace the one-key/one-note rule or the approved SESSION GUITARIST — ELECTRIC SUNBURST DELUXE reference.**
+
+
+## 10. Explicit user confirmation — 2026-11-18
+
+The user explicitly reconfirmed and approved the PATTERN MODE behaviour in this specification:
+
+- one selected performance/rhythmic style remains active while the player changes MIDI pitches;
+- each different key selects and plays its own pitch-appropriate individual guitar note clip;
+- the selected articulation and rhythmic playing character remain consistent across mapped notes;
+- the player's MIDI note order and timing determine the performed sequence;
+- no ordinary key press launches a prerecorded melody, riff, loop or multi-note recording.
+
+This is a confirmed product requirement. It does not imply that the playback engine, sample mappings or acceptance tests have already been implemented or passed.
