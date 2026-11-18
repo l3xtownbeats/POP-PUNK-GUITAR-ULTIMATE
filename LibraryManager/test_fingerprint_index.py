@@ -40,6 +40,21 @@ class FingerprintIndexTests(unittest.TestCase):
             self.assertFalse(report["safety"]["source_files_modified"])
             self.assertEqual(before, {p.name: p.read_bytes() for p in (a, b, c)})
 
+    def test_excludes_piano_bell_drum_labeled_paths(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            guitar = root / "Electric Guitar" / "riff.wav"
+            piano = root / "Piano" / "riff.wav"
+            bell = root / "Bell Samples" / "hit.wav"
+            drum = root / "Drum_Loops" / "loop.wav"
+            for path in (guitar, piano, bell, drum):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                self.make_tone(path)
+            report = build_fingerprint_index(root, workers=2)
+            self.assertEqual(report["files_discovered"], 1)
+            self.assertEqual(report["files_fingerprinted"], 1)
+            self.assertEqual(report["files_excluded_by_label"], 3)
+
     def test_ignores_non_wav_files(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
