@@ -53,6 +53,7 @@ class LibraryManagerApp:
         self._cancel_button = None
         self._task_journal = TaskJournal(MANAGER_DIR / 'reports' / 'task_history.jsonl')
         self._active_task_id = None
+        self._active_task_title = None
         self._build()
         self.root.after(100, self._poll_worker_events)
 
@@ -149,6 +150,7 @@ class LibraryManagerApp:
 
         self._job_running = True
         self._cancel_event.clear()
+        self._active_task_title = title
         self._active_task_id = self._task_journal.start(
             title, details={"samples_root": self.samples_root.get(), "manager_version": APP_VERSION}
         )
@@ -389,7 +391,7 @@ class LibraryManagerApp:
         self._write("[ВЫПОЛНЯЕТСЯ] " + message)
         if self._active_task_id:
             try:
-                self._task_journal.progress(self._active_task_id, "Background task", message)
+                self._task_journal.progress(self._active_task_id, self._active_task_title or "Background task", message)
             except OSError as exc:
                 self._write(f"[ПРЕДУПРЕЖДЕНИЕ] Не удалось записать историю: {exc}")
         self.status.set(message)
