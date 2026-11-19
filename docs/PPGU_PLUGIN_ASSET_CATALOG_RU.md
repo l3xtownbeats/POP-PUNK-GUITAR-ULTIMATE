@@ -61,7 +61,7 @@ The catalog describes prepared sample payloads and analysis evidence. The VST3 r
 
 ## Known conservative queues
 
-STRUMMING, ARPEGGIO, ARTICULATIONS and ENDING are not inferred from generic onset/RMS analysis. They remain manual-review sections until an operator explicitly assigns a reviewed asset to one or more modes in the review dialog. Manual assignment records the chosen mode; it does not fabricate stroke direction, string/fret positions, articulation or ending-event timing. Long RMS-active regions remain in `unassigned_review_assets` and are not automatically called a riff, phrase or pattern.
+STRUMMING, ARTICULATIONS and ENDING are not inferred from generic onset/RMS analysis. They remain manual-review sections until an operator explicitly assigns a reviewed asset to one or more modes in the review dialog. ARPEGGIO additionally receives chord-derived fretboard voicing hypotheses under an unconfirmed standard-tuning assumption; these are not approved fingerings or recorded string-attack events. Manual assignment records the chosen mode; it does not fabricate stroke direction, articulation or ending-event timing. Long RMS-active regions remain in `unassigned_review_assets` and are not automatically called a riff, phrase or pattern.
 
 ## Status interpretation
 
