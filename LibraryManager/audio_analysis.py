@@ -33,7 +33,7 @@ def _read_with_soundfile(path: Path, max_samples: int):
         values = []
         absolute = 0
         while True:
-            block = audio.read(262144, dtype="float32", always_2d=True)
+            block = audio.read(65536, dtype="float32", always_2d=True)
             if block.size == 0: break
             mono = block.mean(axis=1, dtype=np.float64)
             first = (-absolute) % hop
@@ -62,7 +62,7 @@ def _read_pcm_wav(path: Path, max_samples: int):
             index += usable // stride
         return values, rate, frames, channels, width, hop, "WAV", "PCM", "python-wave"
 
-def read_mono_pcm(path: Path, max_samples: int = 2_000_000):
+def read_mono_pcm(path: Path, max_samples: int = 350_000):
     """Backward-compatible six-field decoder API used by analysis submodules."""
     path = Path(path)
     decoded = _read_with_soundfile(path, max_samples)
@@ -95,8 +95,9 @@ def _autocorrelation_pitch(samples, rate):
     names=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
     return {"frequency_hz":round(hz,2),"midi_note":midi,"note_name":names[midi%12]+str(midi//12-1),"confidence":round(min(1.,best),3)}
 
-def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10) -> dict:
-    samples, rate, frames, channels, width, decimation = read_mono_pcm(path)
+def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10, max_samples: int = 350_000) -> dict:
+    """Analyze a bounded, decimated mono view to keep memory modest on older PCs."
+    samples, rate, frames, channels, width, decimation = read_mono_pcm(path, max_samples=max_samples)
     fmt, subtype, backend = _audio_metadata(Path(path))
     if rate <= 0 or not samples: raise ValueError("Empty or invalid audio")
     frame=max(32,round(rate*frame_ms/1000/decimation)); hop=max(1,round(rate*hop_ms/1000/decimation))
@@ -125,10 +126,10 @@ def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10) -> dict:
         if best_lag and best_corr>0: tempo=round(60*env_rate/best_lag,1)
     pitch=_autocorrelation_pitch(samples,rate)
     return {
-        "analysis_version":"0.2.0","source":str(Path(path).resolve()),
+        "analysis_version":"0.3.0","source":str(Path(path).resolve()),
         "duration_seconds":round(frames/rate,6),"sample_rate":rate,"channels":channels,
         "sample_width_bytes":width,"container_format":fmt,"codec_subtype":subtype,
-        "decoder_backend":backend,"analysis_decimation":decimation,
+        "decoder_backend":backend,"analysis_decimation":decimation,"analysis_sample_cap":max_samples,"decoder_block_frames":65536,
         "level":{"peak":round(peak,6),"mean_frame_rms":round(mean_rms,6),"rms_min":round(min(rms),6),"rms_max":round(max(rms),6)},
         "zero_crossing_rate_mean":round(statistics.fmean(zcr),6),"tempo_candidate_bpm":tempo,
         "dominant_pitch_candidate":pitch,"onset_evidence_seconds":onset_candidates,
