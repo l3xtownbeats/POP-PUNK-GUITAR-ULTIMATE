@@ -70,6 +70,20 @@ class LibraryStructureTests(unittest.TestCase):
         self.assertEqual(result["melody_mode"]["assets"][0]["melody_structure_status"], "INCOMPLETE")
         self.assertIn("confirmed_melody_events_with_timing", result["melody_mode"]["assets"][0]["missing_fields"])
 
+    def test_pattern_note_zone_is_not_mistaken_for_a_rhythm_loop(self):
+        note_zone = {
+            "asset_id": "PN1", "kind": "note_event",
+            "review_status": "REVIEWED", "license_status": "LICENSE_APPROVED",
+            "integrity_status": "VERIFIED", "confirmed_midi_note": 60,
+            "playable": False, "playable_in_mode": False,
+        }
+        result = build_library_structure(_catalog({"PATTERN MODE": [note_zone]}))
+        pattern = result["pattern_mode"]["assets"][0]
+        self.assertEqual(pattern["pattern_structure_status"], "NOTE_ZONE_READY")
+        self.assertEqual(pattern["missing_fields"], [])
+        self.assertEqual(result["pattern_mode"]["note_zone_ready_count"], 1)
+        self.assertEqual(result["pattern_mode"]["structure_verified_count"], 0)
+
     def test_complete_pattern_and_melody_metadata_is_recognized(self):
         pattern = {
             "asset_id": "P2", "review_status": "REVIEWED",
