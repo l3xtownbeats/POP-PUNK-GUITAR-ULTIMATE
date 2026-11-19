@@ -25,8 +25,9 @@ from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, sha256_fi
 from pattern_pipeline import build_pattern_report
 from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_long_wav, write_virtual_index
+from other_audit import audit_other_library
 
-VERSION = "1.0.0"
+VERSION = "1.8.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 
 
@@ -86,8 +87,6 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
 
     for path in included:
         ext = path.suffix.lower()
-        if ext not in SUPPORTED:
-            continue
         relative = str(path.relative_to(incoming))
         try:
             stat = path.stat()
@@ -101,7 +100,12 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 "source_path": str(path.resolve()),
                 "source_modified_by_manager": False,
             }
-            if ext in AUDIO_EXT:
+            if ext not in SUPPORTED:
+                row["category_suggestion"] = "OTHER_REVIEW_REQUIRED"
+                row["audio_analysis_status"] = "UNSUPPORTED_FORMAT"
+                row["classification_status"] = "MANUAL_REVIEW_REQUIRED"
+                row["unsupported_reason"] = "File extension is not currently supported by the analysis pipeline."
+            elif ext in AUDIO_EXT:
                 meta = wav_info(path)
                 row.update(meta)
                 row["category_suggestion"] = (
@@ -170,6 +174,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         {"sha256": digest, "count": len(paths), "paths": paths}
         for digest, paths in sorted(duplicate_groups.items()) if len(paths) > 1
     ]
+    other_audit_summary = audit_other_library(samples_root, reports / "other_audit")
     summary = {
         "manager_version": VERSION,
         "run_id": run_id,
@@ -198,6 +203,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             for item in audio_reports if item["virtual_extraction"] is not None
         ),
         "errors": len(errors),
+        "other_audit": other_audit_summary,
+        "unsupported_import_files": sum(row.get("audio_analysis_status") == "UNSUPPORTED_FORMAT" for row in inventory),
         "source_files_modified": False,
         "source_files_moved_or_deleted": False,
         "automatic_factory_promotion": False,
