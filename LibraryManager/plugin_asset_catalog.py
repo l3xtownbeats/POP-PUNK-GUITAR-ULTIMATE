@@ -245,9 +245,20 @@ def _manifest_to_asset(
         if mode == "SAMPLE MODE" and (confirmed_note or confirmed_chord or confirmed_sequence):
             playable_modes.append(mode)
         elif mode == "MELODY MODE" and (confirmed_note or confirmed_sequence):
-            playable_modes.append(mode)
+            # Single-note Melody candidates require an explicit human check that
+            # the derived clip contains exactly one intended guitar note.
+            single_note_review_ok = (
+                metadata.get("melody_asset_role") != "SINGLE_GUITAR_NOTE"
+                or review_validation.get("single_note_identity_verified") is True
+            )
+            if single_note_review_ok:
+                playable_modes.append(mode)
     playable = valid_integrity and approvals_ok and bool(playable_modes)
     blocking = list(errors) + approval_reasons
+    if ("MELODY MODE" in target_modes
+            and metadata.get("melody_asset_role") == "SINGLE_GUITAR_NOTE"
+            and review_validation.get("single_note_identity_verified") is not True):
+        blocking.append("MELODY MODE requires explicit review_validation.single_note_identity_verified")
     if valid_integrity and approvals_ok and not playable_modes:
         blocking.append("mode-specific reviewed event mapping is not yet available for this performance mode")
     relative_audio = None
