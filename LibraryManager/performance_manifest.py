@@ -104,7 +104,7 @@ def build_performance_manifest(
     manifest = {
         "schema": PERFORMANCE_SCHEMA,
         "project": "POP PUNK GUITAR ULTIMATE",
-        "status": "ASSET_BINDINGS_AVAILABLE_EVENT_TIMELINE_PENDING" if bindings else "TEMPLATE_ONLY_NO_STAGED_ASSETS",
+        "status": ("ASSET_BINDINGS_AVAILABLE_EVENT_TIMELINE_PENDING" if any(item["playable"] for item in bindings) else "REVIEW_ONLY_ASSET_BINDINGS_EVENT_TIMELINE_PENDING") if bindings else "TEMPLATE_ONLY_NO_STAGED_ASSETS",
         "catalog_schema": catalog.get("schema"),
         "catalog_file": catalog_path.name,
         "mode_execution_models": [
@@ -199,6 +199,9 @@ def validate_performance_manifest(manifest: dict[str, Any]) -> list[str]:
         start, end = event.get("source_start_sample"), event.get("source_end_sample")
         if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end <= start:
             errors.append("Performance event source sample offsets are invalid")
+        position, duration = event.get("position_ticks"), event.get("duration_ticks")
+        if not isinstance(position, int) or position < 0 or not isinstance(duration, int) or duration <= 0:
+            errors.append("Performance event DAW tick position/duration are invalid")
         digest = str(event.get("source_sha256") or "").upper()
         if not re.fullmatch(r"[0-9A-F]{64}", digest):
             errors.append("Performance event source SHA-256 is invalid")
