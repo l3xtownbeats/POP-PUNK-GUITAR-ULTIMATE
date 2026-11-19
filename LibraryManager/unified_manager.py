@@ -347,9 +347,12 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 try:
                     if cancel_event is not None and cancel_event.is_set():
                         raise RuntimeError("Анализ остановлен пользователем.")
-                    acoustic = analyse_wav(path)
+                    # Low-load discovery pass: reduced analysis sample budget and
+                    # envelope-only classification. Expensive monophonic YIN tracking
+                    # is deferred to selected assets during dedicated Sample/Melody work.
+                    acoustic = analyse_wav(path, max_samples=90_000)
                     acoustic["source_sha256"] = digest
-                    classification = classify_wav(path, analyze_pitch=True)
+                    classification = classify_wav(path, analyze_pitch=False)
                     classification["source_sha256"] = digest
                     classification["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
                     classification["automatic_factory_promotion"] = False
