@@ -50,7 +50,9 @@ def prepare_sample_and_melody(
         source, pre_roll_ms=pre_roll_ms, post_roll_ms=post_roll_ms,
         max_segments=max_note_events,
     )
-    source_hash = report["source_sha256"]
+    source_hash = str(report["source_sha256"]).upper()
+    if _sha256(source) != source_hash:
+        raise RuntimeError("Source SHA-256 changed since Sample/Melody analysis")
     clips_dir, manifests_dir = root / "clips", root / "manifests"
     for folder in (clips_dir, manifests_dir):
         folder.mkdir(parents=True, exist_ok=True)
@@ -58,6 +60,8 @@ def prepare_sample_and_melody(
         folder.resolve().relative_to(STAGING_BASE)
 
     source_info = audio_source_info(source)
+    if source_info.framerate != int(report["sample_rate"]):
+        raise RuntimeError("Source sample rate changed since Sample/Melody analysis")
     rate = source_info.framerate
     total_frames = source_info.frames
     events = report["segments"]
