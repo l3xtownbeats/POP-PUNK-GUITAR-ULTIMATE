@@ -387,3 +387,8 @@ Then run `factory_curator.py` in dry-run mode to inspect the proposed folder and
 The v1.8 development branch adds a dedicated OTHER audit and explicit decision-file based routing, whole-Import dependency audit for cleanup, corrected pattern extraction report integration, transactional extraction rollback, and a Windows x64 PyInstaller packaging workflow.
 
 See [V1_8_RELEASE_NOTES_RU.md](V1_8_RELEASE_NOTES_RU.md) for implemented behavior, safety rules, launch/build steps and remaining limitations. A passing CI suite does not establish musical correctness or replace real-library listening tests.
+
+
+## Журнал задач 2.1.0
+
+История фоновых задач, этапов, успешных завершений и ошибок описана в [TASK_JOURNAL_RU.md](TASK_JOURNAL_RU.md). Журнал расположен в `LibraryManager/reports/task_history.jsonl` и не возобновляет прерванные операции автоматически.
