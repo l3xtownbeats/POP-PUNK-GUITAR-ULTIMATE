@@ -651,6 +651,12 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "repeated_rhythm_pattern_candidates": sum(
             item["pattern_analysis"]["pattern_analysis"]["candidate_count"] for item in audio_reports
         ),
+        "pattern_mode_candidates": sum(
+            item["virtual_extraction"]["candidate_count"]
+            for item in audio_reports if item["virtual_extraction"] is not None
+        ),
+        # Backward-compatible field name; candidates now represent repeated
+        # rhythmic motifs, not broad RMS-active regions.
         "virtual_active_region_candidates": sum(
             item["virtual_extraction"]["candidate_count"]
             for item in audio_reports if item["virtual_extraction"] is not None
