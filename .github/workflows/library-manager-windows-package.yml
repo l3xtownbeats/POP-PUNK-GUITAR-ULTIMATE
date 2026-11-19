@@ -19,9 +19,16 @@ jobs:
           python -m pip install -r LibraryManager/requirements-build.txt
       - name: Build portable folder
         run: python -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths LibraryManager --collect-all soundfile --collect-all _soundfile_data --distpath dist LibraryManager/manager_gui.py
-      - name: Archive package
+      - name: Verify executable and archive
         shell: pwsh
-        run: Compress-Archive -Path dist/POP_PUNK_GUITAR_LIBRARY_MANAGER -DestinationPath dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
+        run: |
+          $exe = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
+          if (!(Test-Path $exe)) { throw "Portable GUI executable was not produced: $exe" }
+          $zip = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip"
+          Compress-Archive -Path dist/POP_PUNK_GUITAR_LIBRARY_MANAGER -DestinationPath $zip
+          if (!(Test-Path $zip) -or (Get-Item $zip).Length -lt 1024) { throw "Portable ZIP is missing or unexpectedly small." }
+          $entries = tar -tf $zip
+          if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
       - uses: actions/upload-artifact@v4
         with:
           name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
