@@ -356,6 +356,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     audio_record = {
                         "source_path": str(path.resolve()), "source_sha256": digest,
                         "acoustic_analysis": acoustic, "pattern_analysis": pattern,
+                        "pitch_candidates": classification.get("fragment_candidates", []),
                         "virtual_extraction": None,
                     }
                     if guitar_source_confirmed:
