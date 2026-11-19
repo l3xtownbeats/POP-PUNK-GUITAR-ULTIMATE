@@ -212,7 +212,7 @@ def route_approved_to_other(samples_root: Path, decision_file: Path, *, approve:
                 shutil.copyfileobj(src, dst, 1024 * 1024)
             if _hash(destination) != entry["sha256"]:
                 raise IOError("OTHER destination SHA-256 mismatch")
-            record = {**entry, "source_sha256": entry["sha256"],
+            record = {**entry, "asset_id": entry["sha256"][:24], "source_sha256": entry["sha256"],
                       "destination_sha256": _hash(destination),
                       "distribution_status": "VERIFIED_COPIED_TO_OTHER",
                       "distributed_at_utc": datetime.now(timezone.utc).isoformat(),
