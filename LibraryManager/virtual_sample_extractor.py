@@ -41,38 +41,37 @@ def _frame_levels(source: Path, window_ms: int, hop_ms: int) -> tuple[list[dict[
         hop = max(1, round(rate * hop_ms / 1000))
         if total < window:
             raise ValueError("WAV is shorter than one analysis window")
-        # Decode each PCM frame to a normalized mono value. Read sequentially;
-        # memory use is bounded by one analysis window plus the compact envelope.
+        # Read each analysis window independently so long files do not need
+        # to be decoded into RAM. Only the compact envelope is retained.
         frame_bytes = channels * width
-        raw = reader.readframes(total)
-        if len(raw) != total * frame_bytes:
-            raise IOError("Incomplete PCM source read")
-        mono: list[float] = []
-        for offset in range(0, len(raw), frame_bytes):
-            values = []
-            for channel in range(channels):
-                start = offset + channel * width
-                sample = raw[start:start + width]
-                if width == 1:
-                    value = (sample[0] - 128) / 128.0
-                else:
-                    if width == 3:
-                        sample += b"\\xff" if sample[2] & 0x80 else b"\\x00"
-                    value = int.from_bytes(sample, "little", signed=True) / float(1 << (8 * width - 1))
-                values.append(value)
-            mono.append(sum(values) / channels)
-
-    levels = []
-    for start in range(0, total - window + 1, hop):
-        chunk = mono[start:start + window]
-        rms = math.sqrt(sum(value * value for value in chunk) / len(chunk))
-        crossings = sum((a < 0) != (b < 0) for a, b in zip(chunk, chunk[1:]))
-        levels.append({
-            "start_sample": start,
-            "end_sample": start + window,
-            "rms": rms,
-            "zcr": crossings / max(1, len(chunk) - 1),
-        })
+        levels = []
+        for start in range(0, total - window + 1, hop):
+            reader.setpos(start)
+            raw = reader.readframes(window)
+            if len(raw) != window * frame_bytes:
+                raise IOError("Incomplete PCM analysis window")
+            chunk: list[float] = []
+            for offset in range(0, len(raw), frame_bytes):
+                values = []
+                for channel in range(channels):
+                    sample_start = offset + channel * width
+                    sample = raw[sample_start:sample_start + width]
+                    if width == 1:
+                        value = (sample[0] - 128) / 128.0
+                    else:
+                        if width == 3:
+                            sample += b"\\xff" if sample[2] & 0x80 else b"\\x00"
+                        value = int.from_bytes(sample, "little", signed=True) / float(1 << (8 * width - 1))
+                    values.append(value)
+                chunk.append(sum(values) / channels)
+            rms = math.sqrt(sum(value * value for value in chunk) / len(chunk))
+            crossings = sum((a < 0) != (b < 0) for a, b in zip(chunk, chunk[1:]))
+            levels.append({
+                "start_sample": start,
+                "end_sample": start + window,
+                "rms": rms,
+                "zcr": crossings / max(1, len(chunk) - 1),
+            })
     return levels, {"sample_rate": rate, "channels": channels,
                     "sample_width_bytes": width, "total_frames": total}
 
