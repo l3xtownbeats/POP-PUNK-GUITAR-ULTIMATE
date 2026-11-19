@@ -14,7 +14,7 @@ def _decode_sample(raw: bytes, width: int) -> int:
     if width == 1: return (raw[0] - 128) << 8
     if width == 2: return int.from_bytes(raw, "little", signed=True)
     if width == 3:
-        value = int.from_bytes(raw + (b"\xff" if raw[2] & 0x80 else b"\x00"), "little", signed=True)
+        value = int.from_bytes(raw + (b"\\xff" if raw[2] & 0x80 else b"\\x00"), "little", signed=True)
         return value >> 8
     if width == 4: return int.from_bytes(raw, "little", signed=True) >> 16
     raise ValueError("Unsupported PCM sample width")
@@ -100,6 +100,7 @@ def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10, max_samples: i
 
     Callers may raise max_samples for a focused second-pass analysis of selected
     assets. The discovery pass should stay responsive on dual-core/8GB PCs.
+    """
     samples, rate, frames, channels, width, decimation = read_mono_pcm(path, max_samples=max_samples)
     fmt, subtype, backend = _audio_metadata(Path(path))
     if rate <= 0 or not samples: raise ValueError("Empty or invalid audio")
