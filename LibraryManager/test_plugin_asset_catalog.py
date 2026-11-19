@@ -2,6 +2,9 @@ import hashlib
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
+
+import plugin_asset_catalog as catalog_module
 import wave
 from pathlib import Path
 
@@ -64,7 +67,8 @@ class PluginAssetCatalogTests(unittest.TestCase):
                 {"mode": "RIFF MODE", "candidates": [{"candidate_type": "RIFF_OR_PHRASE_REVIEW"}]}
             ]}), encoding="utf-8")
             output = base / "plugin_asset_catalog.json"
-            result = build_plugin_asset_catalog(staging, output, mode_report_path=mode_report)
+            with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
+                result = build_plugin_asset_catalog(staging, output, mode_report_path=mode_report)
             catalog = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(catalog["schema"], CATALOG_SCHEMA)
             self.assertEqual([item["mode"] for item in catalog["modes"]], list(MODE_ORDER))
@@ -114,7 +118,8 @@ class PluginAssetCatalogTests(unittest.TestCase):
             }
             (staging / "manifests" / "approved.json").write_text(json.dumps(record), encoding="utf-8")
             output = base / "catalog.json"
-            result = build_plugin_asset_catalog(staging, output)
+            with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
+                result = build_plugin_asset_catalog(staging, output)
             catalog = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["playable_asset_count"], 1)
             self.assertEqual(catalog["status"], "READY_FOR_PLUGIN_IMPORT")
@@ -153,7 +158,8 @@ class PluginAssetCatalogTests(unittest.TestCase):
             }
             (staging / "manifests" / "bad.json").write_text(json.dumps(record), encoding="utf-8")
             output = base / "catalog.json"
-            result = build_plugin_asset_catalog(staging, output)
+            with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
+                result = build_plugin_asset_catalog(staging, output)
             catalog = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(result["playable_asset_count"], 0)
             self.assertEqual(catalog["modes"][0]["assets"][0]["integrity_status"], "BLOCKED")
@@ -166,8 +172,9 @@ class PluginAssetCatalogTests(unittest.TestCase):
             staging.mkdir()
             output = base / "catalog.json"
             output.write_text("sentinel", encoding="utf-8")
-            with self.assertRaises(FileExistsError):
-                build_plugin_asset_catalog(staging, output)
+            with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
+                with self.assertRaises(FileExistsError):
+                    build_plugin_asset_catalog(staging, output)
             self.assertEqual(output.read_text(encoding="utf-8"), "sentinel")
 
 
