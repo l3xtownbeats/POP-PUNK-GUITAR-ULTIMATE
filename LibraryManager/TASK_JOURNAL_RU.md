@@ -442,3 +442,17 @@ Melody использует самостоятельную логику испо
 ### Следующие release gates
 
 Полный Windows test suite; исправление всех регрессий; portable build и запуск на Windows; проверка всех десяти очередей на fixture library и реальной Samples; preview/review/distribution/rollback workflow; актуальные manifests и отчёты; отсутствие повреждения исходников; обновлённая инструкция и release notes. Финальная версия 3.0.0 выставляется только после закрытия gates.
+
+
+## TJ-2026-11-19-MANAGER-30-STRUCTURE-019 — структурная сборка библиотеки плагина
+
+- Версия разработки: `3.0.0-dev2`; статус: DEVELOPMENT / NOT FINAL.
+- Созданы `library_structure.py` и `test_library_structure.py`.
+- Каталог VST3 сохраняет полное проверенное поле `musical_metadata`.
+- GUI action «Сформировать каталог VST3» дополнительно создаёт `plugin_library_structure_*.json` и `plugin_library_coverage_*.json`.
+- Структура включает 3 потребительских engine targets (SAMPLE_INSTRUMENT, PATTERN_INSTRUMENT, MELODY_INSTRUMENT), десять разделов Manager, ссылки на физические assets без WAV-дублирования, confirmed pitch zones, confirmed technique tags, velocity zones, Pattern structural completeness и Melody event completeness.
+- Coverage gaps фиксируются явно: 12 pitch classes, velocity LOW/MEDIUM/HIGH и все утверждённые техники.
+- Pattern требует loop bounds, BPM, meter, attack events, cycle integrity и musical review. Melody требует подтверждённой последовательности, timed events/durations и mapping verification.
+- Runtime readiness повторно ограничена REVIEWED + LICENSE_APPROVED + VERIFIED + asset path. Неизвестные данные не повышаются до подтверждённых.
+- Тесты добавлены, но CI и фактическая проверка на библиотеке пользователя ещё не подтверждены.
+- Исходные WAV не перемещаются, не копируются и не изменяются этим структурным этапом.
