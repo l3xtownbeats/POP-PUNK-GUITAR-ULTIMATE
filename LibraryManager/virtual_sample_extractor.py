@@ -245,7 +245,7 @@ def write_virtual_index(report: dict[str, Any], import_root: Path) -> list[Path]
             # Exclusive creation prevents overwriting user or concurrent data.
             with path.open("x", encoding="utf-8") as stream:
                 json.dump(record, stream, ensure_ascii=False, indent=2)
-                stream.write("\\n")
+                stream.write("\n")
             created.append(path)
             written.append(path)
 
