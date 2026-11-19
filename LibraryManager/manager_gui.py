@@ -108,15 +108,69 @@ class LibraryManagerApp:
         self._cancel_button = ttk.Button(actions, text="ОСТАНОВИТЬ задачу", command=self.cancel_job, state="disabled")
         self._cancel_button.grid(row=cancel_row, column=0, columnspan=3, sticky="ew", padx=4, pady=5)
 
-        ttk.Label(outer, text="Журнал работы:").pack(anchor="w", pady=(8, 2))
-        self.log = tk.Text(outer, wrap="word", height=22, font=("Consolas", 9))
-        self.log.pack(fill="both", expand=True)
+        log_header = ttk.Frame(outer)
+        log_header.pack(fill="x", pady=(8, 2))
+        ttk.Label(log_header, text="Журнал работы:").pack(side="left")
+        ttk.Button(log_header, text="Копировать выделенное",
+                   command=self.copy_log_selection).pack(side="right", padx=(4, 0))
+        ttk.Button(log_header, text="Копировать весь журнал",
+                   command=self.copy_log_all).pack(side="right")
+        ttk.Button(log_header, text="Выделить всё",
+                   command=self.select_log_all).pack(side="right", padx=(4, 4))
+        log_frame = ttk.Frame(outer)
+        log_frame.pack(fill="both", expand=True)
+        self.log = tk.Text(log_frame, wrap="word", height=22, font=("Consolas", 9),
+                           exportselection=True, undo=False)
+        log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log.yview)
+        self.log.configure(yscrollcommand=log_scroll.set)
+        self.log.pack(side="left", fill="both", expand=True)
+        log_scroll.pack(side="right", fill="y")
+        self.log.bind("<Control-a>", self.select_log_all)
+        self.log.bind("<Control-A>", self.select_log_all)
+        self.log.bind("<Control-c>", self.copy_log_selection)
+        self.log.bind("<Control-C>", self.copy_log_selection)
+        self.log.bind("<Button-3>", self.show_log_context_menu)
         self.log.configure(state="disabled")
         ttk.Label(outer, textvariable=self.status, relief="sunken", anchor="w").pack(fill="x", pady=(8, 0))
 
         self._write("Менеджер не перемещает и не удаляет исходники при анализе.\n"
                     "FACTORY принимает только REVIEWED + LICENSE_APPROVED WAV.\n"
                     "Кандидаты и неподтверждённые материалы остаются в staging/Import Sample Guitar.\n")
+
+    def _copy_log_text(self, value: str) -> None:
+        if not value:
+            self.status.set("Нечего копировать.")
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append(value)
+        self.root.update_idletasks()
+        self.status.set(f"Скопировано в буфер обмена: {len(value)} символов.")
+
+    def copy_log_selection(self, event=None):
+        try:
+            value = self.log.get("sel.first", "sel.last")
+        except tk.TclError:
+            self.status.set("Сначала выделите нужные строки журнала.")
+            return "break" if event else None
+        self._copy_log_text(value)
+        return "break" if event else None
+
+    def copy_log_all(self):
+        self._copy_log_text(self.log.get("1.0", "end-1c"))
+
+    def select_log_all(self, event=None):
+        self.log.tag_add("sel", "1.0", "end-1c")
+        self.log.mark_set("insert", "1.0")
+        self.log.see("insert")
+        return "break"
+
+    def show_log_context_menu(self, event):
+        menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="Копировать выделенное", command=self.copy_log_selection)
+        menu.add_command(label="Копировать весь журнал", command=self.copy_log_all)
+        menu.add_command(label="Выделить всё", command=self.select_log_all)
+        menu.tk_popup(event.x_root, event.y_root)
+        menu.grab_release()
 
     def _write(self, text: str) -> None:
         self.log.configure(state="normal")
