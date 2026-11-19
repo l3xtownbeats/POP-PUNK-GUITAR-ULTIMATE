@@ -96,7 +96,7 @@ def _autocorrelation_pitch(samples, rate):
     return {"frequency_hz":round(hz,2),"midi_note":midi,"note_name":names[midi%12]+str(midi//12-1),"confidence":round(min(1.,best),3)}
 
 def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10, max_samples: int = 350_000) -> dict:
-    """Analyze a bounded, decimated mono view to keep memory modest on older PCs."
+    """Analyze a bounded, decimated mono view to keep memory modest on older PCs."""
     samples, rate, frames, channels, width, decimation = read_mono_pcm(path, max_samples=max_samples)
     fmt, subtype, backend = _audio_metadata(Path(path))
     if rate <= 0 or not samples: raise ValueError("Empty or invalid audio")
