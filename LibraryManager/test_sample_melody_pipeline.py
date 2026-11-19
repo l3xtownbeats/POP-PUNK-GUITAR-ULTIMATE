@@ -79,6 +79,51 @@ class SampleMelodyPipelineTests(unittest.TestCase):
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
 
+    def test_sample_and_melody_extraction_from_aiff_source(self):
+        try:
+            import numpy as np
+            import soundfile as sf
+        except ImportError:
+            self.skipTest("python-soundfile is unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "guitar.aiff"
+            samples = (0.2 * np.sin(2 * np.pi * 330 * np.arange(16000) / 8000)).astype("float32")
+            try:
+                sf.write(str(source), samples, 8000, format="AIFF", subtype="PCM_16")
+            except Exception:
+                self.skipTest("libsndfile AIFF decoding/encoding unavailable")
+            events = []
+            for index, start in enumerate((0.1, 0.4, 0.7), 1):
+                a, b = round(start * 8000), round((start + 0.2) * 8000)
+                events.append({
+                    "source_start_sample": a,
+                    "source_end_sample": b,
+                    "source_start_seconds": a / 8000,
+                    "source_end_seconds": b / 8000,
+                    "detected_note_start_seconds": start,
+                    "detected_note_end_seconds": start + 0.2,
+                    "midi_note_candidate": 60 + index,
+                    "note_name_candidate": "CANDIDATE",
+                    "confidence": 0.8,
+                })
+            fake_report = {
+                "source_sha256": _hash(source),
+                "sample_rate": 8000,
+                "segments": events,
+            }
+            stage = pipeline.STAGING_BASE / ("test-aiff-sample-" + next(tempfile._get_candidate_names()))
+            try:
+                with patch.object(pipeline, "propose_segments", return_value=fake_report):
+                    result = pipeline.prepare_sample_and_melody(source, stage)
+                self.assertEqual(result["sample_mode_count"], 3)
+                self.assertEqual(result["melody_mode_count"], 1)
+                self.assertEqual(result["sample_mode"][0]["source_format"], "AIFF")
+                with wave.open(result["sample_mode"][0]["derived_path"], "rb") as clip:
+                    self.assertEqual(clip.getframerate(), 8000)
+                    self.assertEqual(clip.getnframes(), 2000)
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
     def test_rejects_non_staging_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.wav"
