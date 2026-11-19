@@ -24,13 +24,14 @@ from task_journal import TaskJournal
 from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
 from performance_manifest import build_performance_manifest
 from pattern_song_manager import open_pattern_song_manager
+from chromatic_pitch_map import build_chromatic_pitch_map, chromatic_note_table
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
     distribution_plan,
 )
 
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.5.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -91,6 +92,7 @@ class LibraryManagerApp:
             ("Сформировать каталог VST3", self.build_plugin_catalog),
             ("Sample Browser / режимы VST3", self.open_plugin_browser),
             ("Pattern Song Manager", self.open_pattern_song_library),
+            ("12 нот / Auto Chords", self.open_chromatic_pitch_map),
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("Отдельное извлечение Pattern WAV", self.extract_patterns),
@@ -656,14 +658,42 @@ class LibraryManagerApp:
                 "plugin_asset_catalog", "performance_manifest"
             ) + ".json")
             performance_result = build_performance_manifest(output, performance_output)
+            chromatic_output = output.with_name(output.stem.replace(
+                "plugin_asset_catalog", "chromatic_pitch_map"
+            ) + ".json")
+            chromatic_map = build_chromatic_pitch_map(json.loads(output.read_text(encoding="utf-8")))
+            chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
             return {
                 "plugin_asset_catalog": catalog_result,
                 "performance_manifest": performance_result,
+                "chromatic_pitch_map": {
+                    "path": str(chromatic_output),
+                    "pitch_class_count": len(chromatic_map["pitch_classes"]),
+                    "midi_key_count": chromatic_map["coverage"]["midi_key_count"],
+                    "exact_sample_count": chromatic_map["coverage"]["exact_approved_sample_count"],
+                    "fallback_proposal_count": chromatic_map["coverage"]["fallback_proposal_count"],
+                    "missing_source_count": chromatic_map["coverage"]["missing_source_count"],
+                    "runtime_status": chromatic_map["runtime_status"],
+                },
             }
 
         self._write("=== СБОРКА КАТАЛОГА ДЛЯ VST3 ===")
         self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и все 10 режимов. Непроверенные WAV не становятся playable.")
         self._background("Сборка каталога VST3", work)
+
+    def open_chromatic_pitch_map(self) -> None:
+        """Show the shared 12-tone map and explain Auto Chords enharmonic aliases."""
+        sharp = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="sharp"))
+        flat = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="flat"))
+        messagebox.showinfo(
+            "PPGU — 12 нот / Auto Chords",
+            "Все 12 хроматических высот сохраняются и доступны для исполнения.\\n\\n"
+            f"Диезы: {sharp}\\n\\nБемоли: {flat}\\n\\n"
+            "Энгармонические названия объединяются в один pitch class: C# = Db, D# = Eb, F# = Gb и т. д.\\n"
+            "E и F — разные ноты.\\n\\n"
+            "Auto Chords использует ту же карту высот. Названия-дубликаты объединяются, "
+            "но хроматические ноты не удаляются. Непроверенные WAV и fallback не допускаются автоматически."
+        )
 
     def open_pattern_song_library(self) -> None:
         """Edit song-grouped Pattern Instrument metadata; WAV sources remain untouched."""
