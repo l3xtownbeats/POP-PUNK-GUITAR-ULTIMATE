@@ -92,6 +92,23 @@ def audit_other_library(samples_root: Path, report_dir: Path) -> dict[str, Any]:
                     "routing_decision": "NONE",
                     "source_preserved": True,
                 }
+                if origin == "OTHER" and ext in AUDIO_EXT:
+                    try:
+                        metadata = wav_info(path)
+                        row["wav_status"] = metadata.get("wav_status", "UNKNOWN")
+                        if metadata.get("wav_status") in {"OK", "NON_PCM_OR_EXTENSIBLE"}:
+                            classification = classify_wav(path, analyze_pitch=False)
+                            row.update({
+                                "asset_kind_candidate": classification.get("asset_kind_candidate", "UNKNOWN"),
+                                "sample_subtype_candidate": classification.get("sample_subtype_candidate", "UNKNOWN"),
+                                "classification_confidence": classification.get("classification_confidence", ""),
+                                "classification_evidence": " | ".join(classification.get("evidence", [])),
+                                "content_audit": "AUDIO_CANDIDATE_ONLY_REQUIRES_REVIEW",
+                            })
+                        else:
+                            row["content_audit"] = "INVALID_OR_UNSUPPORTED_AUDIO"
+                    except Exception as exc:
+                        row["content_audit"] = f"AUDIO_AUDIT_ERROR: {type(exc).__name__}: {exc}"
                 if origin == "IMPORT":
                     if ext not in AUDIO_EXT and ext not in {".sfz", ".zip", ".7z", ".rar"}:
                         row.update(audit_status="OTHER_REVIEW_REQUIRED",
@@ -142,6 +159,7 @@ def audit_other_library(samples_root: Path, report_dir: Path) -> dict[str, Any]:
         "other_folder": str(other),
         "files_audited": len(rows),
         "existing_other_files": sum(r["origin"] == "OTHER" for r in rows),
+        "existing_other_wav_files": sum(r["origin"] == "OTHER" and r["extension"] in AUDIO_EXT for r in rows),
         "import_files_needing_other_or_manual_review": sum(
             r["origin"] == "IMPORT" and r["audit_status"] in {"OTHER_REVIEW_REQUIRED", "UNKNOWN_MANUAL_REVIEW", "MANUAL_REVIEW"}
             for r in rows
