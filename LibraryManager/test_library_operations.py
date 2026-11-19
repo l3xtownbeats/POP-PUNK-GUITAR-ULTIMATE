@@ -56,6 +56,7 @@ class LibraryOperationsTests(unittest.TestCase):
             "review_status": "REVIEWED",
             "license_status": "LICENSE_APPROVED",
             "musical_metadata": {
+                "style_family": "POP_PUNK",
                 "instrument_family": "ELECTRIC_GUITAR",
                 "asset_role": "RHYTHM_PATTERN",
                 "tone_family": "CRUNCH",
@@ -70,7 +71,7 @@ class LibraryOperationsTests(unittest.TestCase):
     def test_plan_is_dry_run_and_routes_by_reviewed_tags(self) -> None:
         plan = distribution_plan([self.manifest], self.samples, self.staging)
         self.assertEqual(plan["entries"][0]["category_path"],
-                         "ELECTRIC_GUITAR/RHYTHM_PATTERN/CRUNCH")
+                         "POP_PUNK/WAV/ELECTRIC_GUITAR/RHYTHM_PATTERN/CRUNCH")
         self.assertEqual(plan["entries"][0]["status"], "READY_FOR_EXPLICIT_APPROVAL")
         self.assertTrue(self.original.exists())
         self.assertTrue(self.staged.exists())
