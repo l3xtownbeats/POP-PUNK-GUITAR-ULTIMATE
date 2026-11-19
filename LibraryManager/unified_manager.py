@@ -107,10 +107,25 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
                progress: Callable[[str], None] | None = None,
                cancel_event: Any = None) -> dict[str, Any]:
-    """Fast filesystem-only scan: no hashing, decoding, acoustic analysis or writes to sources."""
+    """Fast filesystem-only scan with bounded memory.
+
+    This stage only enumerates directories and reads stat metadata. It never
+    hashes, decodes, previews, classifies, copies, moves or deletes source data.
+    Inventory rows are streamed directly to CSV; memory use is independent of
+    the number of files (apart from the small extension counter and directory
+    traversal stack).
+    """
+    import time
+
+    started = time.perf_counter()
     samples_root = resolve_samples_root(samples_root)
-    incoming = next(p for p in samples_root.iterdir()
-                    if p.is_dir() and p.name.strip().casefold() == "import sample guitar")
+    incoming = next(
+        (p for p in samples_root.iterdir()
+         if p.is_dir() and p.name.strip().casefold() == "import sample guitar"),
+        None,
+    )
+    if incoming is None:
+        raise FileNotFoundError(f"Не найдена папка Import Sample Guitar внутри {samples_root}")
     report_base = (reports_root or (Path(__file__).resolve().parent / "reports")).expanduser().resolve()
     report_base.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -121,68 +136,99 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         if progress:
             progress(message)
 
-    emit("БЫСТРОЕ СКАНИРОВАНИЕ: только обход папок и чтение файловой метаинформации; без SHA-256 и анализа аудио.")
-    rows: list[dict[str, Any]] = []
+    emit("БЫСТРОЕ СКАНИРОВАНИЕ: обход папок и файловая метаинформация; без SHA-256, декодирования и аудиоанализа.")
+    fields = [
+        "relative_path", "filename", "extension", "bytes", "modified_ns",
+        "source_path", "scan_status", "source_modified_by_manager",
+    ]
     counts: dict[str, int] = defaultdict(int)
     total_bytes = 0
+    files_found = 0
+    stat_errors = 0
     stack = [incoming]
-    while stack:
-        if cancel_event is not None and cancel_event.is_set():
-            raise RuntimeError("Быстрое сканирование остановлено пользователем.")
-        folder = stack.pop()
-        try:
-            with os.scandir(folder) as entries:
-                for entry in entries:
-                    if cancel_event is not None and cancel_event.is_set():
-                        raise RuntimeError("Быстрое сканирование остановлено пользователем.")
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            stack.append(Path(entry.path))
-                            continue
-                        if not entry.is_file(follow_symlinks=False):
-                            continue
-                        path = Path(entry.path)
-                        relative_path = path.relative_to(incoming)
-                        if _is_excluded(relative_path):
-                            continue
-                        stat = entry.stat(follow_symlinks=False)
-                        ext = path.suffix.lower() or "[без расширения]"
-                        counts[ext] += 1
-                        total_bytes += stat.st_size
-                        rows.append({
-                            "relative_path": str(relative_path), "filename": path.name,
-                            "extension": ext, "bytes": stat.st_size,
-                            "modified_ns": stat.st_mtime_ns,
-                            "source_path": str(path.resolve()),
-                            "source_modified_by_manager": False,
-                        })
-                        if len(rows) % 500 == 0:
-                            emit(f"Быстрый обход: найдено {len(rows):,} файлов…")
-                    except OSError as exc:
-                        rows.append({
-                            "relative_path": str(Path(entry.path).relative_to(incoming)),
-                            "filename": entry.name, "extension": Path(entry.name).suffix.lower(),
-                            "bytes": "", "source_path": entry.path,
-                            "scan_status": f"ERROR: {type(exc).__name__}: {exc}",
-                            "source_modified_by_manager": False,
-                        })
-        except OSError as exc:
-            emit(f"[ПРЕДУПРЕЖДЕНИЕ] Не удалось прочитать папку {folder}: {exc}")
-
-    rows.sort(key=lambda item: item["relative_path"].casefold())
     csv_path = report_dir / "quick_inventory.csv"
-    _write_csv(csv_path, rows)
+    with csv_path.open("x", newline="", encoding="utf-8-sig") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        while stack:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Быстрое сканирование остановлено пользователем.")
+            folder = stack.pop()
+            try:
+                with os.scandir(folder) as entries:
+                    for entry in entries:
+                        if cancel_event is not None and cancel_event.is_set():
+                            raise RuntimeError("Быстрое сканирование остановлено пользователем.")
+                        try:
+                            if entry.is_dir(follow_symlinks=False):
+                                stack.append(Path(entry.path))
+                                continue
+                            if not entry.is_file(follow_symlinks=False):
+                                continue
+                            path = Path(entry.path)
+                            relative_path = path.relative_to(incoming)
+                            if _is_excluded(relative_path):
+                                continue
+                            stat = entry.stat(follow_symlinks=False)
+                            ext = path.suffix.lower() or "[без расширения]"
+                            counts[ext] += 1
+                            total_bytes += stat.st_size
+                            files_found += 1
+                            writer.writerow({
+                                "relative_path": str(relative_path),
+                                "filename": path.name,
+                                "extension": ext,
+                                "bytes": stat.st_size,
+                                "modified_ns": stat.st_mtime_ns,
+                                "source_path": str(path.absolute()),
+                                "scan_status": "OK",
+                                "source_modified_by_manager": False,
+                            })
+                        except OSError as exc:
+                            stat_errors += 1
+                            files_found += 1
+                            try:
+                                relative = str(Path(entry.path).relative_to(incoming))
+                            except (ValueError, OSError):
+                                relative = entry.name
+                            writer.writerow({
+                                "relative_path": relative,
+                                "filename": entry.name,
+                                "extension": Path(entry.name).suffix.lower(),
+                                "bytes": "",
+                                "modified_ns": "",
+                                "source_path": entry.path,
+                                "scan_status": f"ERROR: {type(exc).__name__}: {exc}",
+                                "source_modified_by_manager": False,
+                            })
+                        if files_found and files_found % 500 == 0:
+                            emit(f"Быстрый обход: найдено {files_found:,} файлов…")
+            except OSError as exc:
+                emit(f"[ПРЕДУПРЕЖДЕНИЕ] Не удалось прочитать папку {folder}: {exc}")
+
+    elapsed = time.perf_counter() - started
     summary = {
-        "manager_version": VERSION, "scan_type": "FAST_FILESYSTEM_ONLY",
-        "report_directory": str(report_dir), "incoming_folder": str(incoming),
-        "files_found": len(rows), "total_bytes": total_bytes,
+        "manager_version": VERSION,
+        "scan_type": "FAST_FILESYSTEM_ONLY",
+        "report_directory": str(report_dir),
+        "incoming_folder": str(incoming),
+        "files_found": files_found,
+        "stat_errors": stat_errors,
+        "total_bytes": total_bytes,
         "formats": dict(sorted(counts.items())),
-        "sha256_performed": False, "audio_decoding_performed": False,
-        "acoustic_analysis_performed": False, "source_files_modified": False,
+        "elapsed_seconds": round(elapsed, 3),
+        "memory_strategy": "STREAMING_CSV_BOUNDED_MEMORY",
+        "sha256_performed": False,
+        "audio_decoding_performed": False,
+        "acoustic_analysis_performed": False,
+        "source_files_modified": False,
         "next_stage": "DEEP_INVENTORY_AND_ANALYSIS",
     }
     _write_json(report_dir / "quick_summary.json", summary)
-    emit(f"БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО: {len(rows):,} файлов, {total_bytes:,} байт. Отчёт: {report_dir}")
+    emit(
+        f"БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО: {files_found:,} файлов за {elapsed:.2f} сек.; "
+        f"ошибок метаданных: {stat_errors}. Отчёт: {report_dir}"
+    )
     return summary
 
 
