@@ -18,7 +18,7 @@ from unified_manager import run_manager, quick_scan, resolve_samples_root
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
-from finalization import finalize_staging
+from finalization import finalize_library as finalize_library_audit
 from manifest_review import review_manifest
 from library_operations import (
     cleanup_original_sources,
@@ -341,8 +341,8 @@ class LibraryManagerApp:
                 })
 
             report_progress("ЭТАП 5/6: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
-            finalization_result = finalize_staging(
-                STAGING_ROOT,
+            finalization_result = finalize_library_audit(
+                samples, STAGING_ROOT,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
@@ -355,7 +355,7 @@ class LibraryManagerApp:
                     "sample_mode_wav_count": extracted_sample,
                     "melody_mode_wav_count": extracted_melody,
                     "total_new_wav_candidates": extracted_pattern + extracted_sample + extracted_melody,
-                    "manifest_count_in_staging": finalization_result["manifests_checked"],
+                    "manifest_count_in_staging": finalization_result["staging"]["manifests_checked"],
                     "failures": extraction_failures,
                     "review_status": "NEEDS_MUSICAL_REVIEW",
                     "license_status": "UNREVIEWED",
@@ -575,8 +575,8 @@ class LibraryManagerApp:
             self._worker_events.put(("progress", message))
         self._background(
             "Финализация staging",
-            lambda: finalize_staging(
-                STAGING_ROOT,
+            lambda: finalize_library_audit(
+                self._samples(), STAGING_ROOT,
                 progress=progress,
                 cancel_event=self._cancel_event,
             ),
