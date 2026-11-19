@@ -170,6 +170,36 @@ class SampleMelodyPipelineTests(unittest.TestCase):
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
 
+
+    def test_existing_manifest_is_never_deleted_or_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.wav"
+            _write_test_wav(source)
+            stage = pipeline.STAGING_BASE / ("test-collision-" + next(tempfile._get_candidate_names()))
+            candidates = [{
+                "start_seconds": 0.2, "end_seconds": 0.4,
+                "midi_note_candidate": 60, "note_name_candidate": "C4",
+                "confidence": 0.9,
+            }]
+            # Account for the default 35 ms pre-roll and 220 ms post-roll.
+            start = max(0, round(8000 * 0.2) - 280)
+            end = round(8000 * 0.4) + 1760
+            asset_id = pipeline._identity(_hash(source), "SAMPLE_NOTE", start, end)
+            manifest = stage / "manifests" / f"SAMPLE-{asset_id}.json"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            sentinel = '{"do_not_delete": true}\\n'
+            manifest.write_text(sentinel, encoding="utf-8")
+            try:
+                with self.assertRaises(FileExistsError):
+                    pipeline.prepare_sample_and_melody(
+                        source, stage, pitch_candidates=candidates,
+                        expected_source_sha256=_hash(source),
+                    )
+                self.assertEqual(manifest.read_text(encoding="utf-8"), sentinel)
+                self.assertFalse((stage / "clips" / f"SAMPLE-{asset_id}.wav").exists())
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
     def test_rejects_non_staging_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.wav"
