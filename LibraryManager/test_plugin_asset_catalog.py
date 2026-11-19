@@ -133,6 +133,18 @@ class PluginAssetCatalogTests(unittest.TestCase):
                 },
             }
             (staging / "manifests" / "approved.json").write_text(json.dumps(record), encoding="utf-8")
+            pattern_derived = staging / "clips" / "pattern.wav"
+            write_wav(pattern_derived)
+            pattern_record = dict(record)
+            pattern_record.update({
+                "asset_id": "PATTERN-UNREADY",
+                "kind": "audio_region_candidate",
+                "derived_path": str(pattern_derived),
+                "derived_sha256": digest(pattern_derived),
+                "engine_targets": ["PATTERN_MODE"],
+                "musical_metadata": dict(record["musical_metadata"]),
+            })
+            (staging / "manifests" / "pattern.json").write_text(json.dumps(pattern_record), encoding="utf-8")
             output = base / "catalog.json"
             with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
                 result = build_plugin_asset_catalog(staging, output)
@@ -141,6 +153,9 @@ class PluginAssetCatalogTests(unittest.TestCase):
             self.assertEqual(catalog["status"], "READY_FOR_PLUGIN_IMPORT")
             self.assertEqual(catalog["playable_assets"][0]["asset_id"], "ASSET-APPROVED")
             self.assertTrue(catalog["playable_assets"][0]["playable"])
+            pattern_mode = next(item for item in catalog["modes"] if item["mode"] == "PATTERN MODE")
+            self.assertEqual(pattern_mode["asset_count"], 1)
+            self.assertFalse(pattern_mode["assets"][0]["playable_in_mode"])
 
     def test_rejects_derived_asset_outside_staging_and_hash_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
