@@ -50,6 +50,7 @@ def finalize_staging(
     report_dir.mkdir(parents=True, exist_ok=False)
 
     rows: list[dict[str, Any]] = []
+    source_hash_cache: dict[str, str] = {}
     status_counts: Counter[str] = Counter()
     style_counts: Counter[str] = Counter()
     for index, manifest_path in enumerate(manifests, 1):
@@ -89,15 +90,26 @@ def finalize_staging(
                 raise ValueError("Derived WAV SHA-256 mismatch")
             source = Path(record.get("source_path", ""))
             expected_source = str(record.get("source_sha256", "")).upper()
-            if not source.is_file() or not expected_source or _sha256(source) != expected_source:
+            source_key = str(source.resolve())
+            if not source.is_file() or not expected_source:
                 raise ValueError("Original source missing or SHA-256 mismatch")
+            actual_source_hash = source_hash_cache.get(source_key)
+            if actual_source_hash is None:
+                actual_source_hash = _sha256(source)
+                source_hash_cache[source_key] = actual_source_hash
+            if actual_source_hash != expected_source:
+                raise ValueError("Original source SHA-256 mismatch")
             start = int(record.get("source_start_sample", -1))
             end = int(record.get("source_end_sample", -1))
             if start < 0 or end <= start:
                 raise ValueError("Invalid source sample boundaries")
-            with wave.open(str(derived), "rb") as audio:
+            with wave.open(str(source), "rb") as original_audio, wave.open(str(derived), "rb") as audio:
+                if end > original_audio.getnframes():
+                    raise ValueError("Source boundaries exceed original WAV")
                 if audio.getcomptype() != "NONE" or audio.getnframes() != end - start:
                     raise ValueError("WAV frame count/PCM validation failed")
+                if audio.getframerate() != original_audio.getframerate():
+                    raise ValueError("Derived WAV sample rate differs from original")
             tags = record.get("musical_metadata") or {}
             if not isinstance(tags, dict):
                 raise ValueError("musical_metadata must be an object")
@@ -112,7 +124,16 @@ def finalize_staging(
                     raise ValueError(f"Missing or invalid reviewed tag: {field}")
                 row[field] = value
             row["format_family"] = "WAV"
+            validation = record.get("review_validation") or {}
             if row["review_status"] == "REVIEWED" and row["license_status"] == "LICENSE_APPROVED":
+                if not str(tags.get("license_evidence", "")).strip() or not str(tags.get("musical_review_notes", "")).strip():
+                    raise ValueError("Missing explicit license evidence or musical review notes")
+                if not all(validation.get(key) is True for key in (
+                    "source_sha256_verified", "derived_sha256_verified",
+                    "sample_boundaries_verified", "explicit_musical_approval",
+                    "explicit_license_approval",
+                )):
+                    raise ValueError("Missing explicit review/license validation evidence")
                 row["status"] = "FACTORY_READY"
                 style_counts[row["style_family"]] += 1
             elif row["review_status"] != "REVIEWED":
