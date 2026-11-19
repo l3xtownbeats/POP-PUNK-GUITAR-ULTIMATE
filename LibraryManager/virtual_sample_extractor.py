@@ -16,6 +16,10 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from audio_range_io import audio_source_info, write_pcm_wav_range
+
+STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
+
 VERSION = "0.1.0"
 DEFAULT_WINDOW_MS = 20
 DEFAULT_HOP_MS = 10
@@ -224,6 +228,141 @@ def write_virtual_index(report: dict[str, Any], import_root: Path) -> list[Path]
     if sha256_file(source) != report["source_sha256"]:
         raise RuntimeError("Source SHA-256 changed while writing virtual index")
     return written
+
+
+
+def _safe_staging_root(path: Path) -> Path:
+    root = Path(path).expanduser().resolve()
+    try:
+        root.relative_to(STAGING_BASE)
+    except ValueError as exc:
+        raise ValueError("Extracted long-recording WAVs must remain inside LibraryManager/staging") from exc
+    return root
+
+
+def extract_virtual_ranges(
+    report: dict[str, Any],
+    staging_root: Path = STAGING_BASE,
+    *,
+    max_clips: int = 100,
+    min_duration_ms: int = 250,
+) -> list[dict[str, Any]]:
+    """Physically extract reviewed-range candidates from a long WAV to staging.
+
+    The detector only supplies broad sound-active regions. Extracted WAVs remain
+    NEEDS_MUSICAL_REVIEW/UNREVIEWED and are never presented as verified riffs.
+    Source offsets are exact frames; audio is decoded/written in bounded blocks.
+    """
+    if max_clips < 1 or max_clips > 1000 or min_duration_ms < 1:
+        raise ValueError("Invalid virtual-range extraction limits")
+    root = _safe_staging_root(staging_root)
+    source = Path(str(report.get("source_path") or "")).expanduser().resolve()
+    expected_hash = str(report.get("source_sha256") or "").upper()
+    candidates = report.get("candidates")
+    if not source.is_file() or len(expected_hash) != 64:
+        raise ValueError("Virtual-range report must identify an existing source and SHA-256")
+    if not isinstance(candidates, list):
+        raise ValueError("Virtual-range report does not contain a candidate list")
+    if sha256_file(source) != expected_hash:
+        raise RuntimeError("Source SHA-256 changed since long-recording analysis")
+
+    info = audio_source_info(source)
+    clips_dir, manifests_dir = root / "clips", root / "manifests"
+    for folder in (clips_dir, manifests_dir):
+        folder.mkdir(parents=True, exist_ok=True)
+        try:
+            folder.resolve().relative_to(root)
+            folder.resolve().relative_to(STAGING_BASE)
+        except ValueError as exc:
+            raise ValueError("Staging subdirectories must not resolve outside staging") from exc
+
+    results: list[dict[str, Any]] = []
+    created: list[Path] = []
+    seen_ranges: set[tuple[int, int]] = set()
+    try:
+        for candidate in candidates:
+            if len(results) >= max_clips:
+                break
+            start = int(candidate.get("source_start_sample", -1))
+            end = int(candidate.get("source_end_sample", -1))
+            if start < 0 or end <= start or end > info.frames:
+                raise ValueError("Virtual candidate contains an invalid source-frame range")
+            if (end - start) * 1000 < min_duration_ms * info.framerate:
+                continue
+            key = (start, end)
+            if key in seen_ranges:
+                continue
+            seen_ranges.add(key)
+            identity = hashlib.sha256(
+                f"{expected_hash}:LONG_REGION:{start}:{end}:{VERSION}".encode("utf-8")
+            ).hexdigest()[:24].upper()
+            clip = clips_dir / f"REGION-{identity}.wav"
+            manifest = manifests_dir / f"REGION-{identity}.json"
+            if clip.exists() or manifest.exists():
+                raise FileExistsError(f"Refusing to overwrite staged long-recording candidate {identity}")
+
+            clip_info = write_pcm_wav_range(
+                source, start, end, clip, expected_rate=info.framerate,
+            )
+            created.append(clip)
+            record = {
+                "schema_version": 1,
+                "asset_id": identity,
+                "parent_asset_id": expected_hash,
+                "source_path": str(source),
+                "source_sha256": expected_hash,
+                "source_start_sample": start,
+                "source_end_sample": end,
+                "source_start_seconds": round(start / info.framerate, 6),
+                "source_end_seconds": round(end / info.framerate, 6),
+                "frame_count": end - start,
+                "duration_seconds": round((end - start) / info.framerate, 6),
+                "sample_rate": clip_info["sample_rate"],
+                "channels": clip_info["channels"],
+                "sample_width_bytes": clip_info["sample_width_bytes"],
+                "source_format": info.source_format,
+                "source_subtype": info.source_subtype,
+                "derived_format": clip_info["derived_format"],
+                "derived_subtype": clip_info["derived_subtype"],
+                "derived_path": str(clip),
+                "derived_sha256": sha256_file(clip),
+                "kind": "long_recording_region_candidate",
+                "engine_targets": ["PATTERN_INSTRUMENT", "MELODY_INSTRUMENT"],
+                "extractor": "virtual_sample_extractor",
+                "extractor_version": VERSION,
+                "musical_metadata": {
+                    "candidate_type": candidate.get("candidate_type", "SOUND_ACTIVE_REGION"),
+                    "candidate_id": candidate.get("candidate_id", identity),
+                    "acoustic_fingerprint": candidate.get("acoustic_fingerprint", ""),
+                    "fingerprint_algorithm": candidate.get("fingerprint_algorithm", ""),
+                    "boundary_basis": "RMS_ZCR_SOUND_ACTIVE_REGION",
+                    "boundary_confidence": None,
+                    "musical_identity": "NOT_ESTABLISHED",
+                },
+                "confidence": None,
+                "review_status": "NEEDS_MUSICAL_REVIEW",
+                "license_status": "UNREVIEWED",
+                "automatic_factory_promotion": False,
+                "automatic_destructive_action": "NONE",
+            }
+            try:
+                with manifest.open("x", encoding="utf-8") as stream:
+                    json.dump(record, stream, ensure_ascii=False, indent=2)
+                    stream.write("\n")
+                created.append(manifest)
+            except Exception:
+                clip.unlink(missing_ok=True)
+                created.remove(clip)
+                raise
+            results.append(record)
+
+        if sha256_file(source) != expected_hash:
+            raise RuntimeError("Source SHA-256 changed during long-recording extraction")
+        return results
+    except Exception:
+        for path in reversed(created):
+            path.unlink(missing_ok=True)
+        raise
 
 
 def main() -> int:
