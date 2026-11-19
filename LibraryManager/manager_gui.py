@@ -81,16 +81,17 @@ class LibraryManagerApp:
         actions.pack(fill="x", pady=8)
         buttons = [
             ("1. Быстрое сканирование", self.quick_scan_only),
-            ("2. Полный цикл: анализ + извлечение", self.scan),
+            ("2. Быстрый глубокий анализ", self.deep_scan_only),
+            ("3. Полный цикл: анализ + извлечение", self.scan),
             ("Предпрослушать WAV", self.preview_audio),
             ("Остановить звук", self.stop_preview),
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("Отдельное извлечение Pattern WAV", self.extract_patterns),
             ("Очередь ручной проверки", self.open_review_queue),
-            ("3. Проверить WAV-кандидат", self.review_candidate),
-            ("4. Финализировать staging + FACTORY", self.finalize_library),
-            ("5. Распределить проверенные материалы", self.distribute),
+            ("4. Проверить WAV-кандидат", self.review_candidate),
+            ("5. Финализировать staging + FACTORY", self.finalize_library),
+            ("6. Распределить проверенные материалы", self.distribute),
             ("Полный аудит очистки Import", self.audit_cleanup),
             ("Удалить оригиналы после полного аудита", self.cleanup),
             ("Открыть отчёты", self.open_reports),
@@ -307,6 +308,48 @@ class LibraryManagerApp:
         self._write("=== БЫСТРОЕ СКАНИРОВАНИЕ ===")
         self._write("Только обход Import Sample Guitar и чтение файловой метаинформации. SHA-256, декодирование и анализ не запускаются.")
         self._background("Быстрое сканирование", work)
+
+    def deep_scan_only(self) -> None:
+        """Run full file inventory/hash cache without acoustic decoding or extraction."""
+        try:
+            samples = self._samples()
+        except Exception as exc:
+            messagebox.showerror("Папка Samples", str(exc))
+            return
+
+        def work():
+            def report_progress(message: str) -> None:
+                self._worker_events.put(("progress", message))
+
+            report_progress("ЭТАП 1/2: быстрый filesystem scan без SHA-256 и декодирования.")
+            quick_result = quick_scan(
+                samples, progress=report_progress, cancel_event=self._cancel_event,
+            )
+            if self._cancel_event.is_set():
+                raise RuntimeError("Глубокий анализ остановлен после быстрого сканирования.")
+            report_progress("ЭТАП 2/2: глубокая инвентаризация, SHA-256 cache, форматы и SFZ. Аудио не декодируется.")
+            deep_result = run_manager(
+                samples,
+                analyze_audio=False,
+                guitar_source_confirmed=False,
+                write_virtual=False,
+                progress=report_progress,
+                cancel_event=self._cancel_event,
+                workers=1,
+            )
+            return {
+                "quick_scan": quick_result,
+                "deep_inventory": deep_result,
+                "acoustic_analysis_performed": False,
+                "physical_extraction_performed": False,
+                "workers": 1,
+                "source_files_modified": False,
+            }
+
+        self._write("=== БЫСТРЫЙ ГЛУБОКИЙ АНАЛИЗ ===")
+        self._write("Проверка форматов, размеров, SHA-256/кэша, точных дубликатов и SFZ. Без pitch/YIN, акустического декодирования и извлечения WAV.")
+        self._write("На первом проходе SHA-256 читает аудиофайлы; последующие проходы используют кэш неизменённых файлов.")
+        self._background("Быстрый глубокий анализ", work)
 
     def scan(self) -> None:
         """Run the complete preparation pipeline after the fast scan."""
