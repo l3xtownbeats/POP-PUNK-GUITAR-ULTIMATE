@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""Review-gated physical distribution and separately confirmed source cleanup.
+
+The module never guesses classifications. It uses only reviewed manifest tags,
+verifies SHA-256 after every copy, refuses overwrites, and journals operations.
+Original import files are deleted only by a separate explicit cleanup call after
+all listed child assets have verified destinations.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from factory_curator import INSTRUMENTS, ROLES, TONES
+
+VERSION = "0.1.0"
+APPROVED_REVIEW_STATES = {"REVIEWED", "BOUNDARIES_USER_OR_REVIEWER_APPROVED"}
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest().upper()
+
+
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def _tag(metadata: dict[str, Any], field: str, allowed: set[str]) -> str:
+    value = metadata.get(field)
+    if isinstance(value, dict):
+        value = value.get("value")
+    if value not in allowed:
+        raise ValueError(f"Missing/invalid reviewed {field}: {value!r}")
+    return value
+
+
+def _load_approved_manifest(manifest_path: Path, staging_root: Path) -> tuple[dict, Path, str]:
+    manifest_path = manifest_path.resolve()
+    staging_root = staging_root.resolve()
+    if not _inside(manifest_path, staging_root) or not manifest_path.is_file():
+        raise ValueError("Manifest must be an existing file inside LibraryManager/staging")
+    record = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if record.get("review_status") not in APPROVED_REVIEW_STATES:
+        raise ValueError("Musical content/boundaries must be reviewed before distribution")
+    if record.get("license_status") != "LICENSE_APPROVED":
+        raise ValueError("Only LICENSE_APPROVED material can enter FACTORY")
+    source = Path(record.get("derived_path", ""))
+    if not source.is_absolute():
+        source = (manifest_path.parent / source).resolve()
+    if not _inside(source, staging_root) or not source.is_file():
+        raise ValueError("Derived WAV must exist inside LibraryManager/staging")
+    if source.suffix.lower() not in {".wav", ".wave"}:
+        raise ValueError("Only WAV assets can be distributed by this stage")
+    expected = str(record.get("derived_sha256", "")).upper()
+    actual = sha256_file(source)
+    if not expected or actual != expected:
+        raise ValueError("Staged WAV SHA-256 does not match its manifest")
+    return record, source, actual
+
+
+def distribution_plan(manifest_paths: list[Path], samples_root: Path,
+                      staging_root: Path) -> dict[str, Any]:
+    samples_root = samples_root.resolve()
+    factory_root = samples_root / "FACTORY"
+    entries = []
+    seen = set()
+    for manifest_path in manifest_paths:
+        record, source, digest = _load_approved_manifest(manifest_path, staging_root)
+        if digest in seen:
+            raise ValueError(f"Duplicate staged content in one distribution batch: {digest}")
+        seen.add(digest)
+        tags = record.get("musical_metadata") or {}
+        if not isinstance(tags, dict):
+            raise ValueError("musical_metadata must be an object")
+        instrument = _tag(tags, "instrument_family", INSTRUMENTS)
+        role = _tag(tags, "asset_role", ROLES)
+        tone = _tag(tags, "tone_family", TONES)
+        destination_dir = factory_root / instrument / role / tone
+        destination = destination_dir / source.name
+        entries.append({
+            "manifest_path": str(Path(manifest_path).resolve()),
+            "source_path": str(source),
+            "source_sha256": digest,
+            "destination_path": str(destination),
+            "category_path": f"{instrument}/{role}/{tone}",
+            "asset_id": record.get("asset_id"),
+            "engine_targets": record.get("engine_targets", []),
+            "operation": "COPY_TO_FACTORY",
+            "status": "READY_FOR_EXPLICIT_APPROVAL",
+        })
+    return {
+        "schema_version": 1,
+        "manager_version": VERSION,
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "samples_root": str(samples_root),
+        "entries": entries,
+        "automatic_factory_promotion": False,
+        "source_originals_deleted": False,
+    }
+
+
+def _append_journal(journal: Path, event: dict[str, Any]) -> None:
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    with journal.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(event, ensure_ascii=False) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def distribute_assets(plan: dict[str, Any], *, approve: bool = False,
+                      journal_path: Path | None = None) -> dict[str, Any]:
+    """Copy verified assets into FACTORY; dry-run unless approve=True."""
+    if not approve:
+        return {**plan, "executed": False, "status": "DRY_RUN"}
+    journal = (journal_path or (Path(plan["samples_root"]) / "FACTORY" /
+                                "LibraryManagerReports" / "operations.jsonl")).resolve()
+    results = []
+    for entry in plan["entries"]:
+        source = Path(entry["source_path"]).resolve()
+        destination = Path(entry["destination_path"]).resolve()
+        if not source.is_file() or sha256_file(source) != entry["source_sha256"]:
+            raise RuntimeError(f"Staged source changed before distribution: {source}")
+        factory_root = (Path(plan["samples_root"]).resolve() / "FACTORY").resolve()
+        if not _inside(destination, factory_root):
+            raise ValueError("Destination escaped FACTORY")
+        sidecar = destination.with_suffix(destination.suffix + ".json")
+        if destination.exists() or sidecar.exists():
+            raise FileExistsError(f"Refusing to overwrite existing destination: {destination}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        created_audio = False
+        try:
+            with source.open("rb") as src, destination.open("xb") as dst:
+                created_audio = True
+                shutil.copyfileobj(src, dst, length=1024 * 1024)
+            copied_hash = sha256_file(destination)
+            if copied_hash != entry["source_sha256"]:
+                raise IOError("Destination SHA-256 mismatch")
+            original_manifest = json.loads(Path(entry["manifest_path"]).read_text(encoding="utf-8"))
+            distributed_record = dict(original_manifest)
+            distributed_record.update({
+                "distributed_path": str(destination),
+                "distributed_sha256": copied_hash,
+                "distribution_status": "VERIFIED_COPIED",
+                "distribution_operation": "COPY_TO_FACTORY",
+                "distribution_category": entry["category_path"],
+                "distribution_verified_at_utc": datetime.now(timezone.utc).isoformat(),
+            })
+            with sidecar.open("x", encoding="utf-8") as stream:
+                json.dump(distributed_record, stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+            event = {
+                "event": "ASSET_DISTRIBUTED",
+                "at_utc": datetime.now(timezone.utc).isoformat(),
+                "source": str(source),
+                "destination": str(destination),
+                "sha256": copied_hash,
+                "category": entry["category_path"],
+                "status": "VERIFIED_COPIED",
+            }
+            _append_journal(journal, event)
+            results.append(event)
+        except Exception:
+            sidecar.unlink(missing_ok=True)
+            if created_audio:
+                destination.unlink(missing_ok=True)
+            raise
+    return {
+        **plan,
+        "executed": True,
+        "status": "DISTRIBUTION_COMPLETE",
+        "results": results,
+        "journal_path": str(journal),
+        "source_originals_deleted": False,
+    }
+
+
+def cleanup_original_sources(distributed_manifest_paths: list[Path], *,
+                             samples_root: Path, confirm_delete: bool = False,
+                             confirm_all_dependents_accounted_for: bool = False,
+                             journal_path: Path | None = None) -> dict[str, Any]:
+    """Delete source originals only after every supplied dependent is verified.
+
+    The second confirmation explicitly asserts that the supplied manifest list
+    contains every derived asset depending on each source recording.
+    """
+    if not confirm_delete or not confirm_all_dependents_accounted_for:
+        raise ValueError(
+            "Cleanup requires BOTH --confirm-delete-originals and "
+            "--confirm-all-dependents-accounted-for"
+        )
+    samples_root = samples_root.resolve()
+    incoming_root = (samples_root / "Import Sample Guitar").resolve()
+    by_source: dict[str, dict[str, Any]] = {}
+    for manifest_path in distributed_manifest_paths:
+        path = Path(manifest_path).resolve()
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if record.get("distribution_status") != "VERIFIED_COPIED":
+            raise ValueError(f"Dependent asset is not successfully distributed: {path}")
+        destination = Path(record.get("distributed_path", ""))
+        expected_derived = str(record.get("distributed_sha256", "")).upper()
+        if not destination.is_file() or not expected_derived:
+            raise ValueError(f"Distributed asset missing: {destination}")
+        if sha256_file(destination) != expected_derived:
+            raise ValueError(f"Distributed asset integrity check failed: {destination}")
+        source = Path(record.get("source_path", "")).resolve()
+        source_hash = str(record.get("source_sha256", "")).upper()
+        if not _inside(source, incoming_root) or not source.is_file():
+            raise ValueError(f"Original must be an existing file inside Import Sample Guitar: {source}")
+        if not source_hash or sha256_file(source) != source_hash:
+            raise ValueError(f"Original source hash mismatch; refusing cleanup: {source}")
+        key = str(source)
+        entry = by_source.setdefault(key, {
+            "source_path": key,
+            "source_sha256": source_hash,
+            "verified_dependents": [],
+        })
+        if entry["source_sha256"] != source_hash:
+            raise ValueError(f"Conflicting source hashes for {source}")
+        entry["verified_dependents"].append(str(destination))
+
+    plan = {
+        "operation": "DELETE_ORIGINALS_AFTER_VERIFIED_DISTRIBUTION",
+        "sources": list(by_source.values()),
+        "confirm_all_dependents_accounted_for": True,
+        "confirm_delete": True,
+    }
+    if not by_source:
+        return {**plan, "deleted": [], "status": "NOTHING_TO_DELETE"}
+    journal = (journal_path or (samples_root / "FACTORY" /
+                                "LibraryManagerReports" / "operations.jsonl")).resolve()
+    # Validate every source and every dependent before deleting any source.
+    for item in plan["sources"]:
+        source = Path(item["source_path"])
+        if sha256_file(source) != item["source_sha256"]:
+            raise RuntimeError(f"Source changed during cleanup preflight: {source}")
+        for dependent in item["verified_dependents"]:
+            if not Path(dependent).is_file():
+                raise RuntimeError(f"Dependent asset disappeared: {dependent}")
+    deleted = []
+    for item in plan["sources"]:
+        source = Path(item["source_path"])
+        event = {
+            "event": "ORIGINAL_SOURCE_DELETED_AFTER_CONFIRMATION",
+            "at_utc": datetime.now(timezone.utc).isoformat(),
+            "source": str(source),
+            "source_sha256": item["source_sha256"],
+            "verified_dependents": item["verified_dependents"],
+        }
+        _append_journal(journal, event)
+        source.unlink()
+        deleted.append(event)
+    return {**plan, "deleted": deleted, "status": "ORIGINAL_CLEANUP_COMPLETE",
+            "journal_path": str(journal)}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Review-gated asset distribution and source cleanup.")
+    sub = parser.add_subparsers(dest="command", required=True)
+    plan_parser = sub.add_parser("plan")
+    plan_parser.add_argument("samples_root", type=Path)
+    plan_parser.add_argument("staging_root", type=Path)
+    plan_parser.add_argument("manifests", nargs="+", type=Path)
+    copy_parser = sub.add_parser("distribute")
+    copy_parser.add_argument("plan", type=Path)
+    copy_parser.add_argument("--approve", action="store_true")
+    copy_parser.add_argument("--journal", type=Path)
+    cleanup_parser = sub.add_parser("cleanup-originals")
+    cleanup_parser.add_argument("samples_root", type=Path)
+    cleanup_parser.add_argument("distributed_manifests", nargs="+", type=Path)
+    cleanup_parser.add_argument("--confirm-delete-originals", action="store_true")
+    cleanup_parser.add_argument("--confirm-all-dependents-accounted-for", action="store_true")
+    cleanup_parser.add_argument("--journal", type=Path)
+    args = parser.parse_args()
+    if args.command == "plan":
+        result = distribution_plan(args.manifests, args.samples_root, args.staging_root)
+    elif args.command == "distribute":
+        plan = json.loads(args.plan.read_text(encoding="utf-8"))
+        result = distribute_assets(plan, approve=args.approve, journal_path=args.journal)
+    else:
+        result = cleanup_original_sources(
+            args.distributed_manifests, samples_root=args.samples_root,
+            confirm_delete=args.confirm_delete_originals,
+            confirm_all_dependents_accounted_for=args.confirm_all_dependents_accounted_for,
+            journal_path=args.journal,
+        )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
