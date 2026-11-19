@@ -14,8 +14,9 @@ from typing import Any
 
 from audio_segmenter import STAGING_BASE, _safe_staging_root, propose_segments
 from audio_range_io import audio_source_info, write_pcm_wav_range
+from melody_note_mapper import map_single_note_candidate
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def _identity(source_hash: str, mode: str, start: int, end: int) -> str:
@@ -186,9 +187,8 @@ def prepare_sample_and_melody(
             created.append(clip)
             record = _record(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
-                "sample_note_candidate", ["SAMPLE_MODE", "MELODY_MODE", "KEYBOARD_PLAYBACK"],
-                {"melody_asset_role": "SINGLE_GUITAR_NOTE",
-                 "one_sound_one_note": True,
+                "melody_single_note_candidate", ["SAMPLE_MODE", "MELODY_MODE", "KEYBOARD_PLAYBACK"],
+                {**map_single_note_candidate(event),
                  "midi_note_candidate": event.get("midi_note_candidate"),
                  "note_name_candidate": event.get("note_name_candidate"),
                  "detected_note_start_seconds": event.get("detected_note_start_seconds"),
@@ -273,6 +273,7 @@ def prepare_sample_and_melody(
         "license_status": "UNREVIEWED",
         "source_modified": False,
         "limitations": [
+            "MELODY MODE now receives each extracted event as its own single-note WAV asset; MIDI mapping remains a candidate until review confirms the pitch.",
             "Pitch-event detection is monophonic and may miss chords or overlapping guitar notes. Single-note clips remain candidates until one-note identity and pitch are reviewed.",
             "Melody phrases are grouped by a time-gap heuristic, not verified musical bars or phrases.",
             "Velocity layers, articulation labels, chord recognition and tuning require separate analysis/review.",
