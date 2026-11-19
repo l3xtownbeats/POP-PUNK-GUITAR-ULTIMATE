@@ -47,6 +47,9 @@ def review_manifest(
     confirmed_midi_note: int | None = None,
     confirmed_chord_name: str | None = None,
     confirmed_note_sequence: list[int] | None = None,
+    confirmed_techniques: list[str] | None = None,
+    confirmed_velocity_layer: str | None = None,
+    advanced_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate provenance and atomically record explicit human approvals."""
     manifest_path = Path(manifest_path).resolve()
@@ -88,6 +91,77 @@ def review_manifest(
     ):
         raise ValueError("confirmed_note_sequence must contain at least two MIDI note numbers from 0 to 127")
 
+    allowed_techniques = {
+        "DOWNSTROKE", "UPSTROKE", "PALM_MUTE", "OPEN", "MUTED", "SLIDE",
+        "LEGATO", "HAMMER_ON", "PULL_OFF", "NATURAL_HARMONIC",
+        "PINCH_HARMONIC", "TREMOLO", "CHOKE", "LET_RING", "DEAD_NOTE",
+    }
+    selected_techniques = list(confirmed_techniques or [])
+    if len(selected_techniques) != len(set(selected_techniques)) or any(
+        item not in allowed_techniques for item in selected_techniques
+    ):
+        raise ValueError("confirmed_techniques contains an unsupported or duplicate technique")
+    if confirmed_velocity_layer not in (None, "", "UNKNOWN", "LOW", "MEDIUM", "HIGH"):
+        raise ValueError("confirmed_velocity_layer must be LOW, MEDIUM, HIGH or UNKNOWN")
+    extra = dict(advanced_metadata or {})
+    allowed_extra = {
+        "pattern_performance_review", "confirmed_melody_events",
+        "melody_phrase_boundaries", "melody_mapping_verified",
+        "velocity_min", "velocity_max",
+    }
+    if set(extra) - allowed_extra:
+        raise ValueError("advanced_metadata contains unsupported fields")
+    pattern = extra.get("pattern_performance_review")
+    if pattern is not None:
+        if not isinstance(pattern, dict):
+            raise ValueError("pattern_performance_review must be an object")
+        start, end = pattern.get("loop_start_sample"), pattern.get("loop_end_sample")
+        if type(start) is not int or type(end) is not int or start < 0 or end <= start:
+            raise ValueError("Pattern loop sample boundaries must be valid integers")
+        tempo = pattern.get("tempo_bpm")
+        if not isinstance(tempo, (int, float)) or not 20 <= tempo <= 400:
+            raise ValueError("Pattern tempo_bpm must be between 20 and 400")
+        if not isinstance(pattern.get("time_signature"), str) or "/" not in pattern["time_signature"]:
+            raise ValueError("Pattern time_signature must be like 4/4")
+        for field in ("attack_events", "beat_grid", "technique_events", "harmonic_events"):
+            if not isinstance(pattern.get(field), list) or not pattern[field]:
+                raise ValueError(f"Pattern {field} must be a non-empty list")
+        if pattern.get("cycle_integrity_verified") is not True or pattern.get("musical_review_verified") is not True:
+            raise ValueError("Pattern cycle integrity and musical review must be explicitly verified")
+    melody_events = extra.get("confirmed_melody_events")
+    if melody_events is not None:
+        if not isinstance(melody_events, list) or len(melody_events) < 2:
+            raise ValueError("confirmed_melody_events must contain at least two events")
+        previous_start = -1.0
+        for event in melody_events:
+            if not isinstance(event, dict):
+                raise ValueError("Each confirmed melody event must be an object")
+            note, velocity = event.get("midi_note"), event.get("velocity")
+            start, duration = event.get("start_beats"), event.get("duration_beats")
+            if type(note) is not int or not 0 <= note <= 127:
+                raise ValueError("Melody event midi_note must be in 0..127")
+            if type(velocity) is not int or not 1 <= velocity <= 127:
+                raise ValueError("Melody event velocity must be in 1..127")
+            if not isinstance(start, (int, float)) or start < previous_start:
+                raise ValueError("Melody event start_beats must be non-negative and ordered")
+            if not isinstance(duration, (int, float)) or duration <= 0:
+                raise ValueError("Melody event duration_beats must be positive")
+            previous_start = float(start)
+    boundaries = extra.get("melody_phrase_boundaries")
+    if boundaries is not None and (
+        not isinstance(boundaries, list) or len(boundaries) < 2
+        or any(not isinstance(value, (int, float)) for value in boundaries)
+        or boundaries != sorted(boundaries)
+    ):
+        raise ValueError("melody_phrase_boundaries must be an ordered list of at least two beat positions")
+    for field in ("velocity_min", "velocity_max"):
+        value = extra.get(field)
+        if value is not None and (type(value) is not int or not 1 <= value <= 127):
+            raise ValueError(f"{field} must be an integer in 1..127")
+    if extra.get("velocity_min") is not None and extra.get("velocity_max") is not None:
+        if extra["velocity_min"] > extra["velocity_max"]:
+            raise ValueError("velocity_min cannot exceed velocity_max")
+
     record = json.loads(manifest_path.read_text(encoding="utf-8"))
     derived = Path(record.get("derived_path", ""))
     if not derived.is_absolute():
@@ -124,7 +198,12 @@ def review_manifest(
         raise ValueError("musical_metadata must be a JSON object")
     # A fresh review must re-confirm mappings; blank input revokes stale
     # confirmations instead of silently carrying them forward.
-    for field in ("confirmed_midi_note", "confirmed_chord_name", "confirmed_note_sequence"):
+    for field in (
+        "confirmed_midi_note", "confirmed_chord_name", "confirmed_note_sequence",
+        "confirmed_techniques", "confirmed_velocity_layer", "velocity_min", "velocity_max",
+        "pattern_performance_review", "confirmed_melody_events",
+        "melody_phrase_boundaries", "melody_mapping_verified",
+    ):
         metadata.pop(field, None)
     metadata.update({
         "style_family": style_family,
@@ -141,6 +220,11 @@ def review_manifest(
         metadata["confirmed_chord_name"] = confirmed_chord_name.strip()
     if selected_note_sequence:
         metadata["confirmed_note_sequence"] = selected_note_sequence
+    if selected_techniques:
+        metadata["confirmed_techniques"] = selected_techniques
+    if confirmed_velocity_layer and confirmed_velocity_layer != "UNKNOWN":
+        metadata["confirmed_velocity_layer"] = confirmed_velocity_layer
+    metadata.update(extra)
     record["review_status"] = "REVIEWED"
     record["license_status"] = "LICENSE_APPROVED"
     record["reviewed_at_utc"] = datetime.now(timezone.utc).isoformat()
@@ -154,7 +238,7 @@ def review_manifest(
         "explicit_license_approval": True,
         "musical_mapping_verified": bool(
             confirmed_midi_note is not None or confirmed_chord_name is not None
-            or selected_note_sequence
+            or selected_note_sequence or bool(melody_events)
         ),
     }
 
