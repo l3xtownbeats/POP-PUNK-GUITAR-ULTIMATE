@@ -38,6 +38,14 @@ class PerformanceManifestTests(unittest.TestCase):
                 "playable": False,
                 "target_modes": ["SAMPLE MODE"],
             }]
+            arpeggio = next(item for item in catalog["modes"] if item["mode"] == "ARPEGGIO")
+            arpeggio["candidates"] = [{
+                "candidate_id": "VOICING-CANDIDATE-1",
+                "candidate_type": "ARPEGGIO_VOICING_HYPOTHESIS",
+                "voicing_candidates": [{"voicing_candidate_id": "VOICING-001",
+                                        "review_status": "NEEDS_MUSICAL_REVIEW"}],
+                "tuning_status": "NEEDS_CONFIRMATION",
+            }]
             catalog_path = base / "plugin_asset_catalog.json"
             output = base / "performance_manifest.json"
             catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
@@ -49,6 +57,7 @@ class PerformanceManifestTests(unittest.TestCase):
             self.assertEqual(manifest["events"], [])
             self.assertTrue(manifest["event_contract"]["unknown_timing_must_remain_unknown"])
             self.assertEqual(manifest["asset_bindings"][0]["asset_id"], "SAMPLE-1")
+            self.assertEqual(manifest["mode_candidate_bindings"]["ARPEGGIO"][0]["candidate_type"], "ARPEGGIO_VOICING_HYPOTHESIS")
             self.assertEqual(validate_performance_manifest(manifest), [])
 
     def test_rejects_unreviewed_runtime_event(self):
