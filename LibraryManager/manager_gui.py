@@ -32,7 +32,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "3.0.0-dev1"
+APP_VERSION = "3.0.0-dev2"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
