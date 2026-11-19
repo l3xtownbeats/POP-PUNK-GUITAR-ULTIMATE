@@ -24,7 +24,7 @@ from asset_classifier import classify_wav
 from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, infer_labels, sha256_file, wav_info
 from pattern_pipeline import build_pattern_report
 from sfz_parser import parse_sfz_file
-from virtual_sample_extractor import analyze_long_wav, write_virtual_index
+from virtual_sample_extractor import analyze_pattern_ranges, write_virtual_index
 from other_audit import audit_other_library
 
 VERSION = "2.2.0"
@@ -439,19 +439,20 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         },
                         "virtual_extraction": None,
                     }
-                    duration_seconds = float(meta.get("duration_seconds") or 0.0)
-                    if (guitar_source_confirmed and ext in {".wav", ".wave"}
-                            and 5.0 <= duration_seconds <= 600.0):
-                        virtual = analyze_long_wav(path, guitar_source_confirmed=True)
+                    if guitar_source_confirmed and ext in {".wav", ".wave"}:
+                        # Pattern Mode uses repeated rhythmic motifs only; broad RMS
+                        # active regions are not treated as loops or riffs.
+                        virtual = analyze_pattern_ranges(
+                            path, pattern, guitar_source_confirmed=True,
+                            source_sha256=digest,
+                        )
                         audio_record["virtual_extraction"] = virtual
                         if write_virtual and virtual.get("candidate_count", 0):
                             audio_record["virtual_index_files"] = [
                                 str(p) for p in write_virtual_index(virtual, incoming)
                             ]
                     elif guitar_source_confirmed:
-                        audio_record["virtual_extraction_status"] = (
-                            "SKIPPED_NON_WAV_OR_OUTSIDE_5_TO_600_SECONDS"
-                        )
+                        audio_record["virtual_extraction_status"] = "SKIPPED_NON_WAV"
                     row["audio_analysis_status"] = "ANALYZED"
                     row["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
                     row["asset_kind_candidate"] = classification.get("asset_kind_candidate", "UNKNOWN")
@@ -513,7 +514,34 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     classification_reports: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = list(walk_errors)
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
-    supported_files = list(included)  # Hash and report unsupported files too; never silently omit them.
+    # SFZ maps are parsed first so their referenced WAVs can be prioritized.
+    sfz_rows: list[dict[str, Any]] = []
+    sfz_files = sorted((p for p in included if p.suffix.lower() == ".sfz"),
+                       key=lambda p: str(p).casefold())
+    for index, sfz in enumerate(sfz_files, 1):
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("Анализ остановлен пользователем на этапе приоритетного SFZ.")
+        try:
+            sfz_rows.extend(parse_sfz_file(sfz, incoming))
+        except Exception as exc:
+            errors.append({"path": str(sfz.relative_to(incoming)), "stage": "SFZ_PARSE",
+                           "error": f"{type(exc).__name__}: {exc}"})
+        if index % 25 == 0:
+            emit(f"Приоритетный разбор SFZ: {index}/{len(sfz_files)}…")
+    sfz_referenced = {
+        str(Path(str(row.get("resolved_sample") or "")).resolve()).casefold()
+        for row in sfz_rows if row.get("status") == "FOUND" and row.get("resolved_sample")
+    }
+    supported_files = sorted(
+        included,
+        key=lambda p: (
+            0 if p.suffix.lower() == ".sfz" else
+            1 if str(p.resolve()).casefold() in sfz_referenced else
+            2 if p.suffix.lower() in AUDIO_EXT else 3,
+            str(p).casefold(),
+        ),
+    )  # SFZ, mapped WAV, other audio, then non-audio metadata.
+
     worker_count = max(1, min(int(workers if workers is not None else 1), 2))
     completed = 0
     pending = set()
@@ -591,18 +619,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             errors.append({"path": str(path.relative_to(incoming)), "stage": "STAT",
                            "error": f"{type(exc).__name__}: {exc}"})
 
-    emit(f"ЭТАП 2/4 ЗАВЕРШЁН: {len(inventory)} файлов, ошибок: {len(errors)}. ЭТАП 3/4: проверка SFZ-ссылок…")
-    sfz_rows: list[dict[str, Any]] = []
-    for index, sfz in enumerate((p for p in included if p.suffix.lower() == ".sfz"), 1):
-        if cancel_event is not None and cancel_event.is_set():
-            raise RuntimeError("Анализ остановлен пользователем на этапе SFZ.")
-        try:
-            sfz_rows.extend(parse_sfz_file(sfz, incoming))
-        except Exception as exc:
-            errors.append({"path": str(sfz.relative_to(incoming)), "stage": "SFZ_PARSE",
-                           "error": f"{type(exc).__name__}: {exc}"})
-        if index % 25 == 0:
-            emit(f"Проверка SFZ: {index} файлов…")
+    emit(f"ЭТАП 2/4 ЗАВЕРШЁН: {len(inventory)} файлов, ошибок: {len(errors)}. ЭТАП 3/4: SFZ уже разобран первым; проверяю ссылки…")
 
     duplicates = [
         {"sha256": digest, "count": len(paths), "paths": paths}
