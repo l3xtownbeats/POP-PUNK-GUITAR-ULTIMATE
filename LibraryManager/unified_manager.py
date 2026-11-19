@@ -334,7 +334,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         f"{row.get('audio_analysis_status', row.get('category_suggestion', 'OK'))}]"
                     )
                     try:
-                        pending.add(pool.submit(process_one, next(iterator)))
+                        pending.add(pool.submit(safe_process_one, next(iterator)))
                     except StopIteration:
                         pass
                     if completed % 25 == 0:
