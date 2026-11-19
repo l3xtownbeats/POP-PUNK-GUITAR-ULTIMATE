@@ -14,6 +14,7 @@ from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 
 from unified_manager import run_manager
+from pattern_clip_extractor import extract_pattern_occurrences
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -62,8 +63,9 @@ class LibraryManagerApp:
         actions.pack(fill="x", pady=8)
         buttons = [
             ("1. Анализ библиотеки", self.scan),
-            ("2. Распределить проверенные материалы", self.distribute),
-            ("3. Удалить оригиналы после проверки", self.cleanup),
+            ("2. Извлечь найденные ритм-паттерны в WAV", self.extract_patterns),
+            ("3. Распределить проверенные материалы", self.distribute),
+            ("4. Удалить оригиналы после проверки", self.cleanup),
             ("Открыть отчёты", self.open_reports),
             ("Открыть staging", self.open_staging),
         ]
@@ -135,6 +137,65 @@ class LibraryManagerApp:
                 write_virtual=False,
             )
         self._background("Анализ библиотеки", work)
+
+    def extract_patterns(self) -> None:
+        report_path = filedialog.askopenfilename(
+            title="Выберите unified_audio_analysis.json из отчёта анализа",
+            initialdir=str(MANAGER_DIR / "reports"),
+            filetypes=[("Audio analysis report", "unified_audio_analysis.json"), ("JSON", "*.json")],
+        )
+        if not report_path:
+            return
+        try:
+            records = json.loads(Path(report_path).read_text(encoding="utf-8"))
+            if not isinstance(records, list):
+                raise ValueError("Ожидается список аудио-отчётов.")
+            eligible = [
+                item for item in records
+                if (item.get("pattern_analysis") or {}).get("pattern_analysis", {}).get("patterns")
+            ]
+            if not eligible:
+                messagebox.showinfo("Паттерны не найдены",
+                                    "В отчёте нет повторяющихся ритмических кандидатов для извлечения.")
+                return
+            total = sum(
+                len(item["pattern_analysis"]["pattern_analysis"]["patterns"])
+                for item in eligible
+            )
+            if not messagebox.askyesno(
+                "Физическое извлечение WAV",
+                f"Найдено исходных файлов с кандидатами: {len(eligible)}.\n"
+                f"Кандидатов паттернов: {total}.\n"
+                "Будут созданы отдельные WAV-фрагменты в LibraryManager/staging/clips "
+                "и JSON-манифесты в staging/manifests.\n"
+                "Все фрагменты останутся NEEDS_MUSICAL_REVIEW и UNREVIEWED.\n"
+                "Продолжить?"
+            ):
+                return
+        except Exception as exc:
+            messagebox.showerror("Отчёт анализа", str(exc))
+            return
+
+        def work():
+            extracted = []
+            failures = []
+            for item in eligible:
+                pattern_report = item["pattern_analysis"]
+                try:
+                    extracted.extend(extract_pattern_occurrences(pattern_report))
+                except Exception as exc:
+                    failures.append({
+                        "source_path": item.get("source_path"),
+                        "error": f"{type(exc).__name__}: {exc}",
+                    })
+            return {
+                "extracted_count": len(extracted),
+                "assets": extracted,
+                "failures": failures,
+                "review_required": True,
+                "license_review_required": True,
+            }
+        self._background("Извлечение ритм-паттернов", work)
 
     def distribute(self) -> None:
         try:
