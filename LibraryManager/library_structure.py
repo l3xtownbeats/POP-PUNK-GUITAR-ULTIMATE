@@ -139,7 +139,13 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
             techniques = _reviewed_techniques(asset, metadata)
             pitches = _pitch_records(asset, metadata)
             velocity = _velocity_record(asset, metadata)
-            playable = bool(asset.get("playable") and asset.get("playable_in_mode"))
+            playable = bool(
+                asset.get("playable") and asset.get("playable_in_mode")
+                and asset.get("review_status") == "REVIEWED"
+                and asset.get("license_status") == "LICENSE_APPROVED"
+                and asset.get("integrity_status") == "VERIFIED"
+                and asset.get("asset_file")
+            )
             status = "RUNTIME_READY" if playable else (
                 "REVIEW_REQUIRED" if asset.get("review_status") != "REVIEWED"
                 or asset.get("license_status") != "LICENSE_APPROVED" else "MODE_MAPPING_BLOCKED"
