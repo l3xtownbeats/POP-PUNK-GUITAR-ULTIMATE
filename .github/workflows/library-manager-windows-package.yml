@@ -22,7 +22,7 @@ jobs:
           python -m pip install -r LibraryManager/requirements.txt
           python -m pip install -r LibraryManager/requirements-build.txt
       - name: Build portable folder
-        run: python -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths LibraryManager --collect-all soundfile --collect-all _soundfile_data --distpath dist LibraryManager/manager_gui.py
+        run: python -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths LibraryManager --add-data "LibraryManager/PORTABLE_USER_GUIDE_RU.md;." --collect-all soundfile --collect-all _soundfile_data --distpath dist LibraryManager/manager_gui.py
       - name: Verify executable and archive
         shell: pwsh
         run: |
