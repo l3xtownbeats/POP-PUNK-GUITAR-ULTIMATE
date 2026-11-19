@@ -130,6 +130,7 @@ class PluginAssetCatalogTests(unittest.TestCase):
                     "sample_boundaries_verified": True,
                     "explicit_musical_approval": True,
                     "explicit_license_approval": True,
+                    "single_note_identity_verified": True,
                 },
             }
             (staging / "manifests" / "approved.json").write_text(json.dumps(record), encoding="utf-8")
