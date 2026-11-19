@@ -478,3 +478,12 @@ Melody использует самостоятельную логику испо
 - Pattern readiness независимо проверяет loop bounds, BPM, time signature, attack/beat-grid/technique/harmonic events и обе отметки подтверждения. Melody readiness проверяет pitch, timing, duration, velocity, phrase boundaries и mapping verification.
 - Добавлен regression test, гарантирующий, что pitch-specific Pattern note zone не классифицируется как ритм-луп.
 - CI на GitHub Actions всё ещё завершает job до runner allocation: `runner_id=0`, `steps=null`, `logs_url=null`; успешный прогон тестов не подтверждён.
+
+
+## TJ-2026-11-19-MANAGER-30-VALIDATION-022 — усиление проверок структурных карт
+
+- Версия разработки: `3.0.0-dev5`.
+- Pattern loop bounds дополнительно сверяются с frame_count конкретного staged WAV.
+- Pattern note zone получает `NOTE_ZONE_READY` только при наличии подтверждённой pitch zone и реальной ссылки на derived WAV; это не делает её автоматически runtime-ready.
+- Melody readiness проверяет, что список MIDI событий точно совпадает с подтверждённой последовательностью нот, а каждое событие имеет валидные pitch/start/duration/velocity и phrase boundaries.
+- Все три статуса review/license/integrity и mode-specific `playable_modes` остаются независимыми блокирующими gates.
