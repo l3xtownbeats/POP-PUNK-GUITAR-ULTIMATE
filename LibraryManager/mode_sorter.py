@@ -21,7 +21,7 @@ MODE_ORDER = (
 MODE_PURPOSES = {
     "SAMPLE MODE": "Individual notes, one-shots and reviewed chord/power-chord samples.",
     "STRUMMING": "Reviewed downstroke, upstroke and chord-strumming patterns.",
-    "ARPEGGIO": "Reviewed chord voicings and individual-string attacks.",
+    "ARPEGGIO": "Generated chord voicing hypotheses and reviewed individual-string attack events.",
     "PATTERN MODE": "Verified repeating rhythmic patterns with preserved timing.",
     "RIFF MODE": "Musically reviewed guitar riffs and characteristic fragments.",
     "MELODY MODE": "Melodic note sequences supported by pitch-event evidence.",
@@ -33,7 +33,7 @@ MODE_PURPOSES = {
 
 _MANUAL_ONLY = {
     "STRUMMING": "Requires human confirmation of strum direction and chord performance.",
-    "ARPEGGIO": "Requires verified string/fret or voicing evidence; envelope analysis is insufficient.",
+    "ARPEGGIO": "Generated voicings require tuning/fingering review; envelope analysis alone is insufficient.",
     "ARTICULATIONS": "Requires listening review; Palm Mute/Open/Slide/Legato are not inferred from filename or RMS.",
     "ENDING": "Requires musical-context review; an isolated fragment is not automatically an ending.",
 }
