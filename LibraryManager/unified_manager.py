@@ -259,15 +259,20 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         if cancel_event is not None and cancel_event.is_set():
             raise RuntimeError("Анализ остановлен пользователем.")
         stat = path.stat()
-        emit(f"[ФАЙЛ] {path.name} — {stat.st_size:,} байт; подготовка SHA-256…")
-        key = str(path.resolve())
-        cached = cached_rows.get(key)
-        if cached and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
+        ext = path.suffix.lower()
+        relative = str(path.relative_to(incoming))
+        # Hash only audio and SFZ assets. Archives and unrelated files are
+        # inventoried by metadata; hashing multi-GB archives adds no value to
+        # guitar classification and needlessly stalls the scan.
+        hash_required = ext in AUDIO_EXT or ext == ".sfz"
+        key = str(path.resolve()) if hash_required else ""
+        cached = cached_rows.get(key) if key else None
+        if not hash_required:
+            digest, hash_source = "", "SKIPPED_NON_AUDIO"
+        elif cached and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
             digest, hash_source = cached[2], "CACHE"
         else:
             digest, hash_source = hash_with_cancel(path), "COMPUTED"
-        ext = path.suffix.lower()
-        relative = str(path.relative_to(incoming))
         row: dict[str, Any] = {
             "relative_path": relative, "filename": path.name, "extension": ext,
             "bytes": stat.st_size, "sha256": digest, "source_path": str(path.resolve()),
@@ -282,8 +287,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                        classification_status="MANUAL_REVIEW_REQUIRED",
                        unsupported_reason="File extension is not currently supported by the analysis pipeline.")
         elif ext in AUDIO_EXT:
-            emit(f"[МЕТАДАННЫЕ] {path.name} — чтение заголовка аудио…")
-            meta = wav_info(path)
+                meta = wav_info(path)
             row.update(meta)
             row["category_suggestion"] = (
                 "AUDIO_SAMPLE" if meta.get("wav_status") in {"OK", "NON_PCM_OR_EXTENSIBLE"}
@@ -293,7 +297,6 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 try:
                     if cancel_event is not None and cancel_event.is_set():
                         raise RuntimeError("Анализ остановлен пользователем.")
-                    emit(f"[АКУСТИКА] {path.name} — анализ аудио и ритма…")
                     acoustic = analyse_wav(path)
                     acoustic["source_sha256"] = digest
                     classification = classify_wav(path, analyze_pitch=True)
@@ -374,7 +377,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     errors: list[dict[str, str]] = []
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
     supported_files = list(included)  # Hash and report unsupported files too; never silently omit them.
-    worker_count = max(1, min(int(workers or min(4, os.cpu_count() or 2)), 8))
+    worker_count = max(1, min(int(workers or min(8, os.cpu_count() or 4)), 12))
     completed = 0
     pending = set()
     iterator = iter(supported_files)
@@ -410,12 +413,14 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                             (*result["cache"], datetime.now(timezone.utc).isoformat())
                         )
                     completed += 1
-                    emit(
-                        f"Обработка файлов: {completed}/{len(supported_files)} "
-                        f"({completed / max(1, len(supported_files)):.0%}) — "
-                        f"{row['filename']} [{row.get('hash_source')}; "
-                        f"{row.get('audio_analysis_status', row.get('category_suggestion', 'OK'))}]"
-                    )
+                    # Keep the Tk event queue bounded: report progress in
+                    # batches, not once per file (12k events can freeze the UI).
+                    if completed == 1 or completed % 50 == 0 or completed == len(supported_files):
+                        emit(
+                            f"Обработка: {completed}/{len(supported_files)} "
+                            f"({completed / max(1, len(supported_files)):.0%}); "
+                            f"последний файл: {row['filename']}"
+                        )
                     try:
                         pending.add(pool.submit(safe_process_one, next(iterator)))
                     except StopIteration:
