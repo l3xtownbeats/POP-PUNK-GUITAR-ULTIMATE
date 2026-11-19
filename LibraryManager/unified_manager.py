@@ -192,8 +192,11 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 reports_root: Path | None = None,
                 progress: Callable[[str], None] | None = None,
                 cancel_event: Any = None,
-                workers: int | None = None) -> dict[str, Any]:
-    """Run a resumable, parallel, read-only inventory and analysis pass.
+                workers: int | None = 2) -> dict[str, Any]:
+    """Run a resumable, low-memory read-only inventory and analysis pass.
+
+    Defaults to at most two workers for dual-core/8GB systems; callers may
+    request one worker for very large WAV files or slow mechanical disks.
 
     SHA-256 values are cached by absolute path + size + mtime_ns. Unchanged
     files are not re-read on subsequent runs. All source files are read-only.
@@ -249,7 +252,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             while True:
                 if cancel_event is not None and cancel_event.is_set():
                     raise RuntimeError("Анализ остановлен пользователем.")
-                block = stream.read(8 * 1024 * 1024)
+                block = stream.read(1024 * 1024)
                 if not block:
                     break
                 h.update(block)
@@ -378,13 +381,13 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     errors: list[dict[str, str]] = []
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
     supported_files = list(included)  # Hash and report unsupported files too; never silently omit them.
-    worker_count = max(1, min(int(workers or min(8, os.cpu_count() or 4)), 12))
+    worker_count = max(1, min(int(workers if workers is not None else 2), 2))
     completed = 0
     pending = set()
     iterator = iter(supported_files)
     try:
         with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="LibraryScan") as pool:
-            for _ in range(min(len(supported_files), worker_count * 2)):
+            for _ in range(min(len(supported_files), worker_count)):
                 try:
                     pending.add(pool.submit(safe_process_one, next(iterator)))
                 except StopIteration:
