@@ -14,7 +14,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 
-from unified_manager import run_manager, quick_scan, resolve_samples_root
+from unified_manager import AUDIO_EXT, run_manager, quick_scan, resolve_samples_root
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
@@ -312,7 +312,7 @@ class LibraryManagerApp:
                     if extracted_sample + extracted_melody >= 500:
                         break
                     source = Path(record.get("source_path", ""))
-                    if source.suffix.lower() not in {".wav", ".wave"}:
+                    if source.suffix.lower() not in AUDIO_EXT:
                         continue
                     try:
                         remaining = max(1, 500 - extracted_sample - extracted_melody)
