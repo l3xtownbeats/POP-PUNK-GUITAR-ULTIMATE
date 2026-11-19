@@ -57,7 +57,7 @@ def write_pcm_wav_range(
 ) -> dict[str, Any]:
     """Write an exact source frame range as a new 24-bit PCM WAV.
 
-    Reads only the requested range into memory. The destination is created
+    Decodes at most 65,536 frames at a time. The destination is created
     exclusively and partial output is removed on failure.
     """
     import soundfile as sf
