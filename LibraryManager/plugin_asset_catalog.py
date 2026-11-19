@@ -74,7 +74,7 @@ def _candidate_mode_assignments(record: dict[str, Any]) -> list[str]:
     # note-playable Pattern Mode; it is not a whole-loop chord-performance WAV.
     if kind == "note_event" and "PATTERN MODE" not in modes:
         modes.append("PATTERN MODE")
-    return modes
+    return list(dict.fromkeys(modes))
 
 
 def _read_mode_candidates(mode_report_path: Path | None) -> dict[str, list[dict[str, Any]]]:
