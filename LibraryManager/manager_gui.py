@@ -40,7 +40,7 @@ class LibraryManagerApp:
         self.root.geometry("980x680")
         self.root.minsize(760, 520)
         self.samples_root = tk.StringVar(value=str(DEFAULT_SAMPLES))
-        self.analyze_audio = tk.BooleanVar(value=True)
+        self.analyze_audio = tk.BooleanVar(value=False)
         self.guitar_confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Готов. Выберите Samples или непосредственно Import Sample Guitar.")
         # Worker threads must never call Tkinter methods. They only enqueue events;
@@ -72,9 +72,9 @@ class LibraryManagerApp:
 
         options = ttk.Frame(outer)
         options.pack(fill="x", pady=6)
-        ttk.Checkbutton(options, text="Акустический и ритмический анализ аудиофайлов",
+        ttk.Checkbutton(options, text="ТЯЖЁЛЫЙ режим: акустический, pitch и ритмический анализ (медленнее)",
                         variable=self.analyze_audio).pack(side="left")
-        ttk.Checkbutton(options, text="Подтверждаю, что входные файлы — гитарный материал",
+        ttk.Checkbutton(options, text="Подтверждаю гитарный материал (виртуальные кандидаты)",
                         variable=self.guitar_confirmed).pack(side="left", padx=16)
 
         actions = ttk.LabelFrame(outer, text="Рабочие операции", padding=8)
