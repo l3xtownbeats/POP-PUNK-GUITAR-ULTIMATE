@@ -67,22 +67,43 @@ class ManifestReviewTests(unittest.TestCase):
             self.assertTrue(record["review_validation"]["source_sha256_verified"])
 
     def test_review_records_only_explicit_valid_mode_assignments(self):
-        manifest, staging, source, derived = self._staged_asset()
-        result = review_manifest(
-            manifest, staging,
-            style_family="POP_PUNK",
-            instrument_family="ELECTRIC_GUITAR",
-            asset_role="SINGLE_NOTE",
-            tone_family="CLEAN",
-            musical_review_notes="Confirmed note attack and source boundaries.",
-            license_evidence="Original user recording; rights confirmed.",
-            approve_musical_review=True,
-            approve_license=True,
-            mode_assignments=["SAMPLE MODE", "MELODY MODE"],
-        )
-        record = json.loads(manifest.read_text(encoding="utf-8"))
-        self.assertEqual(record["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
-        self.assertEqual(result["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            staging = root / "staging"
+            (staging / "clips").mkdir(parents=True)
+            (staging / "manifests").mkdir()
+            source = root / "original.wav"
+            clip = staging / "clips" / "clip.wav"
+            write_wav(source, 1000)
+            write_wav(clip, 400)
+            manifest = staging / "manifests" / "clip.json"
+            manifest.write_text(json.dumps({
+                "asset_id": "MODE-TEST",
+                "source_path": str(source),
+                "source_sha256": sha(source),
+                "source_start_sample": 100,
+                "source_end_sample": 500,
+                "derived_path": str(clip),
+                "derived_sha256": sha(clip),
+                "musical_metadata": {},
+                "review_status": "NEEDS_MUSICAL_REVIEW",
+                "license_status": "UNREVIEWED",
+            }), encoding="utf-8")
+            result = review_manifest(
+                manifest, staging,
+                style_family="POP_PUNK",
+                instrument_family="ELECTRIC_GUITAR",
+                asset_role="RHYTHM_PATTERN",
+                tone_family="CRUNCH",
+                musical_review_notes="Confirmed musical content and boundaries.",
+                license_evidence="Source license explicitly permits derived WAV distribution.",
+                approve_musical_review=True,
+                approve_license=True,
+                mode_assignments=["SAMPLE MODE", "MELODY MODE"],
+            )
+            record = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(record["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
+            self.assertEqual(result["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
 
     def test_license_unknown_cannot_be_approved_without_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
