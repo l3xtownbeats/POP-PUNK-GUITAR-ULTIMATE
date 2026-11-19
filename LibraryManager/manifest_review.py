@@ -192,6 +192,9 @@ def review_manifest(
         raise ValueError("Derived asset must be uncompressed PCM WAV")
     if derived_info.framerate != original_info.framerate:
         raise ValueError("Derived WAV sample rate differs from original source")
+    pattern_review = (advanced_metadata or {}).get("pattern_performance_review")
+    if pattern_review is not None and pattern_review["loop_end_sample"] > derived_info.frames:
+        raise ValueError("Pattern loop_end_sample exceeds the derived WAV frame count")
 
     metadata = record.setdefault("musical_metadata", {})
     if not isinstance(metadata, dict):
