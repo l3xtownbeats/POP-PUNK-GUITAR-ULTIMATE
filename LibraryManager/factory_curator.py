@@ -73,6 +73,18 @@ def promotion_plan(manifest_path: Path, factory_root: Path,
         raise ValueError("Musical boundaries/content must be reviewed before FACTORY promotion")
     if record.get("license_status") != "LICENSE_APPROVED":
         raise ValueError("License must explicitly be LICENSE_APPROVED")
+    tags = record.get("musical_metadata") or {}
+    if not isinstance(tags, dict) or not str(tags.get("license_evidence", "")).strip():
+        raise ValueError("Explicit license evidence is required")
+    if not str(tags.get("musical_review_notes", "")).strip():
+        raise ValueError("Musical review notes are required")
+    validation = record.get("review_validation") or {}
+    if not all(validation.get(key) is True for key in (
+        "source_sha256_verified", "derived_sha256_verified",
+        "sample_boundaries_verified", "explicit_musical_approval",
+        "explicit_license_approval",
+    )):
+        raise ValueError("Explicit review/license validation evidence is missing")
     source = Path(record.get("derived_path", ""))
     if not source.is_absolute():
         source = (manifest_path.parent / source).resolve()
