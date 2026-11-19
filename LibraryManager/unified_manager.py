@@ -21,7 +21,7 @@ from typing import Any, Callable
 
 from audio_analysis import analyse_wav
 from asset_classifier import classify_wav
-from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, sha256_file, wav_info
+from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, infer_labels, sha256_file, wav_info
 from pattern_pipeline import build_pattern_report
 from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_long_wav, write_virtual_index
@@ -327,6 +327,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             "bytes": stat.st_size, "sha256": digest, "source_path": str(path.resolve()),
             "source_modified_by_manager": False, "hash_source": hash_source,
         }
+        row.update(infer_labels(path))
         audio_record = None
         classification = None
         local_errors = []
@@ -357,6 +358,12 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         "source_path": str(path.resolve()), "source_sha256": digest,
                         "acoustic_analysis": acoustic, "pattern_analysis": pattern,
                         "pitch_candidates": classification.get("fragment_candidates", []),
+                        "filename_metadata": {
+                            "note_candidate": row.get("note_candidate", ""),
+                            "velocity_candidate": row.get("velocity_candidate", ""),
+                            "string_candidate": row.get("string_candidate", ""),
+                            "articulation_candidates": row.get("articulation_candidates", ""),
+                        },
                         "virtual_extraction": None,
                     }
                     if guitar_source_confirmed:
