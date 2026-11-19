@@ -182,8 +182,21 @@ def distribute_assets(plan: dict[str, Any], *, approve: bool = False,
         if manifest_record.get("review_status") not in APPROVED_REVIEW_STATES or manifest_record.get("license_status") != "LICENSE_APPROVED":
             raise RuntimeError("Review/license approval changed after the distribution plan was created")
         tags = manifest_record.get("musical_metadata") or {}
+        manifest_derived = Path(manifest_record.get("derived_path", ""))
+        if not manifest_derived.is_absolute():
+            manifest_derived = (Path(entry["manifest_path"]).parent / manifest_derived).resolve()
+        if manifest_derived.resolve() != source or str(manifest_record.get("derived_sha256", "")).upper() != entry["source_sha256"]:
+            raise RuntimeError("Staged asset path/hash changed after the distribution plan was created")
         if not str(tags.get("license_evidence", "")).strip() or not str(tags.get("musical_review_notes", "")).strip():
             raise RuntimeError("Review or license evidence is missing at distribution time")
+        style = _tag(tags, "style_family", STYLES)
+        instrument = _tag(tags, "instrument_family", INSTRUMENTS)
+        role = _tag(tags, "asset_role", ROLES)
+        tone = _tag(tags, "tone_family", TONES)
+        expected_destination = (Path(plan["samples_root"]).resolve() / "FACTORY" /
+                                style / "WAV" / instrument / role / tone / source.name).resolve()
+        if expected_destination != destination:
+            raise RuntimeError("Factory destination tags changed after the distribution plan was created")
         validation = manifest_record.get("review_validation") or {}
         if not all(validation.get(key) is True for key in (
             "source_sha256_verified", "derived_sha256_verified",
