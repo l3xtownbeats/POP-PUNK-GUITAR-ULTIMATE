@@ -1,6 +1,6 @@
 # POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
 
-## Library Manager 2.5.0 — inventory, extraction and VST3 preparation
+## Library Manager 3.0.0-dev1 — integrated multi-mode library preparation
 
 This is a read-only inventory and SFZ audit stage. It never moves, renames, deletes, rewrites, or overwrites source audio or SFZ files.
 
@@ -423,3 +423,14 @@ Manager 2.5.0 формирует единую хроматическую кар�
 При сборке каталога Manager экспортирует chromatic_pitch_map JSON и включает эту же карту в Performance Manifest для VST3. Точные sample mappings требуют подтверждённых MIDI-нот, лицензии и integrity status. Fallback для отсутствующего WAV записывается как предложение QA, а не как готовый runtime asset.
 
 **Граница реализации:** текущий репозиторий содержит Manager и manifests, но отдельного C++/JUCE VST3 playback source tree здесь пока нет. Поэтому карта и контракт подготовлены для плагина; реальное звучание каждой клавиши требует реализации VST3 playback/fallback engine и аудио-QA.
+
+
+## 3.0 development: reviewed multi-mode assignment index
+
+The unified run now emits `reviewed_mode_assignment_index.json` beside the analysis-only `mode_sorting_report.json`. These are intentionally separate:
+- analysis report = evidence-backed hypotheses requiring listening review;
+- reviewed assignment index = explicit `mode_assignments` saved by the human review workflow, with WAV hash validation and per-mode runtime blockers.
+
+All ten approved modes are always represented. One staged WAV can be logically assigned to several modes without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
+
+Version 3.0 remains a development build until the complete Windows regression suite, portable package smoke test, real-library validation, and user-side workflow checks are successful.
