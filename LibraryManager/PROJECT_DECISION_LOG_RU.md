@@ -773,3 +773,13 @@ Playback-функции: временное переключение Melody/Patt
 Сохраняется инвариант SAME PERFORMANCE, DIFFERENT NOTE: смена ноты не меняет ритм, временные позиции, длину цикла и DAW sync. MELODY остаётся SINGLE GUITAR NOTES. Визуальная идентичность и выбор — наши, не копия NI.
 
 Это решение расширяет спецификацию, но не подтверждает реализацию. Pattern Browser, отдельные движки, Voicing, Latch/Sync/Timing и UI должны быть реализованы и проверены. DEVELOPMENT / NOT FINAL.
+
+
+## PPGU-AUTOCHORDS-12-NOTE-PATTERN-SCOPE-035
+**USER APPROVED / SPECIFICATION FIXED / IMPLEMENTATION NOT VERIFIED.**
+
+Ограничение утверждено: в PPGU описанный Pattern workflow использует только наш режим **AUTOCHORDS — 12 NOTES** как источник аккордового управления/контекста. STRUMMED, ARPEGGIO и RIFF получают chord context через этот режим; отдельные правила исполнения, voicing и музыкальной адаптации остаются раздельными. Не копировать раскладку E1–G1 / C1–D#1 и другие специфические назначения NI. Точное соответствие 12 нот и правила распознавания аккорда определяются собственной спецификацией AUTOCHORDS, а не выводятся предположительно. Другие способы chord input не добавлять без нового одобрения пользователя.
+
+Инварианты: PATTERN = SAME PERFORMANCE, DIFFERENT NOTE; MELODY = SINGLE GUITAR NOTES; собственный UI и схема выбора PPGU.
+
+Это ограничение спецификации, а не подтверждение готовой реализации или успешных тестов. DEVELOPMENT / NOT FINAL.
