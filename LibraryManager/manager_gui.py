@@ -654,14 +654,16 @@ class LibraryManagerApp:
                 mode_report_path=mode_reports[0] if mode_reports else None,
                 pattern_engine_manifest_path=pattern_manifests[0] if pattern_manifests else None,
             )
-            performance_output = output.with_name(output.stem.replace(
-                "plugin_asset_catalog", "performance_manifest"
-            ) + ".json")
-            performance_result = build_performance_manifest(output, performance_output)
             chromatic_output = output.with_name(output.stem.replace(
                 "plugin_asset_catalog", "chromatic_pitch_map"
             ) + ".json")
             chromatic_map = build_chromatic_pitch_map(json.loads(output.read_text(encoding="utf-8")))
+            performance_output = output.with_name(output.stem.replace(
+                "plugin_asset_catalog", "performance_manifest"
+            ) + ".json")
+            performance_result = build_performance_manifest(
+                output, performance_output, chromatic_pitch_map=chromatic_map
+            )
             chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
             return {
                 "plugin_asset_catalog": catalog_result,
