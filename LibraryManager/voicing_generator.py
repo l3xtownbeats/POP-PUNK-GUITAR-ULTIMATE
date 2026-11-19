@@ -96,7 +96,7 @@ def generate_voicing_candidates(
         score = (root_bass_penalty, span, max_used_fret, fret_sum, -len(sounding))
         scored.append((score, frets, sounding, span, tones))
 
-    scored.sort(key=lambda item: (item[0], item[1]))
+    scored.sort(key=lambda item: (item[0], tuple(-1 if fret is None else fret for fret in item[1])))
     candidates = []
     for index, (_score, frets, sounding, span, tones) in enumerate(scored[:max_candidates], 1):
         string_positions = []
