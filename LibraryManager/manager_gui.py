@@ -570,13 +570,18 @@ class LibraryManagerApp:
         self._background("Музыкальная и лицензионная проверка WAV", work)
 
     def finalize_library(self) -> None:
-        """Run the staging integrity audit without copying or moving assets."""
+        """Audit staging and distributed Factory without moving or copying assets."""
+        try:
+            samples = self._samples()
+        except Exception as exc:
+            messagebox.showerror("Папка Samples", str(exc))
+            return
         def progress(message: str) -> None:
             self._worker_events.put(("progress", message))
         self._background(
-            "Финализация staging",
+            "Финализация библиотеки",
             lambda: finalize_library_audit(
-                self._samples(), STAGING_ROOT,
+                samples, STAGING_ROOT,
                 progress=progress,
                 cancel_event=self._cancel_event,
             ),
