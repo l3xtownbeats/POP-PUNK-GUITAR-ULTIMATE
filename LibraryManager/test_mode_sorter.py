@@ -67,6 +67,23 @@ class ModeSorterTests(unittest.TestCase):
         self.assertEqual(modes["MELODY MODE"]["candidates"][0]["source_start_sample"], 100)
         self.assertEqual(modes["MELODY MODE"]["candidates"][0]["source_end_sample"], 900)
 
+    def test_chord_and_power_chord_hypotheses_enter_sample_mode(self):
+        source = record(chord_analysis={
+            "chord_candidates": [
+                {"start_seconds": 0.2, "end_seconds": 0.6,
+                 "chord_name_candidate": "C", "quality": "MAJOR",
+                 "pitch_classes_candidate": ["C", "E", "G"], "confidence": 0.9},
+                {"start_seconds": 0.8, "end_seconds": 1.2,
+                 "chord_name_candidate": "G5", "quality": "POWER5",
+                 "pitch_classes_candidate": ["G", "D"], "confidence": 0.88},
+            ]
+        })
+        report = build_mode_sorting_report([source])
+        sample = {item["candidate_type"] for item in
+                  next(x for x in report["modes"] if x["mode"] == "SAMPLE MODE")["candidates"]}
+        self.assertIn("CHORD_SAMPLE", sample)
+        self.assertIn("POWER_CHORD_SAMPLE", sample)
+
     def test_strumming_arpeggio_articulations_and_ending_are_not_guessed(self):
         report = build_mode_sorting_report([record()])
         modes = {item["mode"]: item for item in report["modes"]}
