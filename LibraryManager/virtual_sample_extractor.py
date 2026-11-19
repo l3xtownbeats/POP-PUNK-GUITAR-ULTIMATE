@@ -135,6 +135,87 @@ def _range_fingerprint(levels: list[dict[str, float]], start: int, end: int) -> 
     return hashlib.sha256(payload).hexdigest().upper()
 
 
+def analyze_pattern_ranges(source: Path, pattern_report: dict[str, Any], *,
+                          guitar_source_confirmed: bool = False,
+                          source_sha256: str = "") -> dict[str, Any]:
+    """Create Pattern Mode ranges only from repeated rhythmic motifs.
+
+    A candidate must be a repeated onset-interval motif with at least two
+    non-overlapping occurrences, >=5 source onsets, >=0.65 rhythmic regularity,
+    and >=4 attacks per occurrence. Broad RMS-active regions are never promoted.
+    """
+    source = Path(source).resolve()
+    if not guitar_source_confirmed:
+        raise ValueError("Confirm guitar-only source before Pattern Mode analysis")
+    patterns = pattern_report.get("pattern_analysis", {}).get("patterns", [])
+    if not isinstance(patterns, list):
+        raise ValueError("Pattern report does not contain a valid pattern list")
+    regularity = pattern_report.get("pattern_analysis", {}).get("rhythmic_regularity_candidate")
+    onset_count = int(pattern_report.get("pattern_analysis", {}).get("onset_count") or 0)
+    if not isinstance(regularity, (int, float)) or regularity < 0.65 or onset_count < 5:
+        patterns = []
+    info = audio_source_info(source)
+    rate, total = info.framerate, info.frames
+    candidates = []
+    for pattern in patterns:
+        if pattern.get("candidate_type") != "REPEATED_RHYTHM_MOTIF":
+            continue
+        if int(pattern.get("occurrence_count") or 0) < 2:
+            continue
+        for occurrence in pattern.get("occurrences", []):
+            start_s = float(occurrence.get("start_seconds") or 0.0)
+            end_s = float(occurrence.get("end_seconds") or 0.0)
+            hits = int(occurrence.get("end_onset_index_exclusive") or 0) - int(
+                occurrence.get("start_onset_index") or 0
+            )
+            duration = end_s - start_s
+            if hits < 4 or duration < 0.35 or duration > 20.0:
+                continue
+            start = max(0, int(round((start_s - 0.02) * rate)))
+            end = min(total, int(round((end_s + 0.03) * rate)))
+            if end <= start:
+                continue
+            identity = hashlib.sha256(
+                f"{source_sha256}:{start}:{end}:{pattern.get('pattern_candidate_id')}:{VERSION}".encode("utf-8")
+            ).hexdigest().upper()[:24]
+            candidates.append({
+                "candidate_id": identity,
+                "candidate_type": "REPEATED_GUITAR_RHYTHM_PATTERN",
+                "pattern_candidate_id": pattern.get("pattern_candidate_id", ""),
+                "pattern_signature_units": pattern.get("pattern_signature_units", []),
+                "source_start_sample": start, "source_end_sample": end,
+                "start_seconds": round(start / rate, 6),
+                "end_seconds": round(end / rate, 6),
+                "duration_seconds": round((end - start) / rate, 6),
+                "onset_count_candidate": hits,
+                "pattern_occurrence_count": int(pattern.get("occurrence_count") or 0),
+                "rhythmic_regularity_candidate": round(float(regularity), 4),
+                "review_status": "NEEDS_MUSICAL_REVIEW",
+                "license_status": "UNREVIEWED",
+                "proposed_group": "PATTERN_MODE_CANDIDATES",
+            })
+            if len(candidates) >= 500:
+                break
+        if len(candidates) >= 500:
+            break
+    return {
+        "schema_version": 1, "engine": "PATTERN_MODE_VIRTUAL_EXTRACTION",
+        "engine_version": VERSION, "source_path": str(source),
+        "source_sha256": source_sha256.upper(), "sample_rate": rate,
+        "channels": info.channels, "sample_width_bytes": info.sample_width,
+        "total_frames": total, "candidate_count": len(candidates),
+        "audio_copied": False, "audio_modified": False,
+        "extraction_policy": "REPEATED_RHYTHM_ONLY_NO_BROAD_RMS_ACTIVE_REGIONS",
+        "candidates": candidates,
+        "limitations": [
+            "Candidates are repeated onset-timing motifs, not guaranteed complete bars or seamless loops.",
+            "Only repeated patterns with multiple attacks and stable rhythmic evidence are proposed.",
+            "Melodic note candidates remain a separate Melody Mode path.",
+            "Every candidate requires listening and manual review; no automatic FACTORY promotion occurs.",
+        ],
+    }
+
+
 def analyze_long_wav(source: Path, *, guitar_source_confirmed: bool = False,
                      window_ms: int = DEFAULT_WINDOW_MS,
                      hop_ms: int = DEFAULT_HOP_MS,
