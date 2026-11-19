@@ -79,7 +79,7 @@ The 393-path count and 387-unique-content count are both intentional and must no
 - Sample/Melody and Pattern extraction remain separate paths. Pattern Mode still requires repeated-rhythm evidence; broad RMS regions are not promoted to musical patterns.
 - A versioned `plugin_asset_catalog.json` and `performance_manifest.json` are generated after full-cycle extraction and staging audit. They carry ten mode sections, relative staged-WAV paths, hashes, sample offsets, candidate musical metadata, asset bindings and a versioned event contract. The performance event timeline remains empty until timing/playing details are musically reviewed.
 - The GUI includes a mode-based Sample Browser and a catalog rebuild action.
-- All unreviewed content remains non-playable in the plugin catalog; no automatic FACTORY promotion is performed. The Performance Manifest never invents DAW ticks, stroke directions, articulation IDs or string/fret positions.
+- All unreviewed content remains non-playable in the plugin catalog; runtime eligibility additionally requires a manually confirmed MIDI note, chord label or note sequence. No automatic FACTORY promotion is performed. The Performance Manifest never invents DAW ticks, stroke directions, articulation IDs or string/fret positions.
 - Windows CI must pass for the updated manager before a new Portable ZIP is treated as validated. The catalog is a future VST3 integration contract; it is not a VST3 binary or proof of DAW playback.
 
 ## Remaining plugin-side work
