@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from factory_curator import INSTRUMENTS, ROLES, TONES
+from factory_curator import INSTRUMENTS, ROLES, STYLES, TONES
 
 VERSION = "0.1.0"
 APPROVED_REVIEW_STATES = {"REVIEWED", "BOUNDARIES_USER_OR_REVIEWER_APPROVED"}
@@ -87,17 +87,20 @@ def distribution_plan(manifest_paths: list[Path], samples_root: Path,
         tags = record.get("musical_metadata") or {}
         if not isinstance(tags, dict):
             raise ValueError("musical_metadata must be an object")
+        style = _tag(tags, "style_family", STYLES)
         instrument = _tag(tags, "instrument_family", INSTRUMENTS)
         role = _tag(tags, "asset_role", ROLES)
         tone = _tag(tags, "tone_family", TONES)
-        destination_dir = factory_root / instrument / role / tone
+        # All promoted derivatives are PCM WAV; source formats remain recorded in provenance.
+        format_family = "WAV"
+        destination_dir = factory_root / style / format_family / instrument / role / tone
         destination = destination_dir / source.name
         entries.append({
             "manifest_path": str(Path(manifest_path).resolve()),
             "source_path": str(source),
             "source_sha256": digest,
             "destination_path": str(destination),
-            "category_path": f"{instrument}/{role}/{tone}",
+            "category_path": f"{style}/{format_family}/{instrument}/{role}/{tone}",
             "asset_id": record.get("asset_id"),
             "engine_targets": record.get("engine_targets", []),
             "operation": "COPY_TO_FACTORY",
