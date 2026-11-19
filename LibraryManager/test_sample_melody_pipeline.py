@@ -63,7 +63,14 @@ class SampleMelodyPipelineTests(unittest.TestCase):
             try:
                 with patch.object(pipeline, "propose_segments", return_value=fake_report):
                     result = pipeline.prepare_sample_and_melody(source, stage)
+                    repeated = pipeline.prepare_sample_and_melody(source, stage)
                 self.assertEqual(result["sample_mode_count"], 3)
+                self.assertTrue(all(item.get("reused_existing") is False
+                                    for item in result["sample_mode"] + result["melody_mode"]))
+                self.assertEqual(repeated["sample_mode_count"], 3)
+                self.assertEqual(repeated["melody_mode_count"], 1)
+                self.assertTrue(all(item.get("reused_existing") is True
+                                    for item in repeated["sample_mode"] + repeated["melody_mode"]))
                 self.assertEqual(result["melody_mode_count"], 1)
                 self.assertFalse(result["source_modified"])
                 self.assertEqual(result["review_status"], "NEEDS_MUSICAL_REVIEW")
