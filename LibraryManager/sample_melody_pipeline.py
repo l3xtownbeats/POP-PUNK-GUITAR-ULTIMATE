@@ -42,6 +42,7 @@ def prepare_sample_and_melody(
     post_roll_ms: int = 220,
     pitch_candidates: list[dict[str, Any]] | None = None,
     expected_source_sha256: str | None = None,
+    source_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Extract note-event WAVs and grouped melody-phrase WAV candidates."""
     if melody_gap_seconds < 0 or melody_min_notes < 2 or max_note_events < 1:
@@ -137,7 +138,8 @@ def prepare_sample_and_melody(
                  "note_name_candidate": event.get("note_name_candidate"),
                  "detected_note_start_seconds": event.get("detected_note_start_seconds"),
                  "detected_note_end_seconds": event.get("detected_note_end_seconds"),
-                 "confidence": event.get("confidence")},
+                 "confidence": event.get("confidence"),
+                 "source_filename_metadata": source_metadata or {}},
             )
             _write_manifest(manifest, record)
             created.append(manifest)
@@ -167,7 +169,8 @@ def prepare_sample_and_melody(
                      for x in group
                  ],
                  "boundary_basis": "grouped_pitch_event_candidates",
-                 "grouping_gap_seconds": melody_gap_seconds},
+                 "grouping_gap_seconds": melody_gap_seconds,
+                 "source_filename_metadata": source_metadata or {}},
             )
             _write_manifest(manifest, record)
             created.append(manifest)
