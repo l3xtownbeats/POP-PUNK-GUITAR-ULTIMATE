@@ -1,6 +1,6 @@
 # POP PUNK GUITAR ULTIMATE — Development Status
 
-Last updated: 2026-11-16
+Last updated: 2026-11-19
 
 ## Repository baseline
 
@@ -70,3 +70,21 @@ The 393-path count and 387-unique-content count are both intentional and must no
 - Do not copy to FACTORY until local preflight passes and the user has explicitly approved the copy operation.
 - Treat folder/name-based sample labels as provisional until verified by audio inspection.
 - Do not claim a build, integration, or test has succeeded unless the corresponding artifact or result exists.
+
+
+## Library Manager 2.4.0 — VST3 preparation bridge
+
+- The ten approved mode sections are emitted in a single conservative mode-sorting report.
+- Confirmed guitar-source analysis now adds experimental chord/power-chord hypotheses; the extraction stage writes review-only chord sample WAVs with exact source offsets and provenance. The Manager also generates bounded fretboard voicing hypotheses for ARPEGGIO from chord pitch classes using an explicitly unconfirmed standard-tuning assumption.
+- Sample/Melody and Pattern extraction remain separate paths. Pattern Mode still requires repeated-rhythm evidence; broad RMS regions are not promoted to musical patterns.
+- A versioned `plugin_asset_catalog.json` and `performance_manifest.json` are generated after full-cycle extraction and staging audit. They carry ten mode sections, relative staged-WAV paths, hashes, sample offsets, candidate musical metadata, asset bindings and a versioned event contract. The performance event timeline remains empty until timing/playing details are musically reviewed.
+- The GUI includes a mode-based Sample Browser and a catalog rebuild action.
+- All unreviewed content remains non-playable in the plugin catalog; runtime eligibility additionally requires a manually confirmed MIDI note, chord label or note sequence. In the current catalog, only pitch-mapped SAMPLE MODE and MELODY MODE assets can be marked runtime-ready; the other performance modes still need reviewed mode-specific event timelines. No automatic FACTORY promotion is performed. The Performance Manifest never invents DAW ticks, stroke directions, articulation IDs or string/fret positions.
+- Windows CI must pass for the updated manager before a new Portable ZIP is treated as validated. The catalog is a future VST3 integration contract; it is not a VST3 binary or proof of DAW playback.
+
+## Remaining plugin-side work
+
+- The VST3 source/build system is still not present in the inspected repository baseline.
+- The plugin must implement catalog loading, sample-zone lookup, realtime voice scheduling, chord/voicing generation, strumming/arpeggio/riff/phrase/melody engines, MIDI Key Switch and DAW sync.
+- Strumming, Articulations and Ending remain manual-evidence categories in Manager until validated source data or explicit human tagging is available. Arpeggio receives generated fretboard voicing hypotheses from chord candidates, but tuning and fingering still require review. The staged review dialog stores explicit mode assignments in manifests and does not invent missing event timing or articulation details.
+- Do not claim successful VST3 build or FL Studio 20 playback until the plugin binary exists and is tested after the approved library/preset integration gate.

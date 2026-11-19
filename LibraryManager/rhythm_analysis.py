@@ -91,6 +91,7 @@ def analyze_rhythm(report: dict[str, Any], *, tolerance: float = 0.12) -> dict[s
     return {
         "rhythm_analysis_version": VERSION,
         "source": report.get("source"),
+        "source_sha256": report.get("source_sha256"),
         "duration_seconds": duration,
         "onset_count": len(events),
         "onset_evidence_seconds": [round(t, 6) for t in events],

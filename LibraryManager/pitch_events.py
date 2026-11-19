@@ -65,7 +65,7 @@ def _yin_pitch(frame: list[float], sample_rate: float,
     return midi, hz, confidence
 
 
-def analyze_pitch_events(path: Path, *, frame_ms: int = 40,
+def analyze_pitch_events(path: Path, *, frame_ms: int = 30,
                          hop_ms: int = 10, min_hz: float = 65.0,
                          max_hz: float = 1200.0,
                          min_event_seconds: float = 0.07) -> dict[str, Any]:
@@ -74,12 +74,12 @@ def analyze_pitch_events(path: Path, *, frame_ms: int = 40,
     if min_hz <= 0 or max_hz <= min_hz or min_event_seconds <= 0:
         raise ValueError("Invalid pitch or event limits")
 
-    samples, rate, total_frames, channels, width, decimation = read_mono_pcm(path)
+    samples, rate, total_frames, channels, width, decimation = read_mono_pcm(path, max_samples=100_000)
     if not samples or rate <= 0:
         raise ValueError("Empty or invalid WAV")
     effective_rate = rate / decimation
     # Keep the analysis rate bounded while retaining enough bandwidth for guitar.
-    extra = max(1, math.ceil(effective_rate / 8000.0))
+    extra = max(1, math.ceil(effective_rate / 4000.0))
     samples = samples[::extra]
     effective_rate /= extra
     frame_size = max(96, round(effective_rate * frame_ms / 1000))

@@ -1,6 +1,6 @@
 # POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
 
-## Safe inventory engine 0.2.0
+## Library Manager 3.0.0-dev5 — integrated multi-mode library preparation
 
 This is a read-only inventory and SFZ audit stage. It never moves, renames, deletes, rewrites, or overwrites source audio or SFZ files.
 
@@ -78,7 +78,7 @@ The planned extraction/mapping stage must:
 
 The Manager's output is consumed by the plugin's per-key playback engine: MIDI key → pitch-specific approved note clip → independent voice playback. The plugin handles real-time note-on/note-off, polyphony and release; the Manager handles source analysis, extraction, metadata, review and mapping preparation.
 
-**Safety:** this is a target capability, not part of the current 0.2.0 scanner. The current scanner remains read-only inventory/SFZ audit until the extraction stage is implemented and tested. Derived audio must stay in staging pending approval; never modify or move source files automatically.
+**Current implementation (2.4.0):** the optional full cycle now runs the physical extraction paths for pitch-specific Sample/Melody assets, repeated Pattern occurrences, and review-only chord/Power Chord sample candidates. Derived PCM WAVs and manifests are written only under LibraryManager/staging, then audited and indexed into the VST3 plugin asset catalog. Riff/Phrase remain review candidates unless the source evidence and musical review establish their identity. Chord analysis also feeds ARPEGGIO with bounded fretboard voicing hypotheses under an explicitly unconfirmed standard-tuning assumption. During explicit staged-asset review, the operator can assign one or more of the ten approved modes; this is how evidence-backed Strumming, Articulations and Ending material enters those queues without automatic guessing. Original source files remain read-only and are never moved or deleted by this workflow.
 
 
 ## Extract meaningful guitar patterns; keep full recordings optional
@@ -380,3 +380,83 @@ The command:
 - writes the manifest atomically and never edits the staged WAV or original source.
 
 Then run `factory_curator.py` in dry-run mode to inspect the proposed folder and gates. Actual copying still requires a separate explicit `--approve`. No automatic promotion or overwrite is allowed.
+
+
+## Development release 1.8.0
+
+The v1.8 development branch adds a dedicated OTHER audit and explicit decision-file based routing, whole-Import dependency audit for cleanup, corrected pattern extraction report integration, transactional extraction rollback, and a Windows x64 PyInstaller packaging workflow.
+
+See [V1_8_RELEASE_NOTES_RU.md](V1_8_RELEASE_NOTES_RU.md) for implemented behavior, safety rules, launch/build steps and remaining limitations. A passing CI suite does not establish musical correctness or replace real-library listening tests.
+
+
+## Журнал задач 2.1.0
+
+История фоновых задач, этапов, успешных завершений и ошибок описана в [TASK_JOURNAL_RU.md](TASK_JOURNAL_RU.md). Журнал расположен в `LibraryManager/reports/task_history.jsonl` и не возобновляет прерванные операции автоматически.
+
+
+## VST3 integration catalog — Library Manager 2.4.0
+
+The full preparation cycle now produces a versioned `plugin_asset_catalog.json` after extraction and staging audit. The catalog contains all ten approved Manager/VST3 mode sections, analysis-only candidates, staged WAV references, source hashes, exact source sample offsets, pitch/chord hypotheses, articulation and velocity metadata where available, and explicit review/license/integrity states.
+
+- SAMPLE MODE receives pitch-specific note clips plus review-only chord and Power Chord sample clips.
+- PATTERN MODE receives repeated-rhythm pattern clips and note-event zones that are explicitly marked for this note-playable mode.
+- MELODY MODE receives grouped melody phrase candidates and pitch-specific source notes.
+- RIFF MODE and PHRASE MODE receive only evidence-backed candidate references; irregular onset groups are not asserted to be finished riffs or complete phrases.
+- STRUMMING, ARTICULATIONS and ENDING remain explicit manual-review queues until source evidence supports their musical identity. ARPEGGIO receives generated voicing hypotheses from chord pitch classes, but tuning, fingering and string attacks remain unverified. Generic onset/RMS analysis is not used to invent stroke direction, articulation or ending role.
+- Long RMS-active regions are retained as unassigned review assets; they are not automatically labeled Pattern, Riff or Phrase.
+
+The catalog's WAV paths are relative to the catalog file and resolve into `LibraryManager/staging`. It is a bridge contract for the future VST3 loader, not a compiled plugin or a packaged factory sound bank. A staged asset becomes runtime-playable only after its derived/source hashes and sample boundaries validate and its manifest contains explicit `REVIEWED` + `LICENSE_APPROVED` evidence. No automatic FACTORY promotion occurs.
+
+The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
+
+
+## Единая карта всех 12 нот и Auto Chords
+
+Manager 2.5.0 формирует единую хроматическую карту для будущего VST3:
+- все 12 pitch classes представлены отдельно и доступны в объявленном MIDI-диапазоне;
+- Sharp/Flat — два способа подписать одну высоту, а не разные ноты;
+- C# = Db, D# = Eb, F# = Gb, G# = Ab, A# = Bb;
+- E и F остаются двумя разными нотами;
+- Auto Chords использует ту же карту pitch class и объединяет только энгармонические дубликаты;
+- хроматические ноты не удаляются из клавиатурного диапазона из-за выбранной тональности или текущего аккорда.
+
+При сборке каталога Manager экспортирует chromatic_pitch_map JSON и включает эту же карту в Performance Manifest для VST3. Точные sample mappings требуют подтверждённых MIDI-нот, лицензии и integrity status. Fallback для отсутствующего WAV записывается как предложение QA, а не как готовый runtime asset.
+
+**Граница реализации:** текущий репозиторий содержит Manager и manifests, но отдельного C++/JUCE VST3 playback source tree здесь пока нет. Поэтому карта и контракт подготовлены для плагина; реальное звучание каждой клавиши требует реализации VST3 playback/fallback engine и аудио-QA.
+
+
+## 3.0 development: reviewed multi-mode assignment index
+
+The unified run now emits `reviewed_mode_assignment_index.json` beside the analysis-only `mode_sorting_report.json`. These are intentionally separate:
+- analysis report = evidence-backed hypotheses requiring listening review;
+- reviewed assignment index = explicit `mode_assignments` saved by the human review workflow, with WAV hash validation and per-mode runtime blockers.
+
+All ten approved modes are always represented. One staged WAV can be logically assigned to several modes without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
+
+Version 3.0 remains a development build until the complete Windows regression suite, portable package smoke test, real-library validation, and user-side workflow checks are successful.
+
+## Manager 3.0 — plugin library structure and coverage
+
+The **Сформировать каталог VST3** action now produces four coordinated artifacts beside the catalog:
+- `plugin_asset_catalog_*.json` — validated asset and ten-mode queues;
+- `plugin_library_structure_*.json` — logical library layout for SAMPLE, PATTERN and MELODY engines, with all ten Manager mode sections and provenance-linked asset references;
+- `plugin_library_coverage_*.json` — explicit coverage/gap report for 12 pitch classes, LOW/MEDIUM/HIGH velocity layers, confirmed techniques, Pattern event structure and Melody note/event timing;
+- `chromatic_pitch_map_*.json` and `performance_manifest_*.json` — shared chromatic mapping and runtime contract.
+
+The structure builder does not copy WAV files. One physical staged asset may be referenced from several modes by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
+
+
+### 3.0-dev3 — review metadata for real library structure
+
+The manual review dialog now records explicit technique tags (Downstroke, Upstroke, Palm Mute, Open, Slide, Legato, Hammer-on, Pull-off, harmonics, tremolo, choke, let-ring and dead-note), a confirmed velocity layer, and optional structured Pattern/Melody event data. Pattern metadata is validated for loop boundaries inside the staged WAV, BPM, meter, attack/beat-grid/technique/harmonic events and cycle/review confirmations. Melody metadata is validated for MIDI pitch, ordered beat positions, durations, velocity and phrase boundaries. Blank/unknown fields are not guessed; they remain coverage gaps. A new review revokes old confirmed tags unless the reviewer confirms them again.
+
+
+## Manager 3.0-dev6 — ускорение инвентаризации и транзакционное распределение
+
+- Быстрый filesystem scan не вычисляет SHA-256 и не декодирует аудио; строки inventory записываются потоково в CSV, поэтому память не растёт пропорционально числу файлов.
+- Для глубокого прохода без DSP используется до двух ограниченных рабочих потоков. При включённом тяжёлом акустическом анализе значение по умолчанию — один поток, чтобы не перегружать старые двухъядерные компьютеры. CLI позволяет явно выбрать --workers 1 или --workers 2.
+- SQLite cache readers переиспользуются внутри каждого рабочего потока вместо открытия нового соединения на каждый файл. Кэш хэшей и аудиоанализа остаётся на диске; исходники только читаются.
+- Распределение FACTORY в GUI и CLI выполняется через единый транзакционный пакет: сначала пересобирается и проверяется весь план, затем проверяются коллизии путей/хэшей, затем копируются файлы. При ошибке или отмене удаляются только назначения, созданные данной транзакцией; rollback фиксируется в operations.jsonl. Исходники и staging не перемещаются и не удаляются.
+- Добавлен regression test для отката частично скопированного пакета и защиты уже существующего файла.
+
+Это development build. Скорость зависит от диска, числа файлов и размера библиотеки; числовые гарантии производительности без измерения на конкретном компьютере не заявляются. Windows Portable smoke test и полный прогон тестов должны быть подтверждены отдельным успешным CI/локальным запуском.
