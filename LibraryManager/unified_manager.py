@@ -203,7 +203,7 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
                                 "scan_status": f"ERROR: {type(exc).__name__}: {exc}",
                                 "source_modified_by_manager": False,
                             })
-                        if files_found and files_found % 500 == 0:
+                        if files_found and files_found % 100 == 0:
                             emit(f"Быстрый обход: найдено {files_found:,} файлов…")
                 directories_scanned += 1
                 if directories_scanned == 1 or directories_scanned % 10 == 0:
@@ -211,7 +211,11 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
             except OSError as exc:
                 directory_errors += 1
                 directories_scanned += 1
-                emit(f"[ПРЕДУПРЕЖДЕНИЕ] Не удалось прочитать папку {folder}: {exc}")
+                emit(f"[ОШИБКА ПАПКИ] Не удалось прочитать {folder}: {type(exc).__name__}: {exc}")
+                if folder.resolve() == incoming.resolve():
+                    raise OSError(
+                        f"Не удаётся прочитать входную папку Import Sample Guitar: {incoming}: {exc}"
+                    ) from exc
 
     elapsed = time.perf_counter() - started
     summary = {
