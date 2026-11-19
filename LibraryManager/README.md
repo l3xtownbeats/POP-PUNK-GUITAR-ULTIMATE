@@ -1,6 +1,6 @@
 # POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
 
-## Library Manager 3.0.0-dev4 — integrated multi-mode library preparation
+## Library Manager 3.0.0-dev5 — integrated multi-mode library preparation
 
 This is a read-only inventory and SFZ audit stage. It never moves, renames, deletes, rewrites, or overwrites source audio or SFZ files.
 
