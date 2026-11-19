@@ -119,8 +119,8 @@ class PluginAssetCatalogTests(unittest.TestCase):
                 "duration_seconds": 0.1,
                 "derived_path": str(derived),
                 "derived_sha256": digest(derived),
-                "engine_targets": ["SAMPLE_MODE"],
-                "musical_metadata": {"license_evidence": "User-owned recording; verified", "confirmed_midi_note": 60},
+                "engine_targets": ["SAMPLE_MODE", "MELODY_MODE"],
+                "musical_metadata": {"melody_asset_role": "SINGLE_GUITAR_NOTE", "one_sound_one_note": True, "license_evidence": "User-owned recording; verified", "confirmed_midi_note": 60},
                 "review_status": "REVIEWED",
                 "license_status": "LICENSE_APPROVED",
                 "review_validation": {
@@ -153,6 +153,12 @@ class PluginAssetCatalogTests(unittest.TestCase):
             self.assertEqual(catalog["status"], "READY_FOR_PLUGIN_IMPORT")
             self.assertEqual(catalog["playable_assets"][0]["asset_id"], "ASSET-APPROVED")
             self.assertTrue(catalog["playable_assets"][0]["playable"])
+            sample_mode = next(item for item in catalog["modes"] if item["mode"] == "SAMPLE MODE")
+            melody_mode = next(item for item in catalog["modes"] if item["mode"] == "MELODY MODE")
+            self.assertEqual(sample_mode["asset_count"], 1)
+            self.assertEqual(melody_mode["asset_count"], 1)
+            self.assertEqual(sample_mode["assets"][0]["asset_id"], melody_mode["assets"][0]["asset_id"])
+            self.assertTrue(melody_mode["assets"][0]["playable_in_mode"])
             pattern_mode = next(item for item in catalog["modes"] if item["mode"] == "PATTERN MODE")
             self.assertEqual(pattern_mode["asset_count"], 1)
             self.assertFalse(pattern_mode["assets"][0]["playable_in_mode"])
