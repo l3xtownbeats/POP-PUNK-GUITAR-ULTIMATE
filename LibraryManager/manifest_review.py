@@ -12,6 +12,7 @@ from typing import Any
 
 from factory_curator import INSTRUMENTS, ROLES, STYLES, TONES
 from audio_range_io import audio_source_info
+from plugin_asset_catalog import MODE_ORDER
 
 
 def _sha256(path: Path) -> str:
@@ -42,6 +43,7 @@ def review_manifest(
     license_evidence: str,
     approve_musical_review: bool = False,
     approve_license: bool = False,
+    mode_assignments: list[str] | None = None,
 ) -> dict[str, Any]:
     """Validate provenance and atomically record explicit human approvals."""
     manifest_path = Path(manifest_path).resolve()
@@ -64,6 +66,9 @@ def review_manifest(
         raise ValueError("Enter a short note describing what was musically checked")
     if not license_evidence.strip():
         raise ValueError("License approval requires a source, license name or evidence note")
+    selected_modes = list(mode_assignments or [])
+    if len(selected_modes) != len(set(selected_modes)) or any(mode not in MODE_ORDER for mode in selected_modes):
+        raise ValueError("mode_assignments must contain unique names from the ten approved Manager modes")
 
     record = json.loads(manifest_path.read_text(encoding="utf-8"))
     derived = Path(record.get("derived_path", ""))
@@ -112,6 +117,7 @@ def review_manifest(
     record["license_status"] = "LICENSE_APPROVED"
     record["reviewed_at_utc"] = datetime.now(timezone.utc).isoformat()
     record["license_approved_at_utc"] = record["reviewed_at_utc"]
+    record["mode_assignments"] = [mode for mode in MODE_ORDER if mode in selected_modes]
     record["review_validation"] = {
         "source_sha256_verified": True,
         "derived_sha256_verified": True,
@@ -144,4 +150,5 @@ def review_manifest(
         "derived_sha256": expected_derived,
         "source_sha256": expected_source,
         "factory_eligible": True,
+        "mode_assignments": record["mode_assignments"],
     }
