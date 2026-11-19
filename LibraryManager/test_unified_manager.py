@@ -83,6 +83,18 @@ class UnifiedManagerTests(unittest.TestCase):
                          self.original_hash)
         self.assertFalse(summary["source_files_moved_or_deleted"])
 
+    def test_unsupported_files_are_visible_and_other_audit_is_generated(self) -> None:
+        unsupported = self.incoming / "unhandled.bin"
+        unsupported.write_bytes(b"not a supported library format")
+        summary = run_manager(self.samples, reports_root=self.reports)
+        report_dir = Path(summary["report_directory"])
+        self.assertEqual(summary["unsupported_import_files"], 1)
+        self.assertTrue((report_dir / "other_audit" / "other_audit.json").is_file())
+        inventory = (report_dir / "unified_inventory.csv").read_text(encoding="utf-8-sig")
+        self.assertIn("unhandled.bin", inventory)
+        self.assertIn("OTHER_REVIEW_REQUIRED", inventory)
+        self.assertTrue(unsupported.exists())
+
     def test_virtual_index_requires_explicit_analysis_and_confirmation(self) -> None:
         with self.assertRaises(ValueError):
             run_manager(self.samples, write_virtual=True, reports_root=self.reports)
