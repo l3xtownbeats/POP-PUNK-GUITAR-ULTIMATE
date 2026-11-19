@@ -162,6 +162,23 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertIn("OTHER_REVIEW_REQUIRED", inventory)
         self.assertTrue(unsupported.exists())
 
+    def test_manager_virtual_sidecars_are_not_marked_as_unsupported_audio(self) -> None:
+        virtual_dir = self.incoming / "VIRTUAL_CANDIDATES" / "RIFF_CANDIDATES"
+        virtual_dir.mkdir(parents=True)
+        sidecar = virtual_dir / "candidate.json"
+        sidecar.write_text(
+            '{"asset_kind":"VIRTUAL_AUDIO_RANGE","source_sha256":"test"}',
+            encoding="utf-8",
+        )
+        summary = run_manager(self.samples, reports_root=self.reports)
+        self.assertEqual(summary["manager_generated_metadata_files"], 1)
+        self.assertEqual(summary["unsupported_import_files"], 0)
+        inventory = (
+            Path(summary["report_directory"]) / "unified_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertIn("MANAGER_GENERATED_METADATA", inventory)
+        self.assertNotIn("OTHER_REVIEW_REQUIRED", inventory)
+
     def test_virtual_index_requires_explicit_analysis_and_confirmation(self) -> None:
         with self.assertRaises(ValueError):
             run_manager(self.samples, write_virtual=True, reports_root=self.reports)
