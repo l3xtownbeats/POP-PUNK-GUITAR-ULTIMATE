@@ -28,8 +28,9 @@ from virtual_sample_extractor import analyze_pattern_ranges, write_virtual_index
 from irregular_phrase_segmenter import analyze_irregular_guitar_phrases
 from other_audit import audit_other_library
 from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
+from mode_sorter import build_mode_sorting_report
 
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 # Non-audio production assets are excluded immediately from all scan/analyze queues.
 # Source files are never deleted or moved; this is an analysis-only filter.
@@ -360,12 +361,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         row[0]: (row[1], row[2], row[3])
         for row in con.execute("SELECT path,size,mtime_ns,sha256 FROM file_hash_cache")
     }
-    cached_analysis = {
-        row[0]: (row[1], row[2])
-        for row in con.execute(
-            "SELECT cache_key,acoustic_json,classification_json FROM audio_analysis_cache"
-        )
-    }
+    # Do not preload the complete analysis cache into RAM. Query SQLite per
+    # audio file so memory use remains bounded as the library grows.
 
     def hash_with_cancel(path: Path) -> str:
         h = hashlib.sha256()
@@ -440,7 +437,15 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                                    "classifier-0.3.0", "pitch-events-current",
                                    "max_samples=90000"))).encode("utf-8")
                     ).hexdigest()
-                    cached_pair = cached_analysis.get(analysis_key)
+                    cache_reader = sqlite3.connect(str(cache_db), timeout=30)
+                    try:
+                        cached_row = cache_reader.execute(
+                            "SELECT acoustic_json,classification_json FROM audio_analysis_cache WHERE cache_key=?",
+                            (analysis_key,),
+                        ).fetchone()
+                    finally:
+                        cache_reader.close()
+                    cached_pair = cached_row
                     cache_status = "MISS"
                     if cached_pair:
                         try:
@@ -471,6 +476,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         "source_path": str(path.resolve()), "source_sha256": digest,
                         "acoustic_analysis": acoustic, "pattern_analysis": pattern,
                         "pitch_candidates": classification.get("fragment_candidates", []),
+                        "classification": classification,
                         "filename_metadata": {
                             "note_candidate": row.get("note_candidate", ""),
                             "velocity_candidate": row.get("velocity_candidate", ""),
@@ -658,6 +664,9 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     if completed % 25 == 0:
                         con.commit()
                 con.commit()
+        analysis_cache_entries = con.execute(
+            "SELECT COUNT(*) FROM audio_analysis_cache"
+        ).fetchone()[0]
     except Exception:
         con.commit()
         raise
@@ -702,6 +711,15 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     if manifest_errors:
         raise RuntimeError("Invalid Pattern Mode manifest template: " + "; ".join(manifest_errors))
 
+    mode_sorting = build_mode_sorting_report(audio_reports)
+    mode_candidate_counts = {
+        item["mode"]: item["candidate_count"] for item in mode_sorting["modes"]
+    }
+    mode_candidate_rows = [
+        {"mode": item["mode"], **candidate}
+        for item in mode_sorting["modes"] for candidate in item["candidates"]
+    ]
+
     summary = {
         "manager_version": VERSION, "run_id": run_id,
         "report_directory": str(reports), "samples_root": str(samples_root),
@@ -717,6 +735,9 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "guitar_source_manually_confirmed": guitar_source_confirmed,
         "audio_files_analyzed": len(audio_reports),
         "asset_classifications_created": len(classification_reports),
+        "mode_sorting_report": "mode_sorting_report.json",
+        "mode_candidate_counts": mode_candidate_counts,
+        "mode_candidates_total": mode_sorting["total_candidates"],
         "classification_policy": "CANDIDATE_ONLY_REQUIRES_HUMAN_REVIEW",
 "pattern_engine_manifest": "pattern_engine_manifest.json",
         "pattern_engine_manifest_status": pattern_manifest["status"],
@@ -741,7 +762,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "automatic_factory_promotion": False,
         "hash_cache": str(cache_db),
         "audio_analysis_cache": str(cache_db),
-        "audio_analysis_cache_entries": len(cached_analysis),
+        "audio_analysis_cache_entries": analysis_cache_entries,
         "workers": worker_count,
         "note": "All source files are read-only. Candidates require musical review and independent license approval.",
     }
@@ -751,6 +772,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_json(reports / "unified_exact_duplicates.json", duplicates)
     _write_json(reports / "unified_audio_analysis.json", audio_reports)
     _write_json(reports / "unified_asset_classification.json", classification_reports)
+    _write_json(reports / "mode_sorting_report.json", mode_sorting)
+    _write_csv(reports / "mode_candidates.csv", mode_candidate_rows)
     _write_json(reports / "pattern_engine_manifest.json", pattern_manifest)
     _write_json(reports / "unified_errors.json", errors)
     _write_json(reports / "unified_summary.json", summary)
