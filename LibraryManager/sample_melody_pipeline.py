@@ -36,6 +36,7 @@ def prepare_sample_and_melody(
     staging_root: Path = STAGING_BASE,
     *,
     max_note_events: int = 500,
+    max_assets: int = 500,
     melody_gap_seconds: float = 0.45,
     melody_min_notes: int = 3,
     pre_roll_ms: int = 35,
@@ -45,7 +46,8 @@ def prepare_sample_and_melody(
     source_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Extract note-event WAVs and grouped melody-phrase WAV candidates."""
-    if melody_gap_seconds < 0 or melody_min_notes < 2 or max_note_events < 1:
+    if (melody_gap_seconds < 0 or melody_min_notes < 2
+            or max_note_events < 1 or max_assets < 1):
         raise ValueError("Invalid Sample/Melody extraction limits")
     root = _safe_staging_root(staging_root)
     source = Path(source).resolve()
@@ -120,6 +122,8 @@ def prepare_sample_and_melody(
     created: list[Path] = []
     try:
         for event in events:
+            if len(results["sample_mode"]) + len(results["melody_mode"]) >= max_assets:
+                break
             start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
             if start < 0 or end <= start or end > total_frames:
                 continue
@@ -143,6 +147,8 @@ def prepare_sample_and_melody(
             results["sample_mode"].append(record)
 
         for group in groups:
+            if len(results["sample_mode"]) + len(results["melody_mode"]) >= max_assets:
+                break
             if len(group) < melody_min_notes:
                 continue
             start = min(int(x["source_start_sample"]) for x in group)
@@ -184,6 +190,7 @@ def prepare_sample_and_melody(
         "pipeline_version": VERSION,
         "source_path": str(source),
         "source_sha256": source_hash,
+        "max_assets": max_assets,
         "sample_mode_count": len(results["sample_mode"]),
         "melody_mode_count": len(results["melody_mode"]),
         **results,
