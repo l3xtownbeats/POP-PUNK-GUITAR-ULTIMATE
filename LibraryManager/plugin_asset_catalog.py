@@ -64,9 +64,9 @@ def _candidate_mode_assignments(record: dict[str, Any]) -> list[str]:
     kind = str(record.get("kind") or "").casefold()
     targets = {str(item).upper() for item in (record.get("engine_targets") or [])}
     modes: list[str] = [mode for mode in record.get("mode_assignments", []) if mode in MODE_ORDER]
-    if kind in {"sample_note_candidate", "one_shot_sample", "note_event", "chord_sample_candidate", "power_chord_sample_candidate"} or "SAMPLE_MODE" in targets:
+    if kind in {"sample_note_candidate", "melody_single_note_candidate", "one_shot_sample", "note_event", "chord_sample_candidate", "power_chord_sample_candidate"} or "SAMPLE_MODE" in targets:
         modes.append("SAMPLE MODE")
-    if kind == "melody_phrase_candidate" or "MELODY_MODE" in targets:
+    if kind in {"melody_phrase_candidate", "melody_single_note_candidate"} or "MELODY_MODE" in targets:
         modes.append("MELODY MODE")
     if kind == "rhythm_pattern" or "PATTERN_MODE" in targets:
         modes.append("PATTERN MODE")
