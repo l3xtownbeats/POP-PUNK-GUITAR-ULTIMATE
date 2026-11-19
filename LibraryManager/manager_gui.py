@@ -65,6 +65,8 @@ class LibraryManagerApp:
         actions.pack(fill="x", pady=8)
         buttons = [
             ("1. Анализ библиотеки", self.scan),
+            ("Предпрослушать WAV", self.preview_audio),
+            ("Остановить звук", self.stop_preview),
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("2. Извлечь найденные ритм-паттерны в WAV", self.extract_patterns),
@@ -142,6 +144,29 @@ class LibraryManagerApp:
                 write_virtual=False,
             )
         self._background("Анализ библиотеки", work)
+
+    def preview_audio(self) -> None:
+        selected = filedialog.askopenfilename(
+            title="Выберите WAV для предпрослушивания",
+            filetypes=[("WAV audio", "*.wav *.wave")],
+        )
+        if not selected:
+            return
+        try:
+            import winsound
+            winsound.PlaySound(selected, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            self._write("Предпрослушивание: " + selected)
+            self.status.set("Воспроизведение WAV")
+        except Exception as exc:
+            messagebox.showerror("Предпрослушивание", f"Не удалось воспроизвести WAV: {exc}")
+
+    def stop_preview(self) -> None:
+        try:
+            import winsound
+            winsound.PlaySound(None, 0)
+            self.status.set("Воспроизведение остановлено")
+        except Exception as exc:
+            messagebox.showerror("Предпрослушивание", str(exc))
 
     def audit_other(self) -> None:
         try:
