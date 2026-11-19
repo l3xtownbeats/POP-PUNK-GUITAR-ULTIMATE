@@ -74,7 +74,8 @@ class LibraryManagerApp:
         actions = ttk.LabelFrame(outer, text="Рабочие операции", padding=8)
         actions.pack(fill="x", pady=8)
         buttons = [
-            ("1. Анализ библиотеки", self.scan),
+            ("1. Быстрое сканирование", self.quick_scan_only),
+            ("2. Полный цикл: анализ + извлечение", self.scan),
             ("Предпрослушать WAV", self.preview_audio),
             ("Остановить звук", self.stop_preview),
             ("Аудит папки OTHER", self.audit_other),
@@ -214,7 +215,27 @@ class LibraryManagerApp:
             self.status.set("Остановка запрошена — завершаю текущий безопасный блок…")
             self._write("[ОТМЕНА] Запрошена остановка. Исходные файлы не затрагиваются.")
 
+    def quick_scan_only(self) -> None:
+        """Run only the fast filesystem inventory; never start deep analysis."""
+        try:
+            samples = self._samples()
+        except Exception as exc:
+            messagebox.showerror("Папка Samples", str(exc))
+            return
+
+        def work():
+            def report_progress(message: str) -> None:
+                self._worker_events.put(("progress", message))
+            return quick_scan(
+                samples, progress=report_progress, cancel_event=self._cancel_event,
+            )
+
+        self._write("=== БЫСТРОЕ СКАНИРОВАНИЕ ===")
+        self._write("Только обход Import Sample Guitar и чтение файловой метаинформации. SHA-256, декодирование и анализ не запускаются.")
+        self._background("Быстрое сканирование", work)
+
     def scan(self) -> None:
+        """Run the complete preparation pipeline after the fast scan."""
         try:
             samples = self._samples()
         except Exception as exc:
@@ -222,14 +243,18 @@ class LibraryManagerApp:
             return
         analyze_audio = self.analyze_audio.get()
         guitar_confirmed = self.guitar_confirmed.get()
+
         def work():
             def report_progress(message: str) -> None:
                 self._worker_events.put(("progress", message))
-            report_progress("ЭТАП 1/5: быстрое сканирование структуры — без SHA-256, декодирования и акустического анализа.")
+
+            report_progress("ЭТАП 1/6: быстрое сканирование структуры — только файловая метаинформация.")
             quick_result = quick_scan(
                 samples, progress=report_progress, cancel_event=self._cancel_event,
             )
-            report_progress("ЭТАП 2/5: глубокая инвентаризация, контроль SHA-256, форматы, дубликаты и SFZ.")
+            if self._cancel_event.is_set():
+                raise RuntimeError("Полный цикл остановлен после быстрого сканирования.")
+            report_progress("ЭТАП 2/6: глубокая инвентаризация, SHA-256 cache, форматы, дубликаты и SFZ.")
             analysis_result = run_manager(
                 samples,
                 analyze_audio=analyze_audio,
@@ -237,63 +262,108 @@ class LibraryManagerApp:
                 write_virtual=False,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
+                workers=2,
             )
-            extracted = []
+
+            extracted_pattern = 0
+            extracted_sample = 0
+            extracted_melody = 0
             extraction_failures = []
             report_file = Path(analysis_result["report_directory"]) / "unified_audio_analysis.json"
-            if analyze_audio and report_file.is_file():
-                report_progress("ЭТАП 3/5: извлечение повторяющихся ритм-паттернов в WAV-кандидаты staging.")
+            if analyze_audio and guitar_confirmed and report_file.is_file():
                 records = json.loads(report_file.read_text(encoding="utf-8"))
                 from pattern_clip_extractor import extract_pattern_occurrences
+                from sample_melody_pipeline import prepare_sample_and_melody
+
+                report_progress("ЭТАП 3/6: физическое извлечение повторяющихся ритм-паттернов в WAV.")
                 for record in records:
                     if self._cancel_event.is_set():
-                        raise RuntimeError("Полный цикл остановлен пользователем; уже созданные кандидаты сохранены.")
+                        raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
                     pattern_data = (record.get("pattern_analysis") or {}).get("pattern_analysis", {})
                     if not pattern_data.get("patterns"):
                         continue
-                    remaining = 1000 - len(extracted)
-                    if remaining <= 0:
-                        extraction_failures.append({"stage": "EXTRACTION", "error": "Достигнут безопасный лимит 1000 WAV-кандидатов за один запуск."})
-                        break
                     try:
-                        extracted.extend(extract_pattern_occurrences({
+                        clips = extract_pattern_occurrences({
                             "source": record["source_path"],
                             "source_sha256": record["source_sha256"],
                             "pattern_analysis": pattern_data,
-                        }, STAGING_ROOT, max_clips=min(100, remaining)))
+                        }, STAGING_ROOT, max_clips=max(0, min(100, 500 - extracted_pattern)))
+                        extracted_pattern += len(clips)
                     except Exception as exc:
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
-                            "stage": "EXTRACTION",
+                            "stage": "PATTERN_EXTRACTION",
                             "error": f"{type(exc).__name__}: {exc}",
                         })
-            report_progress("ЭТАП 4/5: проверка статуса кандидатов и подготовка к ручной проверке/лицензированию.")
+                    if extracted_pattern >= 500:
+                        break
+
+                report_progress("ЭТАП 4/6: извлечение отдельных нот для SAMPLE MODE и фраз для MELODY MODE.")
+                for record in records:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
+                    if extracted_sample + extracted_melody >= 500:
+                        break
+                    source = Path(record.get("source_path", ""))
+                    if source.suffix.lower() not in {".wav", ".wave"}:
+                        continue
+                    try:
+                        remaining = max(1, 500 - extracted_sample - extracted_melody)
+                        result = prepare_sample_and_melody(
+                            source, STAGING_ROOT,
+                            max_note_events=min(100, remaining),
+                        )
+                        extracted_sample += result["sample_mode_count"]
+                        extracted_melody += result["melody_mode_count"]
+                        if result["sample_mode_count"] + result["melody_mode_count"] == 0:
+                            extraction_failures.append({
+                                "source_path": str(source),
+                                "stage": "SAMPLE_MELODY_EXTRACTION",
+                                "error": "Не обнаружены надёжные кандидаты pitch-events; WAV не создан.",
+                            })
+                    except Exception as exc:
+                        extraction_failures.append({
+                            "source_path": str(source),
+                            "stage": "SAMPLE_MELODY_EXTRACTION",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
+            elif analyze_audio and not guitar_confirmed:
+                extraction_failures.append({
+                    "stage": "EXTRACTION_GATE",
+                    "error": "Физическое извлечение пропущено: оператор не подтвердил гитарный источник.",
+                })
+
+            report_progress("ЭТАП 5/6: проверка манифестов, происхождения, SHA-256 и review/license gate.")
+            staging_manifests = list((STAGING_ROOT / "manifests").glob("*.json")) if (STAGING_ROOT / "manifests").exists() else []
+            report_progress("ЭТАП 6/6: финализация отчёта. FACTORY остаётся закрытой до проверки музыки и лицензий.")
             return {
                 "quick_scan": quick_result,
                 "deep_analysis": analysis_result,
-                "extraction": {
-                    "extracted_count": len(extracted),
-                    "assets": extracted,
+                "physical_extraction": {
+                    "pattern_mode_wav_count": extracted_pattern,
+                    "sample_mode_wav_count": extracted_sample,
+                    "melody_mode_wav_count": extracted_melody,
+                    "total_new_wav_candidates": extracted_pattern + extracted_sample + extracted_melody,
+                    "manifest_count_in_staging": len(staging_manifests),
                     "failures": extraction_failures,
                     "review_status": "NEEDS_MUSICAL_REVIEW",
                     "license_status": "UNREVIEWED",
-                    "automatic_factory_promotion": False,
                 },
                 "finalization": {
-                    "status": "WAITING_FOR_HUMAN_REVIEW_AND_LICENSE_APPROVAL",
+                    "status": "STAGING_READY_FOR_REVIEW" if not extraction_failures else "COMPLETED_WITH_WARNINGS",
                     "factory_distribution_allowed": False,
-                    "reason": "FACTORY допускает только REVIEWED + LICENSE_APPROVED WAV с проверенными метаданными.",
+                    "reason": "В FACTORY разрешено копировать только WAV со статусами REVIEWED + LICENSE_APPROVED и заполненными утверждёнными метаданными.",
                 },
                 "source_files_modified": False,
                 "source_files_moved_or_deleted": False,
             }
-        self._write("=== ПОЛНЫЙ ЦИКЛ АНАЛИЗА БИБЛИОТЕКИ 2.0.0 ===")
-        self._write("Полный безопасный цикл: быстрое сканирование → инвентаризация/SHA-256 → акустика/ритмы/SFZ → извлечение WAV-кандидатов → проверка готовности.")
-        self._write("Финальная публикация в FACTORY блокируется до REVIEWED + LICENSE_APPROVED и заполнения музыкальных метаданных.")
-        self._write("Извлечение, распределение и финализация выполняются отдельными подтверждаемыми операциями; анализ не перемещает и не удаляет исходники.")
+
+        self._write("=== ПОЛНЫЙ ЦИКЛ ПОДГОТОВКИ БИБЛИОТЕКИ ===")
+        self._write("Быстрый scan → глубокая инвентаризация → анализ → физическое извлечение Pattern/Sample/Melody WAV → проверка staging.")
+        self._write("Извлечение запускается только после ручного подтверждения гитарного источника. FACTORY остаётся защищённой review/license gate.")
         self._write(f"Акустический анализ: {'ВКЛЮЧЁН' if analyze_audio else 'ВЫКЛЮЧЕН'}")
         self._write(f"Гитарный источник подтверждён: {'ДА' if guitar_confirmed else 'НЕТ'}")
-        self._background("Анализ библиотеки", work)
+        self._background("Полный цикл подготовки библиотеки", work)
 
     def _progress(self, message: str) -> None:
         self._write("[ВЫПОЛНЯЕТСЯ] " + message)
