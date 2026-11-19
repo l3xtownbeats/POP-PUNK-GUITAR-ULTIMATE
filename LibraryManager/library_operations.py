@@ -14,12 +14,12 @@ import json
 import os
 import shutil
 import tempfile
-import wave
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from factory_curator import INSTRUMENTS, ROLES, STYLES, TONES
+from audio_range_io import audio_source_info
 
 VERSION = "0.1.0"
 APPROVED_REVIEW_STATES = {"REVIEWED", "BOUNDARIES_USER_OR_REVIEWER_APPROVED"}
@@ -100,13 +100,14 @@ def _load_approved_manifest(manifest_path: Path, staging_root: Path,
     end = int(record.get("source_end_sample", -1))
     if start < 0 or end <= start:
         raise ValueError("Invalid source sample boundaries")
-    with wave.open(str(original), "rb") as original_audio, wave.open(str(source), "rb") as derived_audio:
-        if original_audio.getcomptype() != "NONE" or derived_audio.getcomptype() != "NONE":
-            raise ValueError("Only uncompressed PCM WAV can enter FACTORY")
-        if end > original_audio.getnframes() or derived_audio.getnframes() != end - start:
-            raise ValueError("WAV frame ranges do not match original sample boundaries")
-        if original_audio.getframerate() != derived_audio.getframerate():
-            raise ValueError("Derived WAV sample rate differs from original source")
+    original_info = audio_source_info(original)
+    derived_info = audio_source_info(source)
+    if end > original_info.frames or derived_info.frames != end - start:
+        raise ValueError("WAV frame ranges do not match original sample boundaries")
+    if derived_info.source_format.upper() != "WAV" or derived_info.source_subtype not in {"PCM_16", "PCM_24", "PCM_32", "PCM_U8", "PCM"}:
+        raise ValueError("Only uncompressed PCM WAV can enter FACTORY")
+    if original_info.framerate != derived_info.framerate:
+        raise ValueError("Derived WAV sample rate differs from original source")
     return record, source, actual
 
 
