@@ -22,7 +22,7 @@ jobs:
           python -m pip install -r LibraryManager/requirements.txt
           python -m pip install -r LibraryManager/requirements-build.txt
       - name: Build portable folder
-        run: python -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths LibraryManager --add-data "LibraryManager/PORTABLE_USER_GUIDE_RU.md;." --collect-all soundfile --collect-all _soundfile_data --distpath dist LibraryManager/manager_gui.py
+        run: python -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths LibraryManager --add-data "LibraryManager/PORTABLE_USER_GUIDE_RU.md;." --add-data "LibraryManager/ppgu_skin;ppgu_skin" --collect-all soundfile --collect-all _soundfile_data --distpath dist LibraryManager/manager_gui.py
       - name: Verify executable and archive
         shell: pwsh
         run: |
@@ -51,6 +51,8 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
           if (!($entries -match "python311.dll")) { throw "Portable ZIP does not contain its bundled Python runtime." }
           if (!($entries -match "PORTABLE_USER_GUIDE_RU.md")) { throw "Portable ZIP does not contain the Russian user guide." }
+          if (!($entries -match "ppgu_skin/theme.json")) { throw "Portable ZIP does not contain the PPGU theme manifest." }
+          if (!($entries -match "ppgu_skin/assets/hero.png")) { throw "Portable ZIP does not contain the PPGU theme hero asset." }
       - uses: actions/upload-artifact@v4
         with:
           name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
