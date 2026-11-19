@@ -380,3 +380,10 @@ The command:
 - writes the manifest atomically and never edits the staged WAV or original source.
 
 Then run `factory_curator.py` in dry-run mode to inspect the proposed folder and gates. Actual copying still requires a separate explicit `--approve`. No automatic promotion or overwrite is allowed.
+
+
+## Development release 1.8.0
+
+The v1.8 development branch adds a dedicated OTHER audit and explicit decision-file based routing, whole-Import dependency audit for cleanup, corrected pattern extraction report integration, transactional extraction rollback, and a Windows x64 PyInstaller packaging workflow.
+
+See [V1_8_RELEASE_NOTES_RU.md](V1_8_RELEASE_NOTES_RU.md) for implemented behavior, safety rules, launch/build steps and remaining limitations. A passing CI suite does not establish musical correctness or replace real-library listening tests.
