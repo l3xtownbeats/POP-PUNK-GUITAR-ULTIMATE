@@ -125,3 +125,8 @@
 ### Дополнение 3.0-dev3 — расширенное музыкальное ревью
 
 В `manifest_review.py` и GUI добавлен ввод подтверждённых техник, velocity layer и расширенных JSON-данных Pattern/Melody. Проверяются границы loop относительно длительности staged WAV, BPM, размер, attack events, beat grid, technique/harmonic events, cycle integrity, MIDI pitch, ordered beat timing, note duration, velocity и phrase boundaries. При повторном ревью старые подтверждённые теги и event mappings сбрасываются, если пользователь их заново не подтвердил. Это предотвращает перенос устаревшей разметки на изменённое решение.
+
+
+### Дополнение 3.0-dev4 — отдельные структуры Pattern note zones и rhythm patterns
+
+PATTERN MODE теперь разделяет pitch-specific note zones и полноценные ритм-паттерны. Первые проверяются по подтверждённым pitch mappings, вторые — по loop bounds, BPM, meter, beat grid, attack/technique/harmonic events и cycle integrity. Это предотвращает ошибочное требование loop-метаданных для одиночных нот и ложную готовность ритм-паттерна только по наличию WAV. Runtime gates дополнительно проверяют `playable_modes`, review, license и integrity. Coverage дедуплицирует физические asset IDs.
