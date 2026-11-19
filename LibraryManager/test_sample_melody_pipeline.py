@@ -112,9 +112,20 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                 "segments": events,
             }
             stage = pipeline.STAGING_BASE / ("test-aiff-sample-" + next(tempfile._get_candidate_names()))
+            candidates = [{
+                "start_seconds": event["detected_note_start_seconds"],
+                "end_seconds": event["detected_note_end_seconds"],
+                "midi_note_candidate": event["midi_note_candidate"],
+                "note_name_candidate": event["note_name_candidate"],
+                "confidence": event["confidence"],
+            } for event in events]
             try:
-                with patch.object(pipeline, "propose_segments", return_value=fake_report):
-                    result = pipeline.prepare_sample_and_melody(source, stage)
+                result = pipeline.prepare_sample_and_melody(
+                    source, stage,
+                    pre_roll_ms=0, post_roll_ms=0,
+                    pitch_candidates=candidates,
+                    expected_source_sha256=_hash(source),
+                )
                 self.assertEqual(result["sample_mode_count"], 3)
                 self.assertEqual(result["melody_mode_count"], 1)
                 self.assertEqual(result["sample_mode"][0]["source_format"], "AIFF")
