@@ -217,6 +217,10 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
             "assets": rows,
         })
 
+    for bucket in (pitch_coverage, velocity_coverage, technique_coverage):
+        for key, asset_ids in bucket.items():
+            bucket[key] = sorted(set(asset_ids))
+
     return {
         "schema": SCHEMA,
         "project": "POP PUNK GUITAR ULTIMATE",
@@ -288,6 +292,7 @@ def validate_library_structure(structure: dict[str, Any]) -> list[str]:
                 or asset.get("license_status") != "LICENSE_APPROVED"
                 or asset.get("integrity_status") != "VERIFIED"
                 or not asset.get("asset_file")
+                or mode["mode"] not in (asset.get("playable_modes") or [])
             ):
                 errors.append(f"Runtime-ready assignment violates approval/integrity gate: {key}")
     return errors
