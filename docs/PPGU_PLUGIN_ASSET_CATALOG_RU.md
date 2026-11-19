@@ -66,7 +66,7 @@ STRUMMING, ARTICULATIONS and ENDING are not inferred from generic onset/RMS anal
 ## Status interpretation
 
 - `CANDIDATES_ONLY_NO_APPROVED_RUNTIME_ASSETS`: catalog valid, but there are no assets that passed all musical/license/integrity gates.
-- `READY_FOR_PLUGIN_IMPORT`: at least one asset passed every gate; this still does not mean the plugin has loaded or played it.
+- `READY_FOR_PLUGIN_IMPORT`: at least one pitch-mapped SAMPLE MODE or MELODY MODE asset passed every gate; this still does not mean the plugin has loaded or played it.
 
 
 ## Voicing candidates for ARPEGGIO\n\nWhen chord-analysis candidates include root and pitch classes, Manager enumerates compact fretboard shapes under standard EADGBE as an explicit assumption (strings 6→1, bounded fret range and hand-span candidate). Each shape includes MIDI-note and string/fret hypotheses, but finger assignment, barre feasibility, tuning confirmation and physical playability remain unknown/review-required. These are not approved guitar fingerings.\n\n## Performance Manifest
