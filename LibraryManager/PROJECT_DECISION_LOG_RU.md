@@ -756,3 +756,20 @@ AUTO SOUND HUNTER использует общее ядро Manager для scan �
 Критерии приёмки: одинаковый pattern/performance ID и event timing для разных нот; сохранение всех ритмических и артикуляционных позиций; realtime MIDI switching без сбоев; корректная DAW sync; проверка заявленного диапазона нот и качества тембра.
 
 Это утверждённое требование к базе, а не подтверждение реализации. PATTERN engine, seamless switching и pitch-preserving playback остаются задачами разработки и проверки. **Project status: DEVELOPMENT / NOT FINAL.**
+
+
+## PPGU-PATTERN-PLAYBACK-AND-UI-SPEC-034 — расширение утверждённой спецификации PATTERN
+
+- Дата: 2026-11-19.
+- Статус: USER APPROVED / SPECIFICATION FIXED / IMPLEMENTATION NOT VERIFIED.
+- Связанная запись: TJ-2026-11-19-PATTERN-PLAYBACK-AND-UI-SPEC-034.
+
+Описание Session Guitarist: Electric Sunburst Deluxe принято как функциональный ориентир, но не как шаблон копирования. PPGU сохраняет собственный визуальный дизайн и ранее утверждённую схему выбора режимов/слотов. Указанные в справке E1–G1 и C1–D#1 не фиксируются как MIDI-назначения PPGU.
+
+Утверждены три самостоятельных семейства: STRUMMED (ритмическое бренчание), ARPEGGIO (ритмическое разложение аккордовых голосов), RIFF (рифф с отдельной гармонической адаптацией). Pattern Browser содержит отдельные слоты/ID, кликовый выбор и MIDI-управление по нашей схеме. Chord/Voicing adaptation допустим только для совместимых активов и с Guitar Voicing Generator, учитывающим строй, струны, лады и физические ограничения. Нельзя подменять это безусловным транспонированием целого WAV.
+
+Playback-функции: временное переключение Melody/Pattern и настройка режима по умолчанию; Latch с контролируемым release window; Pattern Sync к DAW transport и Start on a key; Timing Offset; коэффициенты темпа 1/2, 1:1 и x2 с проверяемыми границами. Не предполагается, что все паттерны имеют одинаковую длину. Динамика может управляться Impact/Intensity или MIDI CC; velocity-triggered Slide и прочие артикуляции разрешены только при наличии подтверждённых событий/вариантов.
+
+Сохраняется инвариант SAME PERFORMANCE, DIFFERENT NOTE: смена ноты не меняет ритм, временные позиции, длину цикла и DAW sync. MELODY остаётся SINGLE GUITAR NOTES. Визуальная идентичность и выбор — наши, не копия NI.
+
+Это решение расширяет спецификацию, но не подтверждает реализацию. Pattern Browser, отдельные движки, Voicing, Latch/Sync/Timing и UI должны быть реализованы и проверены. DEVELOPMENT / NOT FINAL.
