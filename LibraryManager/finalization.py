@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -182,3 +183,148 @@ def finalize_staging(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return summary
+
+
+def audit_factory_library(
+    samples_root: Path,
+    *,
+    reports_root: Path | None = None,
+    progress=None,
+    cancel_event=None,
+) -> dict[str, Any]:
+    """Verify distributed FACTORY WAVs and their sidecar provenance records."""
+    samples = Path(samples_root).resolve()
+    factory = samples / "FACTORY"
+    report_base = Path(reports_root or (Path(__file__).resolve().parent / "reports")).resolve()
+    report_base.mkdir(parents=True, exist_ok=True)
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    report_dir = report_base / f"factory_finalization_{run_id}"
+    report_dir.mkdir(parents=True, exist_ok=False)
+    fields = [
+        "factory_wav", "sidecar", "asset_id", "status", "style_family",
+        "instrument_family", "asset_role", "tone_family", "sha256", "error",
+    ]
+    counts: Counter[str] = Counter()
+    rows_written = 0
+    csv_path = report_dir / "factory_inventory.csv"
+    with csv_path.open("x", newline="", encoding="utf-8-sig") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        if factory.is_dir():
+            for current, dirs, files in os.walk(factory):
+                dirs[:] = [d for d in dirs if not d.startswith(".")]
+                for filename in files:
+                    if not filename.lower().endswith((".wav", ".wave")):
+                        continue
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise RuntimeError("FACTORY finalization cancelled; no assets were changed.")
+                    wav_path = Path(current) / filename
+                    sidecar = wav_path.with_suffix(wav_path.suffix + ".json")
+                    row = {
+                        "factory_wav": str(wav_path),
+                        "sidecar": str(sidecar),
+                        "asset_id": "",
+                        "status": "INVALID",
+                        "style_family": "",
+                        "instrument_family": "",
+                        "asset_role": "",
+                        "tone_family": "",
+                        "sha256": "",
+                        "error": "",
+                    }
+                    try:
+                        if not _inside(wav_path, factory) or not sidecar.is_file():
+                            raise ValueError("Factory WAV has no valid provenance sidecar")
+                        record = json.loads(sidecar.read_text(encoding="utf-8"))
+                        row["asset_id"] = record.get("asset_id", "")
+                        if record.get("distribution_status") != "VERIFIED_COPIED":
+                            raise ValueError("Sidecar does not record VERIFIED_COPIED")
+                        if Path(record.get("distributed_path", "")).resolve() != wav_path.resolve():
+                            raise ValueError("Sidecar distributed_path does not match WAV path")
+                        expected = str(record.get("distributed_sha256", "")).upper()
+                        actual = _sha256(wav_path)
+                        row["sha256"] = actual
+                        if not expected or actual != expected:
+                            raise ValueError("Factory WAV SHA-256 mismatch")
+                        info = audio_source_info(wav_path)
+                        if info.source_format.upper() != "WAV" or info.source_subtype not in {
+                            "PCM_16", "PCM_24", "PCM_32", "PCM_U8", "PCM"
+                        }:
+                            raise ValueError("Factory file is not uncompressed PCM WAV")
+                        if record.get("review_status") != "REVIEWED" or record.get("license_status") != "LICENSE_APPROVED":
+                            raise ValueError("Factory sidecar lacks explicit musical/license approvals")
+                        tags = record.get("musical_metadata") or {}
+                        for field, allowed in (
+                            ("style_family", STYLES),
+                            ("instrument_family", INSTRUMENTS),
+                            ("asset_role", ROLES),
+                            ("tone_family", TONES),
+                        ):
+                            value = tags.get(field)
+                            if value not in allowed:
+                                raise ValueError(f"Missing/invalid reviewed tag: {field}")
+                            row[field] = value
+                        expected_category = wav_path.parent.relative_to(factory).as_posix()
+                        if record.get("distribution_category") != expected_category:
+                            raise ValueError("Factory folder path does not match reviewed category")
+                        if not str(tags.get("license_evidence", "")).strip() or not str(tags.get("musical_review_notes", "")).strip():
+                            raise ValueError("Missing review or license evidence")
+                        validation = record.get("review_validation") or {}
+                        if not all(validation.get(key) is True for key in (
+                            "source_sha256_verified", "derived_sha256_verified",
+                            "sample_boundaries_verified", "explicit_musical_approval",
+                            "explicit_license_approval",
+                        )):
+                            raise ValueError("Missing explicit review/license validation evidence")
+                        row["status"] = "FACTORY_VALID"
+                    except Exception as exc:
+                        row["error"] = f"{type(exc).__name__}: {exc}"
+                    counts[row["status"]] += 1
+                    writer.writerow(row)
+                    rows_written += 1
+                    if progress and rows_written % 50 == 0:
+                        progress(f"Финализация FACTORY: проверено WAV {rows_written}")
+    valid = counts["FACTORY_VALID"]
+    summary = {
+        "factory_root": str(factory),
+        "report_directory": str(report_dir),
+        "factory_wav_checked": rows_written,
+        "factory_valid_count": valid,
+        "factory_invalid_count": counts["INVALID"],
+        "status_counts": dict(counts),
+        "factory_finalized": rows_written > 0 and valid == rows_written,
+        "source_files_modified": False,
+        "factory_files_modified": False,
+    }
+    (report_dir / "factory_finalization_summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    return summary
+
+
+def finalize_library(
+    samples_root: Path,
+    staging_root: Path,
+    *,
+    reports_root: Path | None = None,
+    progress=None,
+    cancel_event=None,
+) -> dict[str, Any]:
+    """Finalize both staging candidates and already distributed FACTORY assets."""
+    staging_result = finalize_staging(
+        staging_root, reports_root=reports_root,
+        progress=progress, cancel_event=cancel_event,
+    )
+    factory_result = audit_factory_library(
+        samples_root, reports_root=reports_root,
+        progress=progress, cancel_event=cancel_event,
+    )
+    return {
+        "staging": staging_result,
+        "factory": factory_result,
+        "factory_distribution_allowed": staging_result["factory_distribution_allowed"],
+        "factory_finalized": factory_result["factory_finalized"],
+        "source_files_modified": False,
+        "factory_files_modified": False,
+    }
+
