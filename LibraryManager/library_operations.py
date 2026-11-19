@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import tempfile
+import wave
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -49,7 +50,8 @@ def _tag(metadata: dict[str, Any], field: str, allowed: set[str]) -> str:
     return value
 
 
-def _load_approved_manifest(manifest_path: Path, staging_root: Path) -> tuple[dict, Path, str]:
+def _load_approved_manifest(manifest_path: Path, staging_root: Path,
+                            source_hash_cache: dict[str, str] | None = None) -> tuple[dict, Path, str]:
     manifest_path = manifest_path.resolve()
     staging_root = staging_root.resolve()
     if not _inside(manifest_path, staging_root) or not manifest_path.is_file():
@@ -82,6 +84,29 @@ def _load_approved_manifest(manifest_path: Path, staging_root: Path) -> tuple[di
     actual = sha256_file(source)
     if not expected or actual != expected:
         raise ValueError("Staged WAV SHA-256 does not match its manifest")
+    original = Path(record.get("source_path", ""))
+    expected_original = str(record.get("source_sha256", "")).upper()
+    if not original.is_file() or not expected_original:
+        raise ValueError("Original source is missing or source SHA-256 is absent")
+    cache = source_hash_cache if source_hash_cache is not None else {}
+    original_key = str(original.resolve())
+    actual_original = cache.get(original_key)
+    if actual_original is None:
+        actual_original = sha256_file(original)
+        cache[original_key] = actual_original
+    if actual_original != expected_original:
+        raise ValueError("Original source SHA-256 changed after extraction/review")
+    start = int(record.get("source_start_sample", -1))
+    end = int(record.get("source_end_sample", -1))
+    if start < 0 or end <= start:
+        raise ValueError("Invalid source sample boundaries")
+    with wave.open(str(original), "rb") as original_audio, wave.open(str(source), "rb") as derived_audio:
+        if original_audio.getcomptype() != "NONE" or derived_audio.getcomptype() != "NONE":
+            raise ValueError("Only uncompressed PCM WAV can enter FACTORY")
+        if end > original_audio.getnframes() or derived_audio.getnframes() != end - start:
+            raise ValueError("WAV frame ranges do not match original sample boundaries")
+        if original_audio.getframerate() != derived_audio.getframerate():
+            raise ValueError("Derived WAV sample rate differs from original source")
     return record, source, actual
 
 
@@ -91,8 +116,9 @@ def distribution_plan(manifest_paths: list[Path], samples_root: Path,
     factory_root = samples_root / "FACTORY"
     entries = []
     seen = set()
+    source_hash_cache: dict[str, str] = {}
     for manifest_path in manifest_paths:
-        record, source, digest = _load_approved_manifest(manifest_path, staging_root)
+        record, source, digest = _load_approved_manifest(manifest_path, staging_root, source_hash_cache)
         if digest in seen:
             raise ValueError(f"Duplicate staged content in one distribution batch: {digest}")
         seen.add(digest)
