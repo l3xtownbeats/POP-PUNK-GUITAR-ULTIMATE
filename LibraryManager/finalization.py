@@ -112,9 +112,9 @@ def finalize_staging(
                     raise ValueError(f"Missing or invalid reviewed tag: {field}")
                 row[field] = value
             row["format_family"] = "WAV"
-            style_counts[row["style_family"]] += 1
             if row["review_status"] == "REVIEWED" and row["license_status"] == "LICENSE_APPROVED":
                 row["status"] = "FACTORY_READY"
+                style_counts[row["style_family"]] += 1
             elif row["review_status"] != "REVIEWED":
                 row["status"] = "MUSICAL_REVIEW_REQUIRED"
             else:
