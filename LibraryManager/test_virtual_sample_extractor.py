@@ -3,6 +3,7 @@ import json
 import math
 import struct
 import tempfile
+import shutil
 import unittest
 import wave
 from pathlib import Path
@@ -96,8 +97,10 @@ class VirtualSampleExtractorTests(unittest.TestCase):
                         self.assertEqual(audio.getframerate(), 11025)
                         self.assertEqual(audio.getnchannels(), 1)
                         self.assertEqual(audio.getsampwidth(), 3)
-                with self.assertRaises(FileExistsError):
-                    extract_virtual_ranges(report, stage, max_clips=10)
+                self.assertTrue(all(record.get("reused_existing") is False for record in records))
+                reused = extract_virtual_ranges(report, stage, max_clips=10)
+                self.assertEqual(len(reused), len(records))
+                self.assertTrue(all(record.get("reused_existing") is True for record in reused))
                 self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest().upper(), before)
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
