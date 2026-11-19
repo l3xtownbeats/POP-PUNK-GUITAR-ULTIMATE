@@ -20,6 +20,7 @@ from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
 from finalization import finalize_library as finalize_library_audit
 from manifest_review import review_manifest
+from task_journal import TaskJournal
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -50,6 +51,8 @@ class LibraryManagerApp:
         self._cancel_event = threading.Event()
         self._action_buttons = []
         self._cancel_button = None
+        self._task_journal = TaskJournal(MANAGER_DIR / 'reports' / 'task_history.jsonl')
+        self._active_task_id = None
         self._build()
         self.root.after(100, self._poll_worker_events)
 
@@ -89,6 +92,7 @@ class LibraryManagerApp:
             ("Полный аудит очистки Import", self.audit_cleanup),
             ("Удалить оригиналы после полного аудита", self.cleanup),
             ("Открыть отчёты", self.open_reports),
+            ("История задач", self.show_task_history),
             ("Открыть staging", self.open_staging),
         ]
         for column in range(3):
