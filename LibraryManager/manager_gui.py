@@ -11,13 +11,15 @@ import queue
 import threading
 import traceback
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 
 from unified_manager import run_manager, quick_scan, resolve_samples_root
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
+from finalization import finalize_staging
+from manifest_review import review_manifest
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -81,7 +83,9 @@ class LibraryManagerApp:
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("2. Извлечь найденные ритм-паттерны в WAV", self.extract_patterns),
-            ("3. Распределить проверенные материалы", self.distribute),
+            ("3. Проверить WAV-кандидат", self.review_candidate),
+            ("4. Финализировать staging", self.finalize_library),
+            ("5. Распределить проверенные материалы", self.distribute),
             ("Полный аудит очистки Import", self.audit_cleanup),
             ("Удалить оригиналы после полного аудита", self.cleanup),
             ("Открыть отчёты", self.open_reports),
@@ -333,9 +337,13 @@ class LibraryManagerApp:
                     "error": "Физическое извлечение пропущено: оператор не подтвердил гитарный источник.",
                 })
 
-            report_progress("ЭТАП 5/6: проверка манифестов, происхождения, SHA-256 и review/license gate.")
-            staging_manifests = list((STAGING_ROOT / "manifests").glob("*.json")) if (STAGING_ROOT / "manifests").exists() else []
-            report_progress("ЭТАП 6/6: финализация отчёта. FACTORY остаётся закрытой до проверки музыки и лицензий.")
+            report_progress("ЭТАП 5/6: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
+            finalization_result = finalize_staging(
+                STAGING_ROOT,
+                progress=report_progress,
+                cancel_event=self._cancel_event,
+            )
+            report_progress("ЭТАП 6/6: отчёт финализации создан. FACTORY не изменялась.")
             return {
                 "quick_scan": quick_result,
                 "deep_analysis": analysis_result,
@@ -344,16 +352,12 @@ class LibraryManagerApp:
                     "sample_mode_wav_count": extracted_sample,
                     "melody_mode_wav_count": extracted_melody,
                     "total_new_wav_candidates": extracted_pattern + extracted_sample + extracted_melody,
-                    "manifest_count_in_staging": len(staging_manifests),
+                    "manifest_count_in_staging": finalization_result["manifests_checked"],
                     "failures": extraction_failures,
                     "review_status": "NEEDS_MUSICAL_REVIEW",
                     "license_status": "UNREVIEWED",
                 },
-                "finalization": {
-                    "status": "STAGING_READY_FOR_REVIEW" if not extraction_failures else "COMPLETED_WITH_WARNINGS",
-                    "factory_distribution_allowed": False,
-                    "reason": "В FACTORY разрешено копировать только WAV со статусами REVIEWED + LICENSE_APPROVED и заполненными утверждёнными метаданными.",
-                },
+                "finalization": finalization_result,
                 "source_files_modified": False,
                 "source_files_moved_or_deleted": False,
             }
@@ -491,6 +495,89 @@ class LibraryManagerApp:
                 "license_review_required": True,
             }
         self._background("Извлечение ритм-паттернов", work)
+
+    def review_candidate(self) -> None:
+        """Collect explicit musical and license decisions for one staged WAV."""
+        selected = filedialog.askopenfilename(
+            title="Выберите WAV-манифест для музыкальной и лицензионной проверки",
+            initialdir=str(STAGING_ROOT / "manifests"),
+            filetypes=[("Staging manifests", "*.json")],
+        )
+        if not selected:
+            return
+        from factory_curator import INSTRUMENTS, ROLES, STYLES, TONES
+
+        def ask_value(title: str, prompt: str, values: set[str]) -> str | None:
+            return simpledialog.askstring(
+                title, prompt + "\n\nДопустимые значения:\n" + ", ".join(sorted(values)),
+                parent=self.root,
+            )
+
+        style = ask_value("Стиль", "Укажите подтверждённый стиль:", STYLES)
+        if style is None:
+            return
+        instrument = ask_value("Инструмент", "Укажите подтверждённое семейство инструмента:", INSTRUMENTS)
+        if instrument is None:
+            return
+        role = ask_value("Тип материала", "Укажите подтверждённую роль материала:", ROLES)
+        if role is None:
+            return
+        tone = ask_value("Характер звучания", "Укажите подтверждённый тип звучания:", TONES)
+        if tone is None:
+            return
+        notes = simpledialog.askstring(
+            "Музыкальная проверка",
+            "Что прослушано и проверено? Укажите границы, характер партии и возможные ограничения:",
+            parent=self.root,
+        )
+        if notes is None:
+            return
+        evidence = simpledialog.askstring(
+            "Лицензионное основание",
+            "Укажите лицензию/источник и основание, разрешающее включение производного WAV в распространяемую FACTORY-библиотеку:",
+            parent=self.root,
+        )
+        if evidence is None:
+            return
+        if not messagebox.askyesno(
+            "Подтверждение REVIEWED",
+            "Подтверждаете, что лично прослушали WAV и проверили музыкальное содержимое и границы?",
+            parent=self.root,
+        ):
+            return
+        if not messagebox.askyesno(
+            "Подтверждение LICENSE_APPROVED",
+            "Подтверждаете, что указанное лицензионное основание действительно разрешает распространение этого материала?",
+            parent=self.root,
+        ):
+            return
+
+        def work():
+            return review_manifest(
+                Path(selected), STAGING_ROOT,
+                style_family=style.strip().upper(),
+                instrument_family=instrument.strip().upper(),
+                asset_role=role.strip().upper(),
+                tone_family=tone.strip().upper(),
+                musical_review_notes=notes,
+                license_evidence=evidence,
+                approve_musical_review=True,
+                approve_license=True,
+            )
+        self._background("Музыкальная и лицензионная проверка WAV", work)
+
+    def finalize_library(self) -> None:
+        """Run the staging integrity audit without copying or moving assets."""
+        def progress(message: str) -> None:
+            self._worker_events.put(("progress", message))
+        self._background(
+            "Финализация staging",
+            lambda: finalize_staging(
+                STAGING_ROOT,
+                progress=progress,
+                cancel_event=self._cancel_event,
+            ),
+        )
 
     def distribute(self) -> None:
         try:
