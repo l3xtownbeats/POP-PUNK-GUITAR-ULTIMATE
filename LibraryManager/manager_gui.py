@@ -23,6 +23,7 @@ from manifest_review import review_manifest
 from task_journal import TaskJournal
 from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
 from performance_manifest import build_performance_manifest
+from pattern_song_manager import open_pattern_song_manager
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -89,6 +90,7 @@ class LibraryManagerApp:
             ("Остановить звук", self.stop_preview),
             ("Сформировать каталог VST3", self.build_plugin_catalog),
             ("Sample Browser / режимы VST3", self.open_plugin_browser),
+            ("Pattern Song Manager", self.open_pattern_song_library),
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("Отдельное извлечение Pattern WAV", self.extract_patterns),
@@ -662,6 +664,11 @@ class LibraryManagerApp:
         self._write("=== СБОРКА КАТАЛОГА ДЛЯ VST3 ===")
         self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и все 10 режимов. Непроверенные WAV не становятся playable.")
         self._background("Сборка каталога VST3", work)
+
+    def open_pattern_song_library(self) -> None:
+        """Edit song-grouped Pattern Instrument metadata; WAV sources remain untouched."""
+        path = MANAGER_DIR / "reports" / "pattern_song_library.json"
+        open_pattern_song_manager(self.root, path)
 
     def open_plugin_browser(self) -> None:
         """Browse the latest plugin catalog and audition staged WAV candidates."""
