@@ -27,7 +27,7 @@ from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_long_wav, write_virtual_index
 from other_audit import audit_other_library
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 
 
@@ -238,11 +238,11 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 reports_root: Path | None = None,
                 progress: Callable[[str], None] | None = None,
                 cancel_event: Any = None,
-                workers: int | None = 2) -> dict[str, Any]:
+                workers: int | None = 1) -> dict[str, Any]:
     """Run a resumable, low-memory read-only inventory and analysis pass.
 
-    Defaults to at most two workers for dual-core/8GB systems; callers may
-    request one worker for very large WAV files or slow mechanical disks.
+    Defaults to one worker for older dual-core/8GB systems to keep the PC responsive.
+    Callers may explicitly request two workers on faster systems; the hard cap is two.
 
     SHA-256 values are cached by absolute path + size + mtime_ns. Unchanged
     files are not re-read on subsequent runs. All source files are read-only.
@@ -435,7 +435,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     errors: list[dict[str, str]] = []
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
     supported_files = list(included)  # Hash and report unsupported files too; never silently omit them.
-    worker_count = max(1, min(int(workers if workers is not None else 2), 2))
+    worker_count = max(1, min(int(workers if workers is not None else 1), 2))
     completed = 0
     pending = set()
     iterator = iter(supported_files)
