@@ -145,6 +145,8 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
     total_bytes = 0
     files_found = 0
     stat_errors = 0
+    directory_errors = 0
+    directories_scanned = 0
     stack = [incoming]
     csv_path = report_dir / "quick_inventory.csv"
     with csv_path.open("x", newline="", encoding="utf-8-sig") as stream:
@@ -203,7 +205,12 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
                             })
                         if files_found and files_found % 500 == 0:
                             emit(f"Быстрый обход: найдено {files_found:,} файлов…")
+                directories_scanned += 1
+                if directories_scanned == 1 or directories_scanned % 10 == 0:
+                    emit(f"Быстрый обход: проверено папок {directories_scanned:,}; файлов {files_found:,}…")
             except OSError as exc:
+                directory_errors += 1
+                directories_scanned += 1
                 emit(f"[ПРЕДУПРЕЖДЕНИЕ] Не удалось прочитать папку {folder}: {exc}")
 
     elapsed = time.perf_counter() - started
@@ -213,7 +220,9 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "report_directory": str(report_dir),
         "incoming_folder": str(incoming),
         "files_found": files_found,
+        "directories_scanned": directories_scanned,
         "stat_errors": stat_errors,
+        "directory_errors": directory_errors,
         "total_bytes": total_bytes,
         "formats": dict(sorted(counts.items())),
         "elapsed_seconds": round(elapsed, 3),
@@ -271,12 +280,43 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     if cancel_event is not None and cancel_event.is_set():
         raise RuntimeError("Анализ отменён пользователем до начала.")
 
-    emit(f"Папка импорта найдена: {incoming}. Подсчитываю файлы…")
-    all_files = sorted(path for path in incoming.rglob("*") if path.is_file())
+    emit(f"Папка импорта найдена: {incoming}. Начинаю глубокий обход папок…")
+    all_files: list[Path] = []
+    walk_errors: list[dict[str, str]] = []
+    directory_stack = [incoming]
+    directories_seen = 0
+    while directory_stack:
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("Глубокая инвентаризация остановлена пользователем при обходе папок.")
+        folder = directory_stack.pop()
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise RuntimeError("Глубокая инвентаризация остановлена пользователем при обходе папок.")
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            directory_stack.append(Path(entry.path))
+                        elif entry.is_file(follow_symlinks=False):
+                            all_files.append(Path(entry.path))
+                    except OSError as exc:
+                        walk_errors.append({
+                            "path": entry.path, "stage": "DIRECTORY_ENUMERATION",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
+        except OSError as exc:
+            walk_errors.append({
+                "path": str(folder), "stage": "DIRECTORY_ENUMERATION",
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+        directories_seen += 1
+        if directories_seen == 1 or directories_seen % 10 == 0 or len(all_files) % 500 == 0:
+            emit(f"Глубокий обход: папок {directories_seen:,}; файлов {len(all_files):,}…")
+
     excluded = [path for path in all_files if _is_excluded(path.relative_to(incoming))]
     included = [path for path in all_files if not _is_excluded(path.relative_to(incoming))]
     total_files = len(included)
-    emit(f"Найдено файлов: {len(all_files)}; к обработке: {total_files}; исключено по меткам: {len(excluded)}.")
+    emit(f"Обход завершён: папок {directories_seen}; найдено файлов: {len(all_files)}; к обработке: {total_files}; исключено по меткам: {len(excluded)}; ошибок доступа: {len(walk_errors)}.")
     emit("ЭТАП 1/4: быстрый обход дерева и подсчёт файлов завершён.")
     emit("ЭТАП 2/4: параллельная инвентаризация, SHA-256 и метаданные. Кэш SHA-256 включён; исходники только читаются.")
 
@@ -442,7 +482,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     inventory: list[dict[str, Any]] = []
     audio_reports: list[dict[str, Any]] = []
     classification_reports: list[dict[str, Any]] = []
-    errors: list[dict[str, str]] = []
+    errors: list[dict[str, str]] = list(walk_errors)
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
     supported_files = list(included)  # Hash and report unsupported files too; never silently omit them.
     worker_count = max(1, min(int(workers if workers is not None else 1), 2))
