@@ -467,3 +467,14 @@ Melody использует самостоятельную логику испо
 - Melody validation проверяет MIDI pitch, упорядоченное время старта, длительность, velocity, phrase boundaries и mapping verification.
 - Повторный review удаляет прежние подтверждения, если они не введены повторно.
 - Добавлен тест записи расширенных полей. Полный CI не подтвердил запуск job steps: GitHub Actions возвращает completed/failure при `runner_id=0`, `steps=null`, без логов; поэтому тестовый pass не заявляется.
+
+
+## TJ-2026-11-19-MANAGER-30-PATTERN-ZONES-021 — разделение note zones и rhythm Pattern
+
+- Версия разработки: `3.0.0-dev4`; статус: DEVELOPMENT / NOT FINAL.
+- `library_structure.py` теперь различает два разных payload в PATTERN MODE: отдельные pitch-specific note zones (`NOTE_ZONE_READY`) и полноценные chord-driven rhythm patterns (`STRUCTURE_VERIFIED`). Нотный WAV больше не ошибочно проверяется как loop с BPM/meter.
+- Runtime-ready определяется не только общим флагом: mode обязан присутствовать в `playable_modes` каталога; review/license и integrity проверяются отдельно. Введён отдельный статус `INTEGRITY_BLOCKED`.
+- Coverage pitch/velocity/technique дедуплицирует asset IDs при многорежимном назначении и учитывает только REVIEWED + LICENSE_APPROVED + VERIFIED данные.
+- Pattern readiness независимо проверяет loop bounds, BPM, time signature, attack/beat-grid/technique/harmonic events и обе отметки подтверждения. Melody readiness проверяет pitch, timing, duration, velocity, phrase boundaries и mapping verification.
+- Добавлен regression test, гарантирующий, что pitch-specific Pattern note zone не классифицируется как ритм-луп.
+- CI на GitHub Actions всё ещё завершает job до runner allocation: `runner_id=0`, `steps=null`, `logs_url=null`; успешный прогон тестов не подтверждён.
