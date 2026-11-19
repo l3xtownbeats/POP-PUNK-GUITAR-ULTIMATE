@@ -1,0 +1,91 @@
+import hashlib
+import math
+import shutil
+import struct
+import tempfile
+import unittest
+import wave
+from pathlib import Path
+from unittest.mock import patch
+
+import sample_melody_pipeline as pipeline
+
+
+def _hash(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(65536), b""):
+            digest.update(block)
+    return digest.hexdigest().upper()
+
+
+def _write_test_wav(path, rate=8000, seconds=2.0):
+    frames = []
+    for index in range(int(rate * seconds)):
+        value = int(7000 * math.sin(2 * math.pi * 440 * index / rate))
+        frames.append(struct.pack("<h", value))
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(b"".join(frames))
+
+
+class SampleMelodyPipelineTests(unittest.TestCase):
+    def test_creates_note_samples_and_grouped_melody_with_provenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.wav"
+            _write_test_wav(source)
+            rate = 8000
+            events = []
+            for index, (start, end, midi) in enumerate([
+                (0.10, 0.30, 69), (0.42, 0.62, 71), (0.74, 0.94, 72)
+            ], 1):
+                a, b = round(start * rate), round(end * rate)
+                events.append({
+                    "segment_id": f"NOTE-{index:04d}",
+                    "source_start_sample": a,
+                    "source_end_sample": b,
+                    "source_start_seconds": a / rate,
+                    "source_end_seconds": b / rate,
+                    "detected_note_start_seconds": start,
+                    "detected_note_end_seconds": end,
+                    "midi_note_candidate": midi,
+                    "note_name_candidate": "CANDIDATE",
+                    "confidence": 0.8,
+                })
+            fake_report = {
+                "source_sha256": _hash(source),
+                "sample_rate": rate,
+                "segments": events,
+            }
+            stage = pipeline.STAGING_BASE / ("test-sample-melody-" + next(tempfile._get_candidate_names()))
+            try:
+                with patch.object(pipeline, "propose_segments", return_value=fake_report):
+                    result = pipeline.prepare_sample_and_melody(source, stage)
+                self.assertEqual(result["sample_mode_count"], 3)
+                self.assertEqual(result["melody_mode_count"], 1)
+                self.assertFalse(result["source_modified"])
+                self.assertEqual(result["review_status"], "NEEDS_MUSICAL_REVIEW")
+                self.assertEqual(result["license_status"], "UNREVIEWED")
+                for asset in result["sample_mode"] + result["melody_mode"]:
+                    self.assertEqual(asset["source_sha256"], _hash(source))
+                    self.assertTrue(Path(asset["derived_path"]).is_file())
+                    with wave.open(asset["derived_path"], "rb") as clip:
+                        self.assertEqual(clip.getframerate(), rate)
+                        self.assertEqual(clip.getnframes(), asset["frame_count"])
+                    self.assertTrue(Path(stage, "manifests", Path(asset["derived_path"]).stem + ".json").exists()
+                                    or list((stage / "manifests").glob("*.json")))
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
+    def test_rejects_non_staging_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.wav"
+            _write_test_wav(source)
+            with self.assertRaises(ValueError):
+                pipeline.prepare_sample_and_melody(source, Path(tmp) / "outside")
+
+
+if __name__ == "__main__":
+    unittest.main()
