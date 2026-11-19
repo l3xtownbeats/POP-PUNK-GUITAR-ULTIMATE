@@ -14,7 +14,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 
-from unified_manager import run_manager, resolve_samples_root
+from unified_manager import run_manager, quick_scan, resolve_samples_root
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
@@ -225,7 +225,12 @@ class LibraryManagerApp:
         def work():
             def report_progress(message: str) -> None:
                 self._worker_events.put(("progress", message))
-            return run_manager(
+            report_progress("ЭТАП 1/5: быстрое сканирование структуры — без SHA-256, декодирования и акустического анализа.")
+            quick_result = quick_scan(
+                samples, progress=report_progress, cancel_event=self._cancel_event,
+            )
+            report_progress("ЭТАП 2/5: глубокая инвентаризация, контроль SHA-256, форматы, дубликаты и SFZ.")
+            analysis_result = run_manager(
                 samples,
                 analyze_audio=analyze_audio,
                 guitar_source_confirmed=guitar_confirmed,
@@ -233,8 +238,58 @@ class LibraryManagerApp:
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
+            extracted = []
+            extraction_failures = []
+            report_file = Path(analysis_result["report_directory"]) / "unified_audio_analysis.json"
+            if analyze_audio and report_file.is_file():
+                report_progress("ЭТАП 3/5: извлечение повторяющихся ритм-паттернов в WAV-кандидаты staging.")
+                records = json.loads(report_file.read_text(encoding="utf-8"))
+                from pattern_clip_extractor import extract_pattern_occurrences
+                for record in records:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Полный цикл остановлен пользователем; уже созданные кандидаты сохранены.")
+                    pattern_data = (record.get("pattern_analysis") or {}).get("pattern_analysis", {})
+                    if not pattern_data.get("patterns"):
+                        continue
+                    remaining = 1000 - len(extracted)
+                    if remaining <= 0:
+                        extraction_failures.append({"stage": "EXTRACTION", "error": "Достигнут безопасный лимит 1000 WAV-кандидатов за один запуск."})
+                        break
+                    try:
+                        extracted.extend(extract_pattern_occurrences({
+                            "source": record["source_path"],
+                            "source_sha256": record["source_sha256"],
+                            "pattern_analysis": pattern_data,
+                        }, STAGING_ROOT, max_clips=min(100, remaining)))
+                    except Exception as exc:
+                        extraction_failures.append({
+                            "source_path": record.get("source_path"),
+                            "stage": "EXTRACTION",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
+            report_progress("ЭТАП 4/5: проверка статуса кандидатов и подготовка к ручной проверке/лицензированию.")
+            return {
+                "quick_scan": quick_result,
+                "deep_analysis": analysis_result,
+                "extraction": {
+                    "extracted_count": len(extracted),
+                    "assets": extracted,
+                    "failures": extraction_failures,
+                    "review_status": "NEEDS_MUSICAL_REVIEW",
+                    "license_status": "UNREVIEWED",
+                    "automatic_factory_promotion": False,
+                },
+                "finalization": {
+                    "status": "WAITING_FOR_HUMAN_REVIEW_AND_LICENSE_APPROVAL",
+                    "factory_distribution_allowed": False,
+                    "reason": "FACTORY допускает только REVIEWED + LICENSE_APPROVED WAV с проверенными метаданными.",
+                },
+                "source_files_modified": False,
+                "source_files_moved_or_deleted": False,
+            }
         self._write("=== ПОЛНЫЙ ЦИКЛ АНАЛИЗА БИБЛИОТЕКИ 2.0.0 ===")
-        self._write("Этапы: быстрый обход → параллельная инвентаризация/SHA-256 → акустика/ритм/SFZ → OTHER/отчёты.")
+        self._write("Полный безопасный цикл: быстрое сканирование → инвентаризация/SHA-256 → акустика/ритмы/SFZ → извлечение WAV-кандидатов → проверка готовности.")
+        self._write("Финальная публикация в FACTORY блокируется до REVIEWED + LICENSE_APPROVED и заполнения музыкальных метаданных.")
         self._write("Извлечение, распределение и финализация выполняются отдельными подтверждаемыми операциями; анализ не перемещает и не удаляет исходники.")
         self._write(f"Акустический анализ: {'ВКЛЮЧЁН' if analyze_audio else 'ВЫКЛЮЧЕН'}")
         self._write(f"Гитарный источник подтверждён: {'ДА' if guitar_confirmed else 'НЕТ'}")
