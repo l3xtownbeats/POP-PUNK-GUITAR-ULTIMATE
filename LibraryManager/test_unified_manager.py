@@ -216,6 +216,15 @@ class UnifiedManagerTests(unittest.TestCase):
             run_manager(self.samples, write_virtual=True, reports_root=self.reports)
 
 
+    def test_inventory_only_defaults_to_two_bounded_workers(self) -> None:
+        summary = run_manager(self.samples, reports_root=self.reports)
+        self.assertEqual(summary["workers"], 2)
+
+    def test_heavy_audio_analysis_defaults_to_one_worker(self) -> None:
+        summary = run_manager(
+            self.samples, analyze_audio=True, reports_root=self.reports,
+        )
+        self.assertEqual(summary["workers"], 1)
     def test_second_scan_reuses_hash_cache_without_modifying_sources(self) -> None:
         first = run_manager(self.samples, reports_root=self.reports)
         second = run_manager(self.samples, reports_root=self.reports)
