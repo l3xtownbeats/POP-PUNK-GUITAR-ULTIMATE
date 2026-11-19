@@ -95,8 +95,11 @@ def _autocorrelation_pitch(samples, rate):
     names=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
     return {"frequency_hz":round(hz,2),"midi_note":midi,"note_name":names[midi%12]+str(midi//12-1),"confidence":round(min(1.,best),3)}
 
-def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10, max_samples: int = 350_000) -> dict:
-    """Analyze a bounded, decimated mono view to keep memory modest on older PCs."""
+def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10, max_samples: int = 90_000) -> dict:
+    """Analyze a bounded, decimated mono view; 90k samples is the low-load default.
+
+    Callers may raise max_samples for a focused second-pass analysis of selected
+    assets. The discovery pass should stay responsive on dual-core/8GB PCs.
     samples, rate, frames, channels, width, decimation = read_mono_pcm(path, max_samples=max_samples)
     fmt, subtype, backend = _audio_metadata(Path(path))
     if rate <= 0 or not samples: raise ValueError("Empty or invalid audio")
@@ -126,7 +129,7 @@ def analyse_wav(path: Path, frame_ms: int = 20, hop_ms: int = 10, max_samples: i
         if best_lag and best_corr>0: tempo=round(60*env_rate/best_lag,1)
     pitch=_autocorrelation_pitch(samples,rate)
     return {
-        "analysis_version":"0.3.0","source":str(Path(path).resolve()),
+        "analysis_version":"0.4.0","source":str(Path(path).resolve()),
         "duration_seconds":round(frames/rate,6),"sample_rate":rate,"channels":channels,
         "sample_width_bytes":width,"container_format":fmt,"codec_subtype":subtype,
         "decoder_backend":backend,"analysis_decimation":decimation,"analysis_sample_cap":max_samples,"decoder_block_frames":65536,
