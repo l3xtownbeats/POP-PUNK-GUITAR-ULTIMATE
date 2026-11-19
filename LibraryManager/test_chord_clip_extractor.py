@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import chord_clip_extractor as extractor
+import audio_segmenter
 
 
 def write_wav(path: Path, frames: int = 16000) -> None:
@@ -46,7 +47,8 @@ class ChordClipExtractorTests(unittest.TestCase):
                      "confidence": 0.88},
                 ],
             }
-            with patch.object(extractor, "STAGING_BASE", staging.resolve()):
+            with patch.object(extractor, "STAGING_BASE", staging.resolve()), \
+                 patch.object(audio_segmenter, "STAGING_BASE", staging.resolve()):
                 results = extractor.extract_chord_samples(report, staging)
             self.assertEqual(len(results), 2)
             self.assertEqual({item["kind"] for item in results},
@@ -70,7 +72,8 @@ class ChordClipExtractorTests(unittest.TestCase):
             write_wav(source)
             report = {"source_path": str(source), "source_sha256": "0" * 64,
                       "chord_candidates": []}
-            with patch.object(extractor, "STAGING_BASE", staging.resolve()):
+            with patch.object(extractor, "STAGING_BASE", staging.resolve()), \
+                 patch.object(audio_segmenter, "STAGING_BASE", staging.resolve()):
                 with self.assertRaisesRegex(RuntimeError, "SHA-256 changed"):
                     extractor.extract_chord_samples(report, staging)
 
