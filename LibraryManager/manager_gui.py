@@ -87,6 +87,7 @@ class LibraryManagerApp:
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("Отдельное извлечение Pattern WAV", self.extract_patterns),
+            ("Очередь ручной проверки", self.open_review_queue),
             ("3. Проверить WAV-кандидат", self.review_candidate),
             ("4. Финализировать staging + FACTORY", self.finalize_library),
             ("5. Распределить проверенные материалы", self.distribute),
@@ -536,9 +537,62 @@ class LibraryManagerApp:
             }
         self._background("Извлечение ритм-паттернов", work)
 
-    def review_candidate(self) -> None:
+    def open_review_queue(self) -> None:
+        """List staged WAV manifests awaiting independent musical/license review."""
+        manifests = sorted((STAGING_ROOT / "manifests").glob("*.json"))
+        rows = []
+        for path in manifests:
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+                rows.append((
+                    path, str(record.get("kind", "UNKNOWN")),
+                    str(record.get("review_status", "NEEDS_MUSICAL_REVIEW")),
+                    str(record.get("license_status", "UNREVIEWED")),
+                    str(record.get("duration_seconds", "")),
+                ))
+            except (OSError, json.JSONDecodeError):
+                rows.append((path, "INVALID_MANIFEST", "ERROR", "ERROR", ""))
+
+        window = tk.Toplevel(self.root)
+        window.title("Очередь ручной проверки — Staging")
+        window.geometry("960x460")
+        window.transient(self.root)
+        frame = ttk.Frame(window, padding=10)
+        frame.pack(fill="both", expand=True)
+        columns = ("kind", "review", "license", "duration", "manifest")
+        tree = ttk.Treeview(frame, columns=columns, show="headings", selectmode="browse")
+        for column, label, width in (
+            ("kind", "Тип", 150), ("review", "Музыкальный статус", 190),
+            ("license", "Лицензия", 150), ("duration", "Длительность, сек", 120),
+            ("manifest", "Манифест", 340),
+        ):
+            tree.heading(column, text=label)
+            tree.column(column, width=width, anchor="w")
+        tree.pack(fill="both", expand=True)
+        paths = {}
+        for path, kind, review, license_status, duration in rows:
+            tree_id = tree.insert("", "end", values=(kind, review, license_status, duration, path.name))
+            paths[tree_id] = path
+
+        ttk.Label(frame, text=f"Манифестов: {len(rows)}. Музыкальная проверка и лицензия подтверждаются отдельно.").pack(anchor="w", pady=6)
+
+        def review_selected() -> None:
+            selection = tree.selection()
+            if not selection:
+                messagebox.showinfo("Очередь проверки", "Выберите WAV-манифест.", parent=window)
+                return
+            selected_path = paths[selection[0]]
+            window.destroy()
+            self.review_candidate(str(selected_path))
+
+        ttk.Button(frame, text="Проверить выбранный WAV", command=review_selected).pack(anchor="e")
+        tree.bind("<Double-1>", lambda _event: review_selected())
+        if not rows:
+            self._write("Очередь ручной проверки пуста: staging/manifests не содержит JSON-манифестов.")
+
+    def review_candidate(self, selected_path: str | None = None) -> None:
         """Collect explicit musical and license decisions for one staged WAV."""
-        selected = filedialog.askopenfilename(
+        selected = selected_path or filedialog.askopenfilename(
             title="Выберите WAV-манифест для музыкальной и лицензионной проверки",
             initialdir=str(STAGING_ROOT / "manifests"),
             filetypes=[("Staging manifests", "*.json")],
