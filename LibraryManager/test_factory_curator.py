@@ -27,11 +27,20 @@ class FactoryCuratorTests(unittest.TestCase):
             "derived_sha256": sha256_file(self.wav),
             "review_status": "REVIEWED",
             "license_status": "LICENSE_APPROVED",
+            "review_validation": {
+                "source_sha256_verified": True,
+                "derived_sha256_verified": True,
+                "sample_boundaries_verified": True,
+                "explicit_musical_approval": True,
+                "explicit_license_approval": True,
+            },
             "musical_metadata": {
+                "style_family": "POP_PUNK",
                 "instrument_family": {"value": "ELECTRIC_GUITAR"},
                 "asset_role": "RHYTHM_PATTERN",
                 "tone_family": "DISTORTION",
-                "styles": ["POP_PUNK", "PUNK_ROCK"]
+                "musical_review_notes": "Reviewed by listening.",
+                "license_evidence": "License allows redistribution."
             }
         }
         self.manifest.write_text(json.dumps(self.record), encoding="utf-8")
@@ -41,7 +50,7 @@ class FactoryCuratorTests(unittest.TestCase):
 
     def test_dry_run_proposes_canonical_group_without_copying(self):
         result = promotion_plan(self.manifest, self.factory, self.staging)
-        self.assertEqual(result["group_path"], "ELECTRIC_GUITAR/RHYTHM_PATTERN/DISTORTION")
+        self.assertEqual(result["group_path"], "POP_PUNK/WAV/ELECTRIC_GUITAR/RHYTHM_PATTERN/DISTORTION")
         self.assertEqual(result["operation"], "COPY_ONLY")
         self.assertFalse(self.factory.exists())
 

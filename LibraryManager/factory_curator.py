@@ -22,7 +22,13 @@ INSTRUMENTS = {
 ROLES = {
     "ONE_SHOT", "INDIVIDUAL_NOTE", "CHORD", "NOTE_SEQUENCE",
     "MELODIC_PHRASE", "RHYTHMIC_MELODY", "RHYTHM_PATTERN", "RIFF",
-    "CONFIRMED_LOOP", "MULTI_HIT", "SUSTAIN", "AMBIENCE_OR_FX"
+    "CONFIRMED_LOOP", "GUITAR_LOOP", "MELODY_PART", "POWER_CHORD",
+    "PALM_MUTE", "ARPEGGIO", "LEAD_GUITAR", "RHYTHM_GUITAR",
+    "MULTI_HIT", "SUSTAIN", "AMBIENCE_OR_FX"
+}
+STYLES = {
+    "POP_PUNK", "PUNK_ROCK", "ALTERNATIVE_ROCK", "MELODIC_PUNK",
+    "SKATE_PUNK", "EMO_POP_ROCK"
 }
 TONES = {
     "CLEAN", "EDGE_OF_BREAKUP", "CRUNCH", "OVERDRIVE", "DISTORTION",
@@ -69,6 +75,18 @@ def promotion_plan(manifest_path: Path, factory_root: Path,
         raise ValueError("Musical boundaries/content must be reviewed before FACTORY promotion")
     if record.get("license_status") != "LICENSE_APPROVED":
         raise ValueError("License must explicitly be LICENSE_APPROVED")
+    tags = record.get("musical_metadata") or {}
+    if not isinstance(tags, dict) or not str(tags.get("license_evidence", "")).strip():
+        raise ValueError("Explicit license evidence is required")
+    if not str(tags.get("musical_review_notes", "")).strip():
+        raise ValueError("Musical review notes are required")
+    validation = record.get("review_validation") or {}
+    if not all(validation.get(key) is True for key in (
+        "source_sha256_verified", "derived_sha256_verified",
+        "sample_boundaries_verified", "explicit_musical_approval",
+        "explicit_license_approval",
+    )):
+        raise ValueError("Explicit review/license validation evidence is missing")
     source = Path(record.get("derived_path", ""))
     if not source.is_absolute():
         source = (manifest_path.parent / source).resolve()
@@ -83,17 +101,19 @@ def promotion_plan(manifest_path: Path, factory_root: Path,
     tags = record.get("musical_metadata", {})
     if not isinstance(tags, dict):
         raise ValueError("musical_metadata must be an object")
+    style = _primary_value(tags, "style_family", STYLES)
     instrument = _primary_value(tags, "instrument_family", INSTRUMENTS)
     role = _primary_value(tags, "asset_role", ROLES)
     tone = _primary_value(tags, "tone_family", TONES)
-    destination_dir = factory_root / instrument / role / tone
+    format_family = "WAV"
+    destination_dir = factory_root / style / format_family / instrument / role / tone
     destination = destination_dir / source.name
     return {
         "source_path": str(source),
         "source_sha256": expected_hash,
         "factory_root": str(factory_root),
         "destination_path": str(destination),
-        "group_path": f"{instrument}/{role}/{tone}",
+        "group_path": f"{style}/{format_family}/{instrument}/{role}/{tone}",
         "all_tags": tags,
         "promotion_status": "READY_FOR_EXPLICIT_APPROVAL",
         "operation": "COPY_ONLY",
