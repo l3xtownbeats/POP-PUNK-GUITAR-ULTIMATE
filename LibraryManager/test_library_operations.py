@@ -55,11 +55,20 @@ class LibraryOperationsTests(unittest.TestCase):
             "engine_targets": ["PATTERN_MODE", "PATTERN_INSTRUMENT"],
             "review_status": "REVIEWED",
             "license_status": "LICENSE_APPROVED",
+            "review_validation": {
+                "source_sha256_verified": True,
+                "derived_sha256_verified": True,
+                "sample_boundaries_verified": True,
+                "explicit_musical_approval": True,
+                "explicit_license_approval": True,
+            },
             "musical_metadata": {
                 "style_family": "POP_PUNK",
                 "instrument_family": "ELECTRIC_GUITAR",
                 "asset_role": "RHYTHM_PATTERN",
                 "tone_family": "CRUNCH",
+                "musical_review_notes": "Reviewed boundaries and guitar content.",
+                "license_evidence": "License explicitly permits redistribution.",
             },
         }
         self.manifest.write_text(json.dumps(record), encoding="utf-8")
