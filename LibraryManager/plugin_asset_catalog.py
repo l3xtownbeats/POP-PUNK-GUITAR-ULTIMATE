@@ -285,6 +285,7 @@ def _manifest_to_asset(
         "string_fret_positions": metadata.get("string_fret_positions"),
         "articulation_candidates": metadata.get("articulation_candidates", ["UNKNOWN"]),
         "velocity_candidate": metadata.get("velocity_candidate"),
+        "musical_metadata": metadata,
         "review_status": review_status,
         "license_status": license_status,
         "license_evidence": metadata.get("license_evidence"),
