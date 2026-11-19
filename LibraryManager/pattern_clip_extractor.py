@@ -102,6 +102,7 @@ def extract_pattern_occurrences(
                     "sample_rate": rate,
                     "channels": clip_info["channels"],
                     "sample_width_bytes": clip_info["sample_width_bytes"],
+                    "source_sample_width_bytes": source_info.sampwidth,
                     "source_format": source_info.source_format,
                     "source_subtype": source_info.source_subtype,
                     "derived_format": clip_info["derived_format"],
