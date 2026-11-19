@@ -25,6 +25,7 @@ from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
 from performance_manifest import build_performance_manifest
 from pattern_song_manager import open_pattern_song_manager
 from chromatic_pitch_map import build_chromatic_pitch_map, chromatic_note_table
+from library_structure import write_library_structure
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -664,10 +665,18 @@ class LibraryManagerApp:
             performance_result = build_performance_manifest(
                 output, performance_output, chromatic_pitch_map=chromatic_map
             )
+            structure_output = output.with_name(output.stem.replace(
+                "plugin_asset_catalog", "plugin_library_structure"
+            ) + ".json")
+            coverage_output = output.with_name(output.stem.replace(
+                "plugin_asset_catalog", "plugin_library_coverage"
+            ) + ".json")
+            structure_result = write_library_structure(output, structure_output, coverage_output)
             chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
             return {
                 "plugin_asset_catalog": catalog_result,
                 "performance_manifest": performance_result,
+                "library_structure": structure_result,
                 "chromatic_pitch_map": {
                     "path": str(chromatic_output),
                     "pitch_class_count": len(chromatic_map["pitch_classes"]),
