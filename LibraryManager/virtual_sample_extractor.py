@@ -299,7 +299,21 @@ def extract_virtual_ranges(
             clip = clips_dir / f"REGION-{identity}.wav"
             manifest = manifests_dir / f"REGION-{identity}.json"
             if clip.exists() or manifest.exists():
-                raise FileExistsError(f"Refusing to overwrite staged long-recording candidate {identity}")
+                if not (clip.is_file() and manifest.is_file()):
+                    raise FileExistsError(f"Incomplete existing long-recording candidate {identity}")
+                existing = json.loads(manifest.read_text(encoding="utf-8"))
+                matches = (
+                    existing.get("source_sha256") == expected_hash
+                    and int(existing.get("source_start_sample", -1)) == start
+                    and int(existing.get("source_end_sample", -1)) == end
+                    and Path(str(existing.get("derived_path", ""))).resolve() == clip.resolve()
+                    and str(existing.get("derived_sha256", "")).upper() == sha256_file(clip)
+                )
+                if not matches:
+                    raise RuntimeError(f"Existing staged long-recording candidate failed provenance/hash validation: {identity}")
+                existing["reused_existing"] = True
+                results.append(existing)
+                continue
 
             clip_info = write_pcm_wav_range(
                 source, start, end, clip, expected_rate=info.framerate,
@@ -354,6 +368,7 @@ def extract_virtual_ranges(
                 clip.unlink(missing_ok=True)
                 created.remove(clip)
                 raise
+            record["reused_existing"] = False
             results.append(record)
 
         if sha256_file(source) != expected_hash:
