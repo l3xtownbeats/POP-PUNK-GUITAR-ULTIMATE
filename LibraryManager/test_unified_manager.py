@@ -55,6 +55,8 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertFalse(summary["sha256_performed"])
         self.assertFalse(summary["audio_decoding_performed"])
         self.assertFalse(summary["source_files_modified"])
+        self.assertEqual(summary["memory_strategy"], "STREAMING_CSV_BOUNDED_MEMORY")
+        self.assertGreaterEqual(summary["elapsed_seconds"], 0)
         self.assertTrue((Path(summary["report_directory"]) / "quick_inventory.csv").is_file())
         self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
                          self.original_hash)
