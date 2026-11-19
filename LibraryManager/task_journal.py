@@ -77,9 +77,8 @@ class TaskJournal:
                     if item.get("schema_version") == SCHEMA_VERSION:
                         records.append(item)
                 except (json.JSONDecodeError, AttributeError):
-                    # Ignore a torn final line after power loss; preserve file.
-                    if number == sum(1 for _ in []):
-                        pass
+                    # Ignore a malformed/torn record; never rewrite the journal.
+                    continue
         return records[-limit:] if limit is not None else records
 
     def latest_states(self) -> dict[str, dict[str, Any]]:
