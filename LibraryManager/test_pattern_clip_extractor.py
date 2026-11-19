@@ -45,7 +45,11 @@ class PatternClipExtractorTests(unittest.TestCase):
             try:
                 before = hashlib.sha256(source.read_bytes()).hexdigest().upper()
                 records = extract_pattern_occurrences(report, stage, pre_roll_ms=20, post_roll_ms=30)
+                reused = extract_pattern_occurrences(report, stage, pre_roll_ms=20, post_roll_ms=30)
                 self.assertEqual(len(records), 2)
+                self.assertTrue(all(item.get("reused_existing") is False for item in records))
+                self.assertEqual(len(reused), 2)
+                self.assertTrue(all(item.get("reused_existing") is True for item in reused))
                 self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest().upper(), before)
                 for record in records:
                     clip = Path(record["derived_path"])
