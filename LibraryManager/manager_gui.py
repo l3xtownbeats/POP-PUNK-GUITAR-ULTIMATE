@@ -28,7 +28,7 @@ from chromatic_pitch_map import build_chromatic_pitch_map, chromatic_note_table
 from library_structure import write_library_structure, TECHNIQUES
 from library_operations import (
     cleanup_original_sources,
-    distribute_assets,
+    distribute_assets_transactional,
     distribution_plan,
 )
 
@@ -1290,9 +1290,10 @@ class LibraryManagerApp:
         ):
             self.status.set("Распределение отменено пользователем")
             return
-        self._background("Распределение FACTORY", lambda: distribute_assets(
-            plan, approve=True,
+        self._background("Распределение FACTORY (транзакция)", lambda: distribute_assets_transactional(
+            plan, staging_root=STAGING_ROOT, approve=True,
             journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
+            cancel_event=self._cancel_event,
         ))
 
     def audit_cleanup(self) -> None:
