@@ -25,6 +25,7 @@ from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, infer_lab
 from pattern_pipeline import build_pattern_report
 from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_pattern_ranges, write_virtual_index
+from irregular_phrase_segmenter import analyze_irregular_guitar_phrases
 from other_audit import audit_other_library
 from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
 
@@ -448,9 +449,26 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                             source_sha256=digest,
                         )
                         audio_record["virtual_extraction"] = virtual
+                        # Separate path for expressive/non-repeating loops. This is
+                        # onset-group segmentation only: candidates are not asserted
+                        # to be notes, chords, complete riffs or musical sections.
+                        irregular = analyze_irregular_guitar_phrases(
+                            path, acoustic, guitar_source_confirmed=True,
+                            source_sha256=digest,
+                        )
+                        audio_record["irregular_phrase_extraction"] = irregular
+                        audio_record["pattern_candidate_total"] = (
+                            virtual.get("candidate_count", 0) +
+                            irregular.get("candidate_count", 0)
+                        )
                         if write_virtual and virtual.get("candidate_count", 0):
                             audio_record["virtual_index_files"] = [
                                 str(p) for p in write_virtual_index(virtual, incoming)
+                            ]
+                        if write_virtual and irregular.get("candidate_count", 0):
+                            audio_record["irregular_phrase_index_files"] = [
+                                str(p) for p in write_virtual_index(irregular, incoming,
+                                    group_name="IRREGULAR_GUITAR_PHRASE_CANDIDATES")
                             ]
                     elif guitar_source_confirmed:
                         audio_record["virtual_extraction_status"] = "SKIPPED_NON_WAV"
