@@ -257,6 +257,34 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             "errors": local_errors, "cache": (key, stat.st_size, stat.st_mtime_ns, digest),
         }
 
+    def safe_process_one(path: Path) -> dict[str, Any]:
+        """Convert an unreadable/locked source into a per-file error, not a fatal scan error."""
+        try:
+            return process_one(path)
+        except Exception as exc:
+            if cancel_event is not None and cancel_event.is_set():
+                raise
+            try:
+                stat = path.stat()
+                size = stat.st_size
+            except OSError:
+                size = ""
+            relative = str(path.relative_to(incoming))
+            return {
+                "row": {
+                    "relative_path": relative, "filename": path.name,
+                    "extension": path.suffix.lower(), "bytes": size, "sha256": "",
+                    "source_path": str(path.resolve()), "source_modified_by_manager": False,
+                    "hash_source": "ERROR", "category_suggestion": "MANUAL_REVIEW_REQUIRED",
+                    "audio_analysis_status": "FILE_READ_ERROR",
+                    "classification_status": "MANUAL_REVIEW_REQUIRED",
+                },
+                "audio_record": None, "classification": None,
+                "errors": [{"path": relative, "stage": "INVENTORY",
+                            "error": f"{type(exc).__name__}: {exc}"}],
+                "cache": None,
+            }
+
     inventory: list[dict[str, Any]] = []
     audio_reports: list[dict[str, Any]] = []
     classification_reports: list[dict[str, Any]] = []
@@ -271,7 +299,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="LibraryScan") as pool:
             for _ in range(min(len(supported_files), worker_count * 2)):
                 try:
-                    pending.add(pool.submit(process_one, next(iterator)))
+                    pending.add(pool.submit(safe_process_one, next(iterator)))
                 except StopIteration:
                     break
             while pending:
@@ -286,19 +314,21 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     result = future.result()
                     row = result["row"]
                     inventory.append(row)
-                    duplicate_groups[row["sha256"]].append(row["relative_path"])
+                    if row.get("sha256"):
+                        duplicate_groups[row["sha256"]].append(row["relative_path"])
                     if result["audio_record"] is not None:
                         audio_reports.append(result["audio_record"])
                     if result["classification"] is not None:
                         classification_reports.append(result["classification"])
                     errors.extend(result["errors"])
-                    con.execute(
-                        "INSERT OR REPLACE INTO file_hash_cache VALUES(?,?,?,?,?)",
-                        (*result["cache"], datetime.now(timezone.utc).isoformat())
-                    )
+                    if result["cache"] is not None:
+                        con.execute(
+                            "INSERT OR REPLACE INTO file_hash_cache VALUES(?,?,?,?,?)",
+                            (*result["cache"], datetime.now(timezone.utc).isoformat())
+                        )
                     completed += 1
                     emit(
-                        f"Инвентаризация и анализ: {completed}/{len(supported_files)} "
+                        f"Обработка файлов: {completed}/{len(supported_files)} "
                         f"({completed / max(1, len(supported_files)):.0%}) — "
                         f"{row['filename']} [{row.get('hash_source')}; "
                         f"{row.get('audio_analysis_status', row.get('category_suggestion', 'OK'))}]"
