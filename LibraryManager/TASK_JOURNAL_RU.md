@@ -308,3 +308,42 @@
 - Проверка отсутствия silent keys, корректности MIDI note mapping, переключения Sharp/Flat без изменения звучащей высоты.
 - Проверка, что fallback не выдаётся за оригинальный семпл и что аккордовые WAV не используются как суррогат отдельных нот без отдельного подтверждения.
 - Эта запись утверждает требование и критерии реализации, но не заявляет, что поддержка уже реализована или протестирована.
+
+
+
+## Запись TJ-2026-11-19-CHROMATIC-AUTOCHORDS-016 — единая карта 12 нот для Manager и будущего VST3
+
+- Дата: 2026-11-19
+- Тип: **РЕАЛИЗАЦИЯ MANAGER / КОНТРАКТ ДАННЫХ ДЛЯ VST3**
+- Статус: **КОД ДОБАВЛЕН; CI И АУДИОПРОВЕРКА ОЖИДАЮТСЯ**
+- Ветка: feature/virtual-riff-extraction
+
+### Что внесено в код
+
+- Добавлен LibraryManager/chromatic_pitch_map.py: единый pitch class 0–11, MIDI note mapping, sharp/flat display и объединение enharmonic aliases.
+- Добавлены тесты LibraryManager/test_chromatic_pitch_map.py на все 12 pitch classes, C#/Db, D#/Eb, F#/Gb, G#/Ab, A#/Bb и различие E/F.
+- Performance Manifest теперь включает общую chromatic pitch map и проверяет наличие всех 12 pitch classes, alias normalization и использование той же карты Auto Chords.
+- Manager 2.5.0 получил кнопку «12 нот / Auto Chords», а операция «Сформировать каталог VST3» дополнительно экспортирует chromatic_pitch_map JSON рядом с каталогом и Performance Manifest.
+- README и docs/PPGU_CHROMATIC_PITCH_MAP_RU.md описывают правила Sharp/Flat, key-aware spelling, Auto Chords и fallback gates.
+
+### Обязательная музыкальная логика
+
+- Все 12 разных хроматических pitch classes остаются в доступной клавиатурной карте независимо от текущей тональности.
+- Enharmonic spellings объединяются: C# = Db, D# = Eb, F# = Gb, G# = Ab, A# = Bb.
+- E и F — разные полутона и никогда не объединяются.
+- Auto Chords может иметь подмножество chord tones для выбранного аккорда, но не удаляет хроматические ноты из общего диапазона.
+- Точный проверенный single-note sample имеет приоритет. Fallback на индивидуальную ноту может быть только явно помеченным предложением до реализации VST3 playback и аудио-QA.
+- Целые chord WAV/loop WAV нельзя использовать для универсального транспонирования.
+
+### Фактические изменения GitHub
+
+- chromatic_pitch_map.py: cc952c7a38945bbc79d4609dc0012138ec17f478
+- test_chromatic_pitch_map.py: 92cb6e60bac842a2de05d0335933a9e4b209cd90
+- performance_manifest.py: a63f1a09c328fd8a76daa92d79d2b6192368e9f5
+- manager_gui.py: 6c5a29b03ffb46475dbb527dec6457394f5ec434
+- docs/PPGU_CHROMATIC_PITCH_MAP_RU.md: 008375b800a4897abf4c020aeced615523725651
+- LibraryManager/README.md: 405f4028008a8d1a62c809b7a1a87b97bb760e9a
+
+### Граница готовности
+
+В текущем дереве репозитория нет отдельного C++/JUCE VST3 plugin source tree. Поэтому на этом этапе реализованы Manager-side pitch map и контракт Performance Manifest для будущего VST3, но не сам realtime playback engine. Наличие всех 12 записей в JSON не является доказательством, что каждая клавиша уже звучит. Необходимо дождаться CI, а затем реализовать VST3 exact-sample/fallback playback и проверить все ноты на слух в FL Studio 20.
