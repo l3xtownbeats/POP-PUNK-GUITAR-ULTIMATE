@@ -117,6 +117,36 @@ def build_mode_sorting_report(audio_reports: list[dict[str, Any]]) -> dict[str, 
                            "pitch_confidence": event.get("confidence")},
                 ))
 
+        # Experimental chord regions are SAMPLE MODE chord/power-chord
+        # candidates. They are not verified voicings or string/fret positions.
+        chord_report = record.get("chord_analysis") or {}
+        for chord in chord_report.get("chord_candidates", []) or []:
+            start_s, end_s = chord.get("start_seconds"), chord.get("end_seconds")
+            if not acoustic_rate or not isinstance(start_s, (int, float)) or not isinstance(end_s, (int, float)) or end_s <= start_s:
+                continue
+            start = max(0, int(round(start_s * acoustic_rate)))
+            end = int(round(end_s * acoustic_rate))
+            if total_frames:
+                end = min(end, total_frames)
+            if end <= start:
+                continue
+            quality = str(chord.get("quality") or "UNKNOWN").upper()
+            candidate_type = "POWER_CHORD_SAMPLE" if quality == "POWER5" else "CHORD_SAMPLE"
+            queues["SAMPLE MODE"].append(_candidate(
+                record, "SAMPLE MODE", candidate_type, start, end,
+                status="CHORD_HYPOTHESIS_REQUIRES_LISTENING",
+                evidence=["Experimental spectral/chroma chord hypothesis; not verified transcription or guitar fingering."],
+                extra={
+                    "chord_name_candidate": chord.get("chord_name_candidate"),
+                    "root_pitch_class_candidate": chord.get("root_pitch_class"),
+                    "quality_candidate": quality,
+                    "pitch_classes_candidate": chord.get("pitch_classes_candidate", []),
+                    "pitch_confidence": chord.get("mean_confidence", chord.get("confidence")),
+                    "voicing_candidate": "UNKNOWN",
+                    "string_fret_positions": None,
+                },
+            ))
+
         # Only the repeated-motif extractor can populate Pattern Mode.
         virtual = record.get("virtual_extraction") or {}
         for item in virtual.get("candidates", []) or []:
