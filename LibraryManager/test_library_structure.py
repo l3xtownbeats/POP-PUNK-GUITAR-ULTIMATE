@@ -31,8 +31,8 @@ class LibraryStructureTests(unittest.TestCase):
             "asset_id": "A1", "asset_file": "staging/clips/a.wav", "manifest_file": "a.json",
             "kind": "note_event", "playable": True, "playable_in_mode": True,
             "review_status": "REVIEWED", "license_status": "LICENSE_APPROVED",
-            "integrity_status": "VERIFIED", "confirmed_midi_note": 60,
-            "confirmed_note_sequence": [60, 62, 64], "musical_metadata": {
+            "integrity_status": "VERIFIED", "playable_modes": ["SAMPLE MODE"],
+            "confirmed_midi_note": 60, "confirmed_note_sequence": [60, 62, 64], "musical_metadata": {
                 "confirmed_techniques": ["DOWNSTROKE", "PALM_MUTE"],
                 "confirmed_velocity_layer": "HIGH",
             }, "blocking_reasons": [],
@@ -107,7 +107,8 @@ class LibraryStructureTests(unittest.TestCase):
     def test_runtime_ready_requires_review_license_and_integrity(self):
         bad = {"asset_id": "X", "asset_file": "x.wav", "playable": True,
                "playable_in_mode": True, "review_status": "NEEDS_MUSICAL_REVIEW",
-               "license_status": "UNREVIEWED", "integrity_status": "BLOCKED"}
+               "license_status": "UNREVIEWED", "integrity_status": "BLOCKED",
+            "playable_modes": ["SAMPLE MODE"]}
         result = build_library_structure(_catalog({"SAMPLE MODE": [bad]}))
         self.assertEqual(result["modes"][0]["assets"][0]["runtime_ready"], False)
         self.assertEqual(validate_library_structure(result), [])
