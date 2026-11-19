@@ -122,6 +122,10 @@ def review_manifest(
     metadata = record.setdefault("musical_metadata", {})
     if not isinstance(metadata, dict):
         raise ValueError("musical_metadata must be a JSON object")
+    # A fresh review must re-confirm mappings; blank input revokes stale
+    # confirmations instead of silently carrying them forward.
+    for field in ("confirmed_midi_note", "confirmed_chord_name", "confirmed_note_sequence"):
+        metadata.pop(field, None)
     metadata.update({
         "style_family": style_family,
         "instrument_family": instrument_family,
