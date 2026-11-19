@@ -124,5 +124,18 @@ class UnifiedManagerTests(unittest.TestCase):
             run_manager(self.samples, write_virtual=True, reports_root=self.reports)
 
 
+    def test_second_scan_reuses_hash_cache_without_modifying_sources(self) -> None:
+        first = run_manager(self.samples, reports_root=self.reports)
+        second = run_manager(self.samples, reports_root=self.reports)
+        report = Path(second["report_directory"]) / "unified_inventory.csv"
+        inventory = report.read_text(encoding="utf-8-sig")
+        self.assertIn("CACHE", inventory)
+        self.assertEqual(second["files_scanned"], first["files_scanned"])
+        self.assertTrue(self.wav.exists())
+        self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
+                         self.original_hash)
+        self.assertTrue(Path(second["hash_cache"]).is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
