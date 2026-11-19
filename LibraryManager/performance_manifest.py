@@ -161,9 +161,18 @@ def build_performance_manifest(
     errors = validate_performance_manifest(manifest)
     if errors:
         raise ValueError("Invalid Performance Manifest: " + "; ".join(errors))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.exists():
         raise FileExistsError(f"Refusing to overwrite Performance Manifest: {output_path}")
-    output_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = output_path.with_suffix(output_path.suffix + ".tmp")
+    try:
+        with temporary.open("x", encoding="utf-8") as stream:
+            stream.write(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+            stream.flush()
+        temporary.replace(output_path)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
     return {
         "manifest_path": str(output_path),
         "schema": PERFORMANCE_SCHEMA,
