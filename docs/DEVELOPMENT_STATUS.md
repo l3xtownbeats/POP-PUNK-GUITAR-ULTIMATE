@@ -75,7 +75,7 @@ The 393-path count and 387-unique-content count are both intentional and must no
 ## Library Manager 2.4.0 — VST3 preparation bridge
 
 - The ten approved mode sections are emitted in a single conservative mode-sorting report.
-- Confirmed guitar-source analysis now adds experimental chord/power-chord hypotheses; the extraction stage writes review-only chord sample WAVs with exact source offsets and provenance.
+- Confirmed guitar-source analysis now adds experimental chord/power-chord hypotheses; the extraction stage writes review-only chord sample WAVs with exact source offsets and provenance. The Manager also generates bounded fretboard voicing hypotheses for ARPEGGIO from chord pitch classes using an explicitly unconfirmed standard-tuning assumption.
 - Sample/Melody and Pattern extraction remain separate paths. Pattern Mode still requires repeated-rhythm evidence; broad RMS regions are not promoted to musical patterns.
 - A versioned `plugin_asset_catalog.json` and `performance_manifest.json` are generated after full-cycle extraction and staging audit. They carry ten mode sections, relative staged-WAV paths, hashes, sample offsets, candidate musical metadata, asset bindings and a versioned event contract. The performance event timeline remains empty until timing/playing details are musically reviewed.
 - The GUI includes a mode-based Sample Browser and a catalog rebuild action.
