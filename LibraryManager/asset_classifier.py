@@ -67,7 +67,7 @@ def classify_wav(path: Path, short_max_seconds: float=1.25,
     active=[x for x in env if x>max(0.003,peak*0.025)]
     onsets=_onsets(env,dt) if peak>=0.003 and active else []
     regularity=_regularity(onsets)
-    pitch=_pitch_evidence(path) if analyze_pitch and peak>=0.003 else {
+    pitch=(_pitch_evidence(path) if duration <= 45.0 else {"events":[],"note_sequence":[],"distinct_pitch_count":0,"pitch_tracker":"SKIPPED_LONG_FILE_LOW_LOAD"}) if analyze_pitch and peak>=0.003 else {
         "events":[],"note_sequence":[],"distinct_pitch_count":0,"pitch_tracker":"SKIPPED"}
     note_sequence=pitch["note_sequence"]
     distinct=pitch["distinct_pitch_count"]
