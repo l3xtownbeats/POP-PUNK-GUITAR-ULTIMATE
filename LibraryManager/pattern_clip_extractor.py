@@ -61,6 +61,7 @@ def extract_pattern_occurrences(
 
     results: list[dict[str, Any]] = []
     created_paths: list[Path] = []
+    created_identities: set[str] = set()
     try:
         for pattern in patterns:
             pattern_id = str(pattern.get("pattern_candidate_id") or "UNKNOWN")
@@ -84,7 +85,23 @@ def extract_pattern_occurrences(
                 clip_path = clips_dir / f"PATTERN-{identity}.wav"
                 manifest_path = manifests_dir / f"PATTERN-{identity}.json"
                 if clip_path.exists() or manifest_path.exists():
-                    raise FileExistsError(f"Refusing to overwrite staged pattern clip {identity}")
+                    if identity in created_identities:
+                        raise FileExistsError(f"Duplicate pattern occurrence in this extraction batch: {identity}")
+                    if not (clip_path.is_file() and manifest_path.is_file()):
+                        raise FileExistsError(f"Incomplete existing staged pattern clip {identity}")
+                    existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    matches = (
+                        existing.get("source_sha256") == expected_hash
+                        and int(existing.get("source_start_sample", -1)) == start
+                        and int(existing.get("source_end_sample", -1)) == end
+                        and Path(str(existing.get("derived_path", ""))).resolve() == clip_path.resolve()
+                        and str(existing.get("derived_sha256", "")).upper() == sha256_file(clip_path)
+                    )
+                    if not matches:
+                        raise RuntimeError(f"Existing staged pattern clip failed provenance/hash validation: {identity}")
+                    existing["reused_existing"] = True
+                    results.append(existing)
+                    continue
                 created_paths.extend([clip_path, manifest_path])
                 clip_info = write_pcm_wav_range(
                     source, start, end, clip_path, expected_rate=rate,
@@ -134,6 +151,8 @@ def extract_pattern_occurrences(
                 with manifest_path.open("x", encoding="utf-8") as stream:
                     json.dump(record, stream, ensure_ascii=False, indent=2)
                     stream.write("\n")
+                record["reused_existing"] = False
+                created_identities.add(identity)
                 results.append(record)
             if len(results) >= max_clips:
                 break
