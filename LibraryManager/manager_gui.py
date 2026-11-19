@@ -7,6 +7,7 @@ All file operations remain review-gated by library_operations.py.
 from __future__ import annotations
 
 import json
+import queue
 import threading
 import traceback
 import tkinter as tk
@@ -39,7 +40,14 @@ class LibraryManagerApp:
         self.analyze_audio = tk.BooleanVar(value=True)
         self.guitar_confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Готов. Выберите Samples или непосредственно Import Sample Guitar.")
+        # Worker threads must never call Tkinter methods. They only enqueue events;
+        # the Tk main thread drains this queue in _poll_worker_events().
+        self._worker_events = queue.Queue()
+        self._job_running = False
+        self._worker_thread = None
+        self._action_buttons = []
         self._build()
+        self.root.after(100, self._poll_worker_events)
 
     def _build(self) -> None:
         outer = ttk.Frame(self.root, padding=12)
@@ -77,7 +85,9 @@ class LibraryManagerApp:
             ("Открыть staging", self.open_staging),
         ]
         for label, command in buttons:
-            ttk.Button(actions, text=label, command=command).pack(side="left", padx=4, pady=3)
+            button = ttk.Button(actions, text=label, command=command)
+            button.pack(side="left", padx=4, pady=3)
+            self._action_buttons.append(button)
 
         ttk.Label(outer, text="Журнал работы:").pack(anchor="w", pady=(8, 2))
         self.log = tk.Text(outer, wrap="word", height=22, font=("Consolas", 9))
@@ -115,15 +125,70 @@ class LibraryManagerApp:
             self.samples_root.set(selected)
 
     def _background(self, title: str, work) -> None:
-        self.status.set(title + "…")
+        """Run work off the UI thread and deliver all UI updates via a queue."""
+        if self._job_running:
+            self._write(f"[ОТКАЗ] Уже выполняется другая операция: {title}")
+            self.status.set("Дождитесь завершения текущей операции.")
+            return
+
+        self._job_running = True
+        self.status.set(title + " — запуск…")
+        for button in self._action_buttons:
+            button.configure(state="disabled")
+        self._write(f"[ЗАДАЧА] Запуск фонового потока: {title}")
+
         def runner():
             try:
                 result = work()
-                self.root.after(0, lambda: self._finish(title, result))
+                self._worker_events.put(("finish", title, result))
             except Exception as exc:
-                details = traceback.format_exc()
-                self.root.after(0, lambda error=exc, trace=details: self._error(title, error, trace))
-        threading.Thread(target=runner, daemon=True).start()
+                self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
+
+        worker = threading.Thread(target=runner, name="LibraryManagerWorker", daemon=True)
+        self._worker_thread = worker
+        try:
+            worker.start()
+        except Exception as exc:
+            self._job_running = False
+            self._worker_thread = None
+            for button in self._action_buttons:
+                button.configure(state="normal")
+            details = traceback.format_exc()
+            self._error(title, exc, details)
+
+    def _poll_worker_events(self) -> None:
+        """Process worker events only on Tk's main thread."""
+        try:
+            while True:
+                event = self._worker_events.get_nowait()
+                kind = event[0]
+                if kind == "progress":
+                    self._progress(event[1])
+                elif kind == "finish":
+                    _, title, result = event
+                    self._job_running = False
+                    self._worker_thread = None
+                    for button in self._action_buttons:
+                        button.configure(state="normal")
+                    self._finish(title, result)
+                elif kind == "error":
+                    _, title, error_text, details = event
+                    self._job_running = False
+                    self._worker_thread = None
+                    for button in self._action_buttons:
+                        button.configure(state="normal")
+                    self._write(f"[ОШИБКА] {error_text}")
+                    self._write(details)
+                    self.status.set(title + ": ошибка")
+                    messagebox.showerror("Ошибка", error_text)
+        except queue.Empty:
+            pass
+        finally:
+            try:
+                self.root.after(100, self._poll_worker_events)
+            except tk.TclError:
+                # Window is already closing.
+                pass
 
     def _finish(self, title: str, result) -> None:
         self._write(json.dumps(result, ensure_ascii=False, indent=2, default=str))
@@ -144,7 +209,7 @@ class LibraryManagerApp:
         guitar_confirmed = self.guitar_confirmed.get()
         def work():
             def report_progress(message: str) -> None:
-                self.root.after(0, lambda text=message: self._progress(text))
+                self._worker_events.put(("progress", message))
             return run_manager(
                 samples,
                 analyze_audio=analyze_audio,
