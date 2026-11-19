@@ -45,6 +45,7 @@ OPTIONAL_REVIEWED_EVENT_FIELDS = (
 def build_performance_manifest(
     catalog_path: Path,
     output_path: Path,
+    chromatic_pitch_map: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a performance manifest beside its catalog, preserving relative paths."""
     catalog_path = Path(catalog_path).expanduser().resolve()
@@ -132,7 +133,7 @@ def build_performance_manifest(
             "host_position_ticks": None,
             "unknown_timing_must_remain_unknown": True,
         },
-        "chromatic_pitch_map": build_chromatic_pitch_map(catalog),
+        "chromatic_pitch_map": chromatic_pitch_map or build_chromatic_pitch_map(catalog),
         "midi_contract": {
             "chromatic_pitch_map_schema": CHROMATIC_PITCH_MAP_SCHEMA,
             "all_12_chromatic_pitch_classes_playable_requirement": True,
