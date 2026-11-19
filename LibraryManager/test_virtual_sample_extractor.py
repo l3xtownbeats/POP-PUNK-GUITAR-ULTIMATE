@@ -15,9 +15,9 @@ def write_test_wav(path: Path, rate: int = 11025) -> None:
     # Silence, a sustained guitar-like tone, short gap, second tone, silence.
     for index in range(rate * 3):
         seconds = index / rate
-        if 0.30 <= seconds < 1.10:
+        if 0.30 <= seconds < 1.00:
             value = 0.35 * math.sin(2 * math.pi * 110 * seconds)
-        elif 1.18 <= seconds < 2.00:
+        elif 1.35 <= seconds < 2.00:
             value = 0.30 * math.sin(2 * math.pi * 146.83 * seconds)
         else:
             value = 0.0
