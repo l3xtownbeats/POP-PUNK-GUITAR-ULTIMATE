@@ -229,8 +229,27 @@ def _manifest_to_asset(
     approvals_ok = not approval_reasons
 
     valid_integrity = not errors and source_ok and derived_ok
-    playable = valid_integrity and approvals_ok
+    target_modes = _candidate_mode_assignments(record)
+    confirmed_note = type(metadata.get("confirmed_midi_note")) is int and 0 <= metadata.get("confirmed_midi_note") <= 127
+    confirmed_chord = bool(str(metadata.get("confirmed_chord_name") or "").strip())
+    confirmed_sequence = (
+        isinstance(metadata.get("confirmed_note_sequence"), list)
+        and len(metadata.get("confirmed_note_sequence")) >= 2
+        and all(type(note) is int and 0 <= note <= 127 for note in metadata.get("confirmed_note_sequence"))
+    )
+    playable_modes = []
+    for mode in target_modes:
+        # The current Manager can supply pitch-mapped Sample/Melody zones.
+        # Other performance engines need reviewed event timelines that are not
+        # fabricated by this asset-only extraction pipeline.
+        if mode == "SAMPLE MODE" and (confirmed_note or confirmed_chord or confirmed_sequence):
+            playable_modes.append(mode)
+        elif mode == "MELODY MODE" and (confirmed_note or confirmed_sequence):
+            playable_modes.append(mode)
+    playable = valid_integrity and approvals_ok and bool(playable_modes)
     blocking = list(errors) + approval_reasons
+    if valid_integrity and approvals_ok and not playable_modes:
+        blocking.append("mode-specific reviewed event mapping is not yet available for this performance mode")
     relative_audio = None
     if derived is not None and derived.is_file() and _inside(derived, staging_root):
         relative_audio = Path(os.path.relpath(derived, catalog_parent)).as_posix()
@@ -238,7 +257,8 @@ def _manifest_to_asset(
     return {
         "asset_id": asset_id,
         "kind": record.get("kind", "UNKNOWN"),
-        "target_modes": _candidate_mode_assignments(record),
+        "target_modes": target_modes,
+        "playable_modes": playable_modes,
         "mode_assignments": [mode for mode in record.get("mode_assignments", []) if mode in MODE_ORDER],
         "asset_file": relative_audio,
         "manifest_file": Path(os.path.relpath(manifest_path.resolve(), catalog_parent)).as_posix(),
@@ -301,7 +321,9 @@ def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
                 errors.append(f"Duplicate asset_id within mode {mode.get('mode')}: {asset_id}")
             seen.add(mode_asset_key)
             if asset.get("playable") and (
-                asset.get("review_status") != "REVIEWED"
+                mode.get("mode") not in asset.get("playable_modes", [])
+                or not asset.get("playable_in_mode")
+                or asset.get("review_status") != "REVIEWED"
                 or asset.get("license_status") != "LICENSE_APPROVED"
                 or asset.get("integrity_status") != "VERIFIED"
                 or not asset.get("asset_file")
@@ -357,9 +379,20 @@ def build_plugin_asset_catalog(
 
     modes = []
     for mode in MODE_ORDER:
-        assets = sorted(mode_assets[mode], key=lambda item: (item["kind"], item["asset_id"]))
+        source_assets = sorted(mode_assets[mode], key=lambda item: (item["kind"], item["asset_id"]))
+        assets = []
+        for source_asset in source_assets:
+            mode_asset = dict(source_asset)
+            mode_asset["playable_in_mode"] = mode in source_asset.get("playable_modes", [])
+            mode_asset["playable"] = mode_asset["playable_in_mode"]
+            if not mode_asset["playable_in_mode"] and mode not in mode_asset.get("blocking_reasons", []):
+                mode_asset["mode_blocking_reason"] = (
+                    "This mode requires a reviewed event timeline or mode-specific mapping; "
+                    "a WAV file and generic note/chord label are not enough."
+                )
+            assets.append(mode_asset)
         candidates = mode_candidates[mode]
-        playable_count = sum(1 for item in assets if item["playable"])
+        playable_count = sum(1 for item in assets if item["playable_in_mode"])
         modes.append({
             "mode": mode,
             "description": MODE_DESCRIPTIONS[mode],
