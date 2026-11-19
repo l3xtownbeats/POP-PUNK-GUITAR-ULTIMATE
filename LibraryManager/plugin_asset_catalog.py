@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 CATALOG_SCHEMA = "ppgu.plugin_asset_catalog/1.0.0"
+STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
 MODE_ORDER = (
     "SAMPLE MODE", "STRUMMING", "ARPEGGIO", "PATTERN MODE", "RIFF MODE",
     "MELODY MODE", "PHRASE MODE", "ONE PITCH", "ARTICULATIONS", "ENDING",
@@ -233,7 +234,7 @@ def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
     names = [item.get("mode") for item in modes if isinstance(item, dict)]
     if names != list(MODE_ORDER):
         errors.append("Catalog must contain all ten modes in the approved order")
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for mode in modes:
         if not isinstance(mode, dict):
             errors.append("Mode entry must be an object")
@@ -242,9 +243,10 @@ def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
             asset_id = str(asset.get("asset_id") or "")
             if not asset_id:
                 errors.append(f"{mode.get('mode')}: asset without asset_id")
-            if asset_id in seen:
-                errors.append(f"Duplicate asset_id in runtime catalog: {asset_id}")
-            seen.add(asset_id)
+            mode_asset_key = (str(mode.get("mode")), asset_id)
+            if mode_asset_key in seen:
+                errors.append(f"Duplicate asset_id within mode {mode.get('mode')}: {asset_id}")
+            seen.add(mode_asset_key)
             if asset.get("playable") and (
                 asset.get("review_status") != "REVIEWED"
                 or asset.get("license_status") != "LICENSE_APPROVED"
@@ -266,7 +268,7 @@ def build_plugin_asset_catalog(
     staging_root = Path(staging_root).expanduser().resolve()
     output_path = Path(output_path).expanduser().resolve()
     try:
-        staging_root.relative_to((Path(__file__).resolve().parent / "staging").resolve())
+        staging_root.relative_to(STAGING_BASE)
     except ValueError as exc:
         raise ValueError("Catalog input must be inside LibraryManager/staging") from exc
     output_path.parent.mkdir(parents=True, exist_ok=True)
