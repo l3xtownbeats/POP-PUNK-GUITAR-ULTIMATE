@@ -405,6 +405,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         row.update(infer_labels(path))
         audio_record = None
         classification = None
+        analysis_cache_record = None
         local_errors = []
         if _is_manager_virtual_metadata(path.relative_to(incoming)):
             row.update(
