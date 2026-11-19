@@ -84,6 +84,7 @@ def analyze_irregular_guitar_phrases(
         "source_sha256": source_sha256.upper(),
         "sample_rate": rate, "total_frames": total_frames,
         "candidate_count": len(candidates), "candidates": candidates,
+        "automatic_factory_promotion": False,
         "audio_copied": False, "audio_modified": False,
         "limitations": [
             "Onset groups are phrase-boundary candidates, not verified notes, chords, riffs, bars or loop seams.",
