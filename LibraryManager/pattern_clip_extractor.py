@@ -42,6 +42,7 @@ def extract_pattern_occurrences(
     patterns = (report.get("pattern_analysis") or {}).get("patterns")
     if not isinstance(patterns, list):
         raise ValueError("Report does not contain pattern_analysis.patterns")
+
     clips_dir = root / "clips"
     manifests_dir = root / "manifests"
     for directory in (clips_dir, manifests_dir):
@@ -54,7 +55,7 @@ def extract_pattern_occurrences(
 
     results: list[dict[str, Any]] = []
     created_paths: list[Path] = []
-        try:
+    try:
         with wave.open(str(source), "rb") as reader:
             params = reader.getparams()
             if params.comptype != "NONE":
@@ -73,11 +74,12 @@ def extract_pattern_occurrences(
                     end_sec = float(occurrence["end_seconds"])
                     if end_sec <= start_sec or start_sec < 0:
                         continue
-                    raw_start = round(start_sec * rate)
-                    raw_end = round(end_sec * rate)
+                    raw_start, raw_end = round(start_sec * rate), round(end_sec * rate)
+                    if raw_end > total_frames:
+                        raw_end = total_frames
                     start = max(0, raw_start - pad_before)
                     end = min(total_frames, raw_end + pad_after)
-                    if end - start < min_frames:
+                    if end <= start or end - start < min_frames:
                         continue
                     identity = hashlib.sha256(
                         f"{expected_hash}:{pattern_id}:{start}:{end}:{VERSION}".encode("utf-8")
@@ -86,13 +88,13 @@ def extract_pattern_occurrences(
                     manifest_path = manifests_dir / f"PATTERN-{identity}.json"
                     if clip_path.exists() or manifest_path.exists():
                         raise FileExistsError(f"Refusing to overwrite staged pattern clip {identity}")
+                    created_paths.extend([clip_path, manifest_path])
                     reader.setpos(start)
                     frames = reader.readframes(end - start)
                     expected_bytes = (end - start) * params.nchannels * params.sampwidth
                     if len(frames) != expected_bytes:
                         raise IOError("Incomplete PCM frame range read")
-                    created_paths.extend([clip_path, manifest_path])
-                with clip_path.open("xb") as raw:
+                    with clip_path.open("xb") as raw:
                         with wave.open(raw, "wb") as writer:
                             writer.setparams(params)
                             writer.writeframes(frames)
@@ -133,20 +135,19 @@ def extract_pattern_occurrences(
                         "review_status": "NEEDS_MUSICAL_REVIEW",
                         "license_status": "UNREVIEWED",
                     }
-                    try:
-                        with manifest_path.open("x", encoding="utf-8") as stream:
-                            json.dump(record, stream, ensure_ascii=False, indent=2)
-                            stream.write("\n")
-                    except Exception:
-                        clip_path.unlink(missing_ok=True)
-                        raise
+                    with manifest_path.open("x", encoding="utf-8") as stream:
+                        json.dump(record, stream, ensure_ascii=False, indent=2)
+                        stream.write("\\n")
                     results.append(record)
                 if len(results) >= max_clips:
                     break
         if sha256_file(source) != expected_hash:
             raise RuntimeError("Source changed during pattern extraction")
         return results
-
+    except Exception:
+        for created in reversed(created_paths):
+            created.unlink(missing_ok=True)
+        raise
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract repeated rhythm occurrences to staging WAV clips.")
