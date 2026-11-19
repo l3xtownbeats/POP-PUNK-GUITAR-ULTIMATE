@@ -548,3 +548,12 @@ Manager 3.0 разделяет два слоя данных:
 - Note zone не обязана иметь BPM/loop grid; ритм-паттерн не считается готовым только по факту наличия WAV.
 - Runtime-ready требует, чтобы mode был явно указан в `playable_modes`, а review/license/integrity/path gates были пройдены.
 - Coverage считает только подтверждённые, лицензированные и целостные материалы; один asset ID не дублируется в coverage при назначении в несколько режимов.
+
+
+## PPGU-MANAGER-30-VALIDATION-022 — строгая сверка Pattern/Melody event maps
+
+- **Статус:** IMPLEMENTED IN DEVELOPMENT BUILD
+- Loop end должен помещаться в реальный frame_count производного WAV.
+- Pattern note-zone classification требует подтверждённой ноты и ссылки на физический derived WAV; оно не заменяет chord-driven rhythm Pattern.
+- Melody event note sequence должна совпадать с подтверждённой последовательностью; события без MIDI pitch, ordered start, duration, velocity или phrase boundaries остаются INCOMPLETE.
+- Ни одна структурная запись не может обойти mode-specific playable_modes, license, review и integrity gates.
