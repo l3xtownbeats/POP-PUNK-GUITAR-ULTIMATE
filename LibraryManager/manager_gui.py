@@ -84,7 +84,7 @@ class LibraryManagerApp:
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("Отдельное извлечение Pattern WAV", self.extract_patterns),
             ("3. Проверить WAV-кандидат", self.review_candidate),
-            ("4. Финализировать staging", self.finalize_library),
+            ("4. Финализировать staging + FACTORY", self.finalize_library),
             ("5. Распределить проверенные материалы", self.distribute),
             ("Полный аудит очистки Import", self.audit_cleanup),
             ("Удалить оригиналы после полного аудита", self.cleanup),
@@ -346,7 +346,7 @@ class LibraryManagerApp:
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
-            report_progress("ЭТАП 6/6: отчёт финализации создан. FACTORY не изменялась.")
+            report_progress("ЭТАП 6/6: проверены staging и FACTORY; исходники и готовые WAV не изменялись.")
             return {
                 "quick_scan": quick_result,
                 "deep_analysis": analysis_result,
