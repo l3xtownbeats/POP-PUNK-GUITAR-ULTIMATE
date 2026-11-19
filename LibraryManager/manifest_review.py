@@ -44,6 +44,9 @@ def review_manifest(
     approve_musical_review: bool = False,
     approve_license: bool = False,
     mode_assignments: list[str] | None = None,
+    confirmed_midi_note: int | None = None,
+    confirmed_chord_name: str | None = None,
+    confirmed_note_sequence: list[int] | None = None,
 ) -> dict[str, Any]:
     """Validate provenance and atomically record explicit human approvals."""
     manifest_path = Path(manifest_path).resolve()
@@ -69,6 +72,21 @@ def review_manifest(
     selected_modes = list(mode_assignments or [])
     if len(selected_modes) != len(set(selected_modes)) or any(mode not in MODE_ORDER for mode in selected_modes):
         raise ValueError("mode_assignments must contain unique names from the ten approved Manager modes")
+    if confirmed_midi_note is not None and (
+        type(confirmed_midi_note) is not int or not 0 <= confirmed_midi_note <= 127
+    ):
+        raise ValueError("confirmed_midi_note must be a MIDI note number from 0 to 127")
+    if confirmed_chord_name is not None and (
+        not isinstance(confirmed_chord_name, str) or not confirmed_chord_name.strip()
+        or len(confirmed_chord_name.strip()) > 24
+    ):
+        raise ValueError("confirmed_chord_name must be a non-empty chord label up to 24 characters")
+    selected_note_sequence = list(confirmed_note_sequence or [])
+    if selected_note_sequence and (
+        len(selected_note_sequence) < 2
+        or any(type(note) is not int or not 0 <= note <= 127 for note in selected_note_sequence)
+    ):
+        raise ValueError("confirmed_note_sequence must contain at least two MIDI note numbers from 0 to 127")
 
     record = json.loads(manifest_path.read_text(encoding="utf-8"))
     derived = Path(record.get("derived_path", ""))
@@ -113,6 +131,12 @@ def review_manifest(
         "musical_review_notes": musical_review_notes.strip(),
         "license_evidence": license_evidence.strip(),
     })
+    if confirmed_midi_note is not None:
+        metadata["confirmed_midi_note"] = confirmed_midi_note
+    if confirmed_chord_name is not None:
+        metadata["confirmed_chord_name"] = confirmed_chord_name.strip()
+    if selected_note_sequence:
+        metadata["confirmed_note_sequence"] = selected_note_sequence
     record["review_status"] = "REVIEWED"
     record["license_status"] = "LICENSE_APPROVED"
     record["reviewed_at_utc"] = datetime.now(timezone.utc).isoformat()
@@ -124,6 +148,10 @@ def review_manifest(
         "sample_boundaries_verified": True,
         "explicit_musical_approval": True,
         "explicit_license_approval": True,
+        "musical_mapping_verified": bool(
+            confirmed_midi_note is not None or confirmed_chord_name is not None
+            or selected_note_sequence
+        ),
     }
 
     fd, temp_name = tempfile.mkstemp(prefix=manifest_path.name + ".", suffix=".tmp",
@@ -151,4 +179,5 @@ def review_manifest(
         "source_sha256": expected_source,
         "factory_eligible": True,
         "mode_assignments": record["mode_assignments"],
+        "musical_mapping_verified": record["review_validation"]["musical_mapping_verified"],
     }
