@@ -30,7 +30,7 @@ from other_audit import audit_other_library
 from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
 from mode_sorter import build_mode_sorting_report
 
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 # Non-audio production assets are excluded immediately from all scan/analyze queues.
 # Source files are never deleted or moved; this is an analysis-only filter.
@@ -441,7 +441,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     analysis_key = hashlib.sha256(
                         ("|".join((str(path.resolve()).casefold(), str(stat.st_size),
                                    str(stat.st_mtime_ns), digest, "acoustic-0.4.0",
-                                   "classifier-0.3.0", "pitch-events-current",
+                                   "classifier-0.3.0", "pitch-events-current", "chord-analysis-0.1.0",
                                    "max_samples=90000"))).encode("utf-8")
                     ).hexdigest()
                     cache_reader = sqlite3.connect(str(cache_db), timeout=30)
@@ -466,6 +466,21 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     else:
                         acoustic = analyse_wav(path, max_samples=90_000)
                         classification = classify_wav(path, analyze_pitch=True, max_samples=90_000)
+                    chord_analysis = None
+                    if guitar_source_confirmed:
+                        chord_analysis = acoustic.get("chord_analysis")
+                        if not isinstance(chord_analysis, dict):
+                            try:
+                                from chord_analysis import analyze_chords
+                                chord_analysis = analyze_chords(path, source_sha256=digest)
+                                acoustic["chord_analysis"] = chord_analysis
+                            except Exception as chord_exc:
+                                local_errors.append({
+                                    "path": relative,
+                                    "stage": "CHORD_ANALYSIS",
+                                    "error": f"{type(chord_exc).__name__}: {chord_exc}",
+                                })
+                                chord_analysis = None
                     acoustic["source_sha256"] = digest
                     acoustic["analysis_cache_status"] = cache_status
                     classification["source_sha256"] = digest
@@ -483,6 +498,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         "source_path": str(path.resolve()), "source_sha256": digest,
                         "acoustic_analysis": acoustic, "pattern_analysis": pattern,
                         "pitch_candidates": classification.get("fragment_candidates", []),
+                        "chord_analysis": chord_analysis,
                         "classification": classification,
                         "filename_metadata": {
                             "note_candidate": row.get("note_candidate", ""),
@@ -530,6 +546,9 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     row["sample_subtype_candidate"] = classification.get("sample_subtype_candidate", "UNKNOWN")
                     row["classification_confidence"] = classification.get("classification_confidence")
                     row["pattern_candidate_count"] = pattern["pattern_analysis"]["candidate_count"]
+                    row["chord_candidate_count"] = (
+                        chord_analysis.get("chord_candidate_count", 0) if chord_analysis else 0
+                    )
                     row["virtual_region_count"] = (
                         audio_record["virtual_extraction"]["candidate_count"]
                         if audio_record["virtual_extraction"] else ""
@@ -745,6 +764,10 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "mode_sorting_report": "mode_sorting_report.json",
         "mode_candidate_counts": mode_candidate_counts,
         "mode_candidates_total": mode_sorting["total_candidates"],
+        "chord_sample_candidates": sum(
+            (item.get("chord_analysis") or {}).get("chord_candidate_count", 0)
+            for item in audio_reports
+        ),
         "classification_policy": "CANDIDATE_ONLY_REQUIRES_HUMAN_REVIEW",
 "pattern_engine_manifest": "pattern_engine_manifest.json",
         "pattern_engine_manifest_status": pattern_manifest["status"],
