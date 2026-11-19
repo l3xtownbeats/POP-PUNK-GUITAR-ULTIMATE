@@ -5,6 +5,10 @@ on:
     paths:
       - "LibraryManager/**"
       - ".github/workflows/library-manager-windows-package.yml"
+  pull_request:
+    paths:
+      - "LibraryManager/**"
+      - ".github/workflows/library-manager-windows-package.yml"
 jobs:
   package:
     runs-on: windows-2022
