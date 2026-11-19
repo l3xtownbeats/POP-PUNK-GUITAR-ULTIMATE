@@ -226,7 +226,7 @@ def _manifest_to_asset(
         "blocking_reasons": blocking,
         "automatic_factory_promotion": False,
         "source_modified": False,
-    }, []
+    }, errors
 
 
 def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
