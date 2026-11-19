@@ -68,7 +68,7 @@ class LibraryManagerApp:
 
         options = ttk.Frame(outer)
         options.pack(fill="x", pady=6)
-        ttk.Checkbutton(options, text="Акустический и ритмический анализ WAV",
+        ttk.Checkbutton(options, text="Акустический и ритмический анализ аудиофайлов",
                         variable=self.analyze_audio).pack(side="left")
         ttk.Checkbutton(options, text="Подтверждаю, что входные файлы — гитарный материал",
                         variable=self.guitar_confirmed).pack(side="left", padx=16)
