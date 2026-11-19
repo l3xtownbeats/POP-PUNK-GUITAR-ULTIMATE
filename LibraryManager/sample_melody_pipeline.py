@@ -144,7 +144,7 @@ def prepare_sample_and_melody(
         else:
             groups.append([event])
 
-    results: dict[str, list[dict[str, Any]]] = {"sample_mode": [], "melody_mode": []}
+    results: dict[str, list[dict[str, Any]]] = {"sample_mode": [], "melody_note_mode": [], "melody_mode": []}
     eligible_groups = [group for group in groups if len(group) >= melody_min_notes]
     melody_quota = (
         min(len(eligible_groups), max(1, max_assets // 4))
@@ -185,8 +185,10 @@ def prepare_sample_and_melody(
             created.append(clip)
             record = _record(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
-                "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
-                {"midi_note_candidate": event.get("midi_note_candidate"),
+                "sample_note_candidate", ["SAMPLE_MODE", "MELODY_MODE", "KEYBOARD_PLAYBACK"],
+                {"melody_asset_role": "SINGLE_GUITAR_NOTE",
+                 "one_sound_one_note": True,
+                 "midi_note_candidate": event.get("midi_note_candidate"),
                  "note_name_candidate": event.get("note_name_candidate"),
                  "detected_note_start_seconds": event.get("detected_note_start_seconds"),
                  "detected_note_end_seconds": event.get("detected_note_end_seconds"),
@@ -198,6 +200,9 @@ def prepare_sample_and_melody(
             created.append(manifest)
             record["reused_existing"] = False
             results["sample_mode"].append(record)
+            # The exact same physical WAV/asset is exposed to Melody as a
+            # single-note zone; no duplicate copy is created for the second mode.
+            results["melody_note_mode"].append(record)
 
         for group in eligible_groups:
             if len(results["melody_mode"]) >= melody_quota:
@@ -260,13 +265,14 @@ def prepare_sample_and_melody(
         "source_sha256": source_hash,
         "max_assets": max_assets,
         "sample_mode_count": len(results["sample_mode"]),
+        "melody_note_mode_count": len(results["melody_note_mode"]),
         "melody_mode_count": len(results["melody_mode"]),
         **results,
         "review_status": "NEEDS_MUSICAL_REVIEW",
         "license_status": "UNREVIEWED",
         "source_modified": False,
         "limitations": [
-            "Pitch-event detection is monophonic and may miss chords or overlapping guitar notes.",
+            "Pitch-event detection is monophonic and may miss chords or overlapping guitar notes. Single-note clips remain candidates until one-note identity and pitch are reviewed.",
             "Melody phrases are grouped by a time-gap heuristic, not verified musical bars or phrases.",
             "Velocity layers, articulation labels, chord recognition and tuning require separate analysis/review.",
             "No candidate is eligible for FACTORY until musical review and explicit license approval."
