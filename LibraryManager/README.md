@@ -444,3 +444,8 @@ The **Сформировать каталог VST3** action now produces four co
 - `chromatic_pitch_map_*.json` and `performance_manifest_*.json` — shared chromatic mapping and runtime contract.
 
 The structure builder does not copy WAV files. One physical staged asset may be referenced from several modes by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
+
+
+### 3.0-dev3 — review metadata for real library structure
+
+The manual review dialog now records explicit technique tags (Downstroke, Upstroke, Palm Mute, Open, Slide, Legato, Hammer-on, Pull-off, harmonics, tremolo, choke, let-ring and dead-note), a confirmed velocity layer, and optional structured Pattern/Melody event data. Pattern metadata is validated for loop boundaries inside the staged WAV, BPM, meter, attack/beat-grid/technique/harmonic events and cycle/review confirmations. Melody metadata is validated for MIDI pitch, ordered beat positions, durations, velocity and phrase boundaries. Blank/unknown fields are not guessed; they remain coverage gaps. A new review revokes old confirmed tags unless the reviewer confirms them again.
