@@ -29,6 +29,9 @@ from other_audit import audit_other_library
 
 VERSION = "2.2.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
+# Non-audio production assets are excluded immediately from all scan/analyze queues.
+# Source files are never deleted or moved; this is an analysis-only filter.
+EXCLUDED_NON_AUDIO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".mid", ".midi", ".xml"}
 
 
 def resolve_samples_root(selected_path: Path) -> Path:
@@ -147,6 +150,7 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "source_path", "scan_status", "source_modified_by_manager",
     ]
     counts: dict[str, int] = defaultdict(int)
+    excluded_counts: dict[str, int] = defaultdict(int)
     total_bytes = 0
     files_found = 0
     stat_errors = 0
@@ -176,8 +180,11 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
                             relative_path = path.relative_to(incoming)
                             if _is_excluded(relative_path):
                                 continue
-                            stat = entry.stat(follow_symlinks=False)
                             ext = path.suffix.lower() or "[без расширения]"
+                            if ext in EXCLUDED_NON_AUDIO_EXTENSIONS:
+                                excluded_counts[ext] += 1
+                                continue
+                            stat = entry.stat(follow_symlinks=False)
                             counts[ext] += 1
                             total_bytes += stat.st_size
                             files_found += 1
@@ -234,6 +241,9 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "directory_errors": directory_errors,
         "total_bytes": total_bytes,
         "formats": dict(sorted(counts.items())),
+        "excluded_non_audio_files": sum(excluded_counts.values()),
+        "excluded_non_audio_formats": dict(sorted(excluded_counts.items())),
+        "excluded_extensions": sorted(EXCLUDED_NON_AUDIO_EXTENSIONS),
         "elapsed_seconds": round(elapsed, 3),
         "memory_strategy": "STREAMING_CSV_BOUNDED_MEMORY",
         "sha256_performed": False,
@@ -307,7 +317,10 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         if entry.is_dir(follow_symlinks=False):
                             directory_stack.append(Path(entry.path))
                         elif entry.is_file(follow_symlinks=False):
-                            all_files.append(Path(entry.path))
+                            candidate = Path(entry.path)
+                            if candidate.suffix.lower() in EXCLUDED_NON_AUDIO_EXTENSIONS:
+                                continue
+                            all_files.append(candidate)
                     except OSError as exc:
                         walk_errors.append({
                             "path": entry.path, "stage": "DIRECTORY_ENUMERATION",
