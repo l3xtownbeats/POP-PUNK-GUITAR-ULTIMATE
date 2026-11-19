@@ -520,3 +520,16 @@ Melody использует самостоятельную логику испо
 - Источники по-прежнему не изменяются; результаты остаются акустическими кандидатами, а не подтверждёнными нотами/риффами. SHA-256, ручная проверка и лицензионные gates не ослаблены.
 - Изменение зафиксировано коммитом fd828d444b78a57ae8b78987fec5b4e419aff1b5.
 - Важно: оптимизация внесена в код, но её скорость и регрессии ещё не подтверждены исполнением тестов/бенчмарка на Windows; CI/Portable статус не повышается.
+
+
+## TJ-2026-11-19-MANAGER-30-APPROVAL-025 — фиксация обязательного объёма и требований стабильности
+
+- Дата: 2026-11-19.
+- Тип: прямое утверждение пользователя.
+- Статус: APPROVED SCOPE / IMPLEMENTATION AND VALIDATION REQUIRED.
+- Пользователь утвердил обязательный объём Manager 3.0: длинные WAV streaming optimization; MELODY extraction (notes, sequences, phrases, exact boundaries/timing/MIDI candidates); selective PATTERN detection/extraction; classification across all ten modes, techniques and velocity with confidence; original/derived listening review queue; physical library/SFZ/mapping; SHA-256, journal, transactions and rollback; tests, CI, Windows Portable and real launch verification.
+- PATTERN extraction is selective: long, irregular, compound or mid-phrase-starting recordings only; do not split every clean loop.
+- AUTO SOUND HUNTER must operate as an integrated full-function mode on the shared Manager core, not as a reduced duplicate tool.
+- Stability acceptance requires no known release-blocking defects, source corruption, uncontrolled memory growth or incomplete transaction recovery; failure/cancellation/restart/hash and integrity tests are mandatory.
+- No absolute zero-bug guarantee is claimed. No feature, CI pass, Portable build or Windows launch is marked complete until execution evidence exists.
+- Previous long-WAV streaming optimization commit: fd828d444b78a57ae8b78987fec5b4e419aff1b5; this journal entry records approval of the scope, not a test pass.
