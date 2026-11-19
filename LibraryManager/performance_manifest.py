@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from plugin_asset_catalog import CATALOG_SCHEMA, MODE_ORDER
+from chromatic_pitch_map import SCHEMA as CHROMATIC_PITCH_MAP_SCHEMA, build_chromatic_pitch_map
 
 PERFORMANCE_SCHEMA = "ppgu.performance_manifest/1.0.0"
 
@@ -131,7 +132,13 @@ def build_performance_manifest(
             "host_position_ticks": None,
             "unknown_timing_must_remain_unknown": True,
         },
+        "chromatic_pitch_map": build_chromatic_pitch_map(catalog),
         "midi_contract": {
+            "chromatic_pitch_map_schema": CHROMATIC_PITCH_MAP_SCHEMA,
+            "all_12_chromatic_pitch_classes_playable_requirement": True,
+            "enharmonic_aliases_share_one_pitch_class": True,
+            "autochords_uses_same_canonical_pitch_classes": True,
+            "autochords_must_not_drop_chromatic_pitch_classes": True,
             "pattern_selector_keys_are_control_only": True,
             "selector_note_numbers": None,
             "playable_note_range": None,
@@ -196,6 +203,17 @@ def validate_performance_manifest(manifest: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if manifest.get("schema") != PERFORMANCE_SCHEMA:
         errors.append("Unsupported Performance Manifest schema")
+    pitch_map = manifest.get("chromatic_pitch_map")
+    if not isinstance(pitch_map, dict) or pitch_map.get("schema") != CHROMATIC_PITCH_MAP_SCHEMA:
+        errors.append("A valid shared chromatic pitch map is required")
+    else:
+        classes = pitch_map.get("pitch_classes", [])
+        if [item.get("pitch_class") for item in classes] != list(range(12)):
+            errors.append("The shared pitch map must contain all 12 chromatic pitch classes")
+        if pitch_map.get("enharmonic_aliases_are_merged") is not True:
+            errors.append("Enharmonic spellings must resolve to one pitch class")
+        if pitch_map.get("autochords_uses_same_pitch_class_map") is not True:
+            errors.append("Auto Chords must use the shared chromatic pitch map")
     models = manifest.get("mode_execution_models")
     if not isinstance(models, list) or [item.get("mode") for item in models] != list(MODE_ORDER):
         errors.append("All ten mode execution models must be present in approved order")
