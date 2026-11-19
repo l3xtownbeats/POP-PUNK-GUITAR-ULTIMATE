@@ -14,7 +14,7 @@ The `modes` array always contains these entries, in order:
 
 1. SAMPLE MODE — note zones, chord samples and Power Chords.
 2. STRUMMING — confirmed Downstroke/Upstroke/chord-strumming performances.
-3. ARPEGGIO — confirmed string-by-string voicing events.
+3. ARPEGGIO — generated chord voicing hypotheses and reviewed string-by-string attack events.
 4. PATTERN MODE — repeated rhythmic patterns and pitch-specific note zones.
 5. RIFF MODE — reviewed riffs and characteristic fragments.
 6. MELODY MODE — pitch-specific notes and melody sequences.
