@@ -1056,9 +1056,29 @@ class LibraryManagerApp:
         )
         if evidence is None:
             return
+        mode_text = simpledialog.askstring(
+            "Назначение режимов Manager / VST3",
+            "Укажите только подтверждённые вами разделы через запятую. "
+            "Можно оставить пустым, если назначение пока неизвестно.\n\n"
+            + ", ".join(MODE_ORDER),
+            parent=self.root,
+        )
+        if mode_text is None:
+            return
+        selected_modes = [item.strip().upper() for item in mode_text.split(",") if item.strip()]
+        invalid_modes = [item for item in selected_modes if item not in MODE_ORDER]
+        if invalid_modes:
+            messagebox.showerror(
+                "Назначение режимов",
+                "Неизвестные разделы: " + ", ".join(invalid_modes)
+                + "\nДопустимые значения: " + ", ".join(MODE_ORDER),
+                parent=self.root,
+            )
+            return
         if not messagebox.askyesno(
             "Подтверждение REVIEWED",
-            "Подтверждаете, что лично прослушали WAV и проверили музыкальное содержимое и границы?",
+            "Подтверждаете, что лично прослушали WAV, проверили музыкальное содержимое и границы, "
+            "а также корректность выбранных назначений режимов?",
             parent=self.root,
         ):
             return
@@ -1080,6 +1100,7 @@ class LibraryManagerApp:
                 license_evidence=evidence,
                 approve_musical_review=True,
                 approve_license=True,
+                mode_assignments=selected_modes,
             )
         self._background("Музыкальная и лицензионная проверка WAV", work)
 
