@@ -539,3 +539,12 @@ Manager 3.0 разделяет два слоя данных:
 - Melody review хранит MIDI event pitch, start/duration, velocity, phrase boundaries и mapping verification.
 - Повторный review очищает старые подтверждения перед записью новых, чтобы не сохранять устаревшую разметку.
 - Эти данные передаются в plugin asset catalog и далее в структурный library/coverage manifest. Неизвестные значения остаются UNKNOWN/GAP/INCOMPLETE.
+
+
+## PPGU-MANAGER-30-PATTERN-ZONES-021 — отдельные структуры note zones и rhythm patterns
+
+- **Статус:** IMPLEMENTED IN DEVELOPMENT / CI UNVERIFIED
+- PATTERN MODE содержит два самостоятельных типа материалов: нотно-ориентированные зоны (одна подтверждённая MIDI-нота → отдельный WAV) и chord-driven ритм-паттерны с loop/grid/attack/harmony событиями.
+- Note zone не обязана иметь BPM/loop grid; ритм-паттерн не считается готовым только по факту наличия WAV.
+- Runtime-ready требует, чтобы mode был явно указан в `playable_modes`, а review/license/integrity/path gates были пройдены.
+- Coverage считает только подтверждённые, лицензированные и целостные материалы; один asset ID не дублируется в coverage при назначении в несколько режимов.
