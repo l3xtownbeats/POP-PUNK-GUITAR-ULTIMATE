@@ -7,7 +7,7 @@ import unittest
 import wave
 from pathlib import Path
 
-from finalization import finalize_staging
+from finalization import audit_factory_library, finalize_staging
 
 
 def write_wav(path: Path, frames: int) -> None:
@@ -23,6 +23,46 @@ def sha(path: Path) -> str:
 
 
 class FinalizationTests(unittest.TestCase):
+    def test_factory_audit_verifies_distributed_wav_and_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            factory = root / "Samples" / "FACTORY"
+            category = factory / "POP_PUNK" / "WAV" / "ELECTRIC_GUITAR" / "RHYTHM_PATTERN" / "CRUNCH"
+            category.mkdir(parents=True)
+            wav_path = category / "riff.wav"
+            write_wav(wav_path, 400)
+            digest = sha(wav_path)
+            record = {
+                "asset_id": "FACTORY-001",
+                "distributed_path": str(wav_path),
+                "distributed_sha256": digest,
+                "distribution_status": "VERIFIED_COPIED",
+                "distribution_category": "POP_PUNK/WAV/ELECTRIC_GUITAR/RHYTHM_PATTERN/CRUNCH",
+                "review_status": "REVIEWED",
+                "license_status": "LICENSE_APPROVED",
+                "source_sha256": "A" * 64,
+                "review_validation": {
+                    "source_sha256_verified": True,
+                    "derived_sha256_verified": True,
+                    "sample_boundaries_verified": True,
+                    "explicit_musical_approval": True,
+                    "explicit_license_approval": True,
+                },
+                "musical_metadata": {
+                    "style_family": "POP_PUNK",
+                    "instrument_family": "ELECTRIC_GUITAR",
+                    "asset_role": "RHYTHM_PATTERN",
+                    "tone_family": "CRUNCH",
+                    "musical_review_notes": "Reviewed.",
+                    "license_evidence": "Redistribution allowed.",
+                },
+            }
+            wav_path.with_suffix(".wav.json").write_text(json.dumps(record), encoding="utf-8")
+            result = audit_factory_library(root, reports_root=root / "reports")
+            self.assertEqual(result["factory_wav_checked"], 1)
+            self.assertEqual(result["factory_valid_count"], 1)
+            self.assertTrue(result["factory_finalized"])
+
     def test_reports_factory_ready_and_review_pending_without_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
