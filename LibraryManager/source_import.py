@@ -18,7 +18,7 @@ AUDIO_EXTENSIONS = {
     ".mp3", ".m4a", ".aac", ".wma", ".opus",
 }
 SUPPORTED_EXTENSIONS = AUDIO_EXTENSIONS | {".sfz", ".zip", ".7z", ".rar"}
-REGISTRY_VERSION = 1
+REGISTRY_VERSION = 2
 
 
 def _identity(path: Path) -> str:
@@ -73,6 +73,7 @@ def register_sources(
 
     known = {record["identity"] for record in records if "identity" in record}
     added, duplicates, errors = [], [], []
+    sfz_roots: dict[str, Path] = {}
     for selected in selections:
         root = selected if selected.is_dir() else selected.parent
         for file_path in _walk(selected):
@@ -107,14 +108,46 @@ def register_sources(
                 records.append(record)
                 known.add(identity)
                 added.append(record)
+                if suffix == ".sfz":
+                    sfz_roots[identity] = root
             except OSError as exc:
                 errors.append({"path": str(file_path), "error": f"{type(exc).__name__}: {exc}"})
+
+    # Resolve SFZ sample= and #include dependencies before the import is
+    # considered scan-ready. The parser is read-only and confines samples to
+    # the selected library root; unresolved references remain explicit.
+    sfz_audit = []
+    if sfz_roots:
+        try:
+            from sfz_parser import parse_sfz_file
+        except ImportError:
+            from .sfz_parser import parse_sfz_file
+        for sfz_identity, library_root in sfz_roots.items():
+            sfz_record = next(item for item in records if item.get("identity") == sfz_identity)
+            try:
+                rows = parse_sfz_file(Path(sfz_record["source_path"]), library_root)
+                for row in rows:
+                    sfz_audit.append({
+                        "sfz_identity": sfz_identity,
+                        "sfz_path": sfz_record["source_path"],
+                        "library_root": str(library_root),
+                        **row,
+                    })
+            except Exception as exc:
+                sfz_audit.append({
+                    "sfz_identity": sfz_identity,
+                    "sfz_path": sfz_record["source_path"],
+                    "library_root": str(library_root),
+                    "status": "SFZ_AUDIT_ERROR",
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
 
     payload = {
         "registry_version": REGISTRY_VERSION,
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "source_count": len(records),
         "sources": records,
+        "sfz_dependency_audit": sfz_audit,
     }
     fd, temporary_name = tempfile.mkstemp(
         prefix=target.name + ".", suffix=".tmp", dir=str(target.parent)
@@ -143,6 +176,9 @@ def register_sources(
             key: sum(1 for item in added if item["format_group"] == key)
             for key in sorted({item["format_group"] for item in added})
         },
+        "sfz_dependency_rows": len(sfz_audit),
+        "sfz_dependencies_found": sum(1 for row in sfz_audit if row.get("status") == "FOUND"),
+        "sfz_dependencies_blocked": sum(1 for row in sfz_audit if row.get("status") != "FOUND"),
         "source_files_modified": False,
         "source_files_moved": False,
         "source_files_deleted": False,
