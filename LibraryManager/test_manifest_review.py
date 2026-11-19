@@ -15,7 +15,7 @@ def write_wav(path: Path, frames: int = 1000) -> None:
         out.setnchannels(1)
         out.setsampwidth(2)
         out.setframerate(8000)
-        out.writeframes(b"\\x01\\x00" * frames)
+        out.writeframes(b"\x01\x00" * frames)
 
 
 def sha(path: Path) -> str:
