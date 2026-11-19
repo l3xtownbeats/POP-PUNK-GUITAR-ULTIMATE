@@ -164,6 +164,8 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                 )
                 total = result["sample_mode_count"] + result["melody_mode_count"]
                 self.assertEqual(total, 4)
+                self.assertEqual(result["sample_mode_count"], 3)
+                self.assertEqual(result["melody_mode_count"], 1)
                 self.assertEqual(result["max_assets"], 4)
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
