@@ -385,7 +385,7 @@ def build_plugin_asset_catalog(
             mode_asset = dict(source_asset)
             mode_asset["playable_in_mode"] = mode in source_asset.get("playable_modes", [])
             mode_asset["playable"] = mode_asset["playable_in_mode"]
-            if not mode_asset["playable_in_mode"] and mode not in mode_asset.get("blocking_reasons", []):
+            if not mode_asset["playable_in_mode"]:
                 mode_asset["mode_blocking_reason"] = (
                     "This mode requires a reviewed event timeline or mode-specific mapping; "
                     "a WAV file and generic note/chord label are not enough."
