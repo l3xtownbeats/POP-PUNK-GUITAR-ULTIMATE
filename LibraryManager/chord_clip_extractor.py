@@ -135,9 +135,9 @@ def extract_chord_samples(
                 "source_modified": False,
             }
             with manifest.open("x", encoding="utf-8") as stream:
+                created.append(manifest)
                 json.dump(record, stream, ensure_ascii=False, indent=2)
                 stream.write("\n")
-            created.append(manifest)
             record["reused_existing"] = False
             results.append(record)
 
