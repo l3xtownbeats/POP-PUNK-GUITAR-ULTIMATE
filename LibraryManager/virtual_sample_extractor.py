@@ -196,38 +196,66 @@ def analyze_long_wav(source: Path, *, guitar_source_confirmed: bool = False,
 
 
 def write_virtual_index(report: dict[str, Any], import_root: Path) -> list[Path]:
-    """Write non-destructive JSON sidecars under Samples/Import Sample Guitar."""
+    """Write or safely reuse JSON sidecars under Samples/Import Sample Guitar."""
     root = Path(import_root).resolve()
     if root.name.casefold() != "import sample guitar":
         raise ValueError("Index destination must be the approved 'Import Sample Guitar' folder")
     source = Path(report["source_path"]).resolve()
-    if sha256_file(source) != report["source_sha256"]:
+    expected_hash = str(report["source_sha256"]).upper()
+    if sha256_file(source) != expected_hash:
         raise RuntimeError("Source SHA-256 changed after analysis; refusing to index")
     target = root / "VIRTUAL_CANDIDATES" / "RIFF_CANDIDATES"
     target.mkdir(parents=True, exist_ok=True)
-    written = []
-    for candidate in report["candidates"]:
-        path = target / f'{candidate["candidate_id"]}.json'
-        record = {
-            "schema_version": report["schema_version"],
-            "asset_kind": "VIRTUAL_AUDIO_RANGE",
-            "source_path": report["source_path"],
-            "source_sha256": report["source_sha256"],
-            "sample_rate": report["sample_rate"],
-            "channels": report["channels"],
-            "sample_width_bytes": report["sample_width_bytes"],
-            "frame_count": candidate["source_end_sample"] - candidate["source_start_sample"],
-            **candidate,
-            "playback": "Read source_path from source_start_sample for frame_count frames",
-            "automatic_destructive_action": "NONE",
-        }
-        # Exclusive creation: never overwrite a previous candidate.
-        with path.open("x", encoding="utf-8") as stream:
-            json.dump(record, stream, ensure_ascii=False, indent=2)
-        written.append(path)
-    if sha256_file(source) != report["source_sha256"]:
-        raise RuntimeError("Source SHA-256 changed while writing virtual index")
-    return written
+    written: list[Path] = []
+    created: list[Path] = []
+    try:
+        for candidate in report["candidates"]:
+            path = target / f'{candidate["candidate_id"]}.json'
+            record = {
+                "schema_version": report["schema_version"],
+                "asset_kind": "VIRTUAL_AUDIO_RANGE",
+                "source_path": str(source),
+                "source_sha256": expected_hash,
+                "sample_rate": report["sample_rate"],
+                "channels": report["channels"],
+                "sample_width_bytes": report["sample_width_bytes"],
+                "frame_count": candidate["source_end_sample"] - candidate["source_start_sample"],
+                **candidate,
+                "playback": "Read source_path from source_start_sample for frame_count frames",
+                "automatic_destructive_action": "NONE",
+            }
+            if path.exists():
+                if not path.is_file():
+                    raise FileExistsError(f"Virtual sidecar path is not a regular file: {path}")
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                matches = (
+                    str(existing.get("source_sha256", "")).upper() == expected_hash
+                    and Path(str(existing.get("source_path", ""))).resolve() == source
+                    and existing.get("candidate_id") == candidate.get("candidate_id")
+                    and int(existing.get("source_start_sample", -1)) == int(candidate["source_start_sample"])
+                    and int(existing.get("source_end_sample", -1)) == int(candidate["source_end_sample"])
+                    and existing.get("acoustic_fingerprint") == candidate.get("acoustic_fingerprint")
+                )
+                if not matches:
+                    raise RuntimeError(
+                        f"Existing virtual sidecar failed source/range/fingerprint validation: {path.name}"
+                    )
+                written.append(path)
+                continue
+            # Exclusive creation prevents overwriting user or concurrent data.
+            with path.open("x", encoding="utf-8") as stream:
+                json.dump(record, stream, ensure_ascii=False, indent=2)
+                stream.write("\\n")
+            created.append(path)
+            written.append(path)
+
+        if sha256_file(source) != expected_hash:
+            raise RuntimeError("Source SHA-256 changed while writing virtual index")
+        return written
+    except Exception:
+        for path in reversed(created):
+            path.unlink(missing_ok=True)
+        raise
 
 
 
