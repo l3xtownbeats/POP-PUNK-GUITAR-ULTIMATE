@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import wave
 from pathlib import Path
 from typing import Any
 
 from audio_segmenter import STAGING_BASE, _safe_staging_root, propose_segments
+from audio_range_io import audio_source_info, write_pcm_wav_range
 
 VERSION = "0.1.0"
 
@@ -24,23 +24,11 @@ def _identity(source_hash: str, mode: str, start: int, end: int) -> str:
     ).hexdigest()[:24].upper()
 
 
-def _write_clip(reader: wave.Wave_read, params: Any, start: int, end: int,
-                destination: Path) -> None:
-    if destination.exists():
-        raise FileExistsError(f"Refusing to overwrite staged asset: {destination}")
-    reader.setpos(start)
-    frames = reader.readframes(end - start)
-    expected = (end - start) * params.nchannels * params.sampwidth
-    if len(frames) != expected:
-        raise IOError("Incomplete PCM frame range read")
-    try:
-        with destination.open("xb") as raw:
-            with wave.open(raw, "wb") as writer:
-                writer.setparams(params)
-                writer.writeframes(frames)
-    except Exception:
-        destination.unlink(missing_ok=True)
-        raise
+def _write_clip(source: Path, start: int, end: int,
+                destination: Path, expected_rate: int) -> dict[str, Any]:
+    return write_pcm_wav_range(
+        source, start, end, destination, expected_rate=expected_rate,
+    )
 
 
 def prepare_sample_and_melody(
@@ -69,7 +57,9 @@ def prepare_sample_and_melody(
         folder.resolve().relative_to(root)
         folder.resolve().relative_to(STAGING_BASE)
 
-    rate = int(report["sample_rate"])
+    source_info = audio_source_info(source)
+    rate = source_info.framerate
+    total_frames = source_info.frames
     events = report["segments"]
     # Group sequential pitch events into phrase candidates. A fixed gap is only
     # a segmentation heuristic; it does not assert a bar, riff or song section.
@@ -88,22 +78,17 @@ def prepare_sample_and_melody(
     results: dict[str, list[dict[str, Any]]] = {"sample_mode": [], "melody_mode": []}
     created: list[Path] = []
     try:
-        with wave.open(str(source), "rb") as reader:
-            params = reader.getparams()
-            if params.comptype != "NONE":
-                raise ValueError("Only uncompressed PCM WAV can be extracted")
-            total_frames = reader.getnframes()
-            for event in events:
+        for event in events:
                 start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
                 if start < 0 or end <= start or end > total_frames:
                     continue
                 asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
                 clip = clips_dir / f"SAMPLE-{asset_id}.wav"
                 manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
-                _write_clip(reader, params, start, end, clip)
+                clip_info = _write_clip(source, start, end, clip, rate)
                 created.append(clip)
                 record = _record(
-                    asset_id, source, source_hash, clip, manifest, params, start, end,
+                    asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                     "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
                     {"midi_note_candidate": event.get("midi_note_candidate"),
                      "note_name_candidate": event.get("note_name_candidate"),
@@ -125,10 +110,10 @@ def prepare_sample_and_melody(
                 asset_id = _identity(source_hash, "MELODY_PHRASE", start, end)
                 clip = clips_dir / f"MELODY-{asset_id}.wav"
                 manifest = manifests_dir / f"MELODY-{asset_id}.json"
-                _write_clip(reader, params, start, end, clip)
+                clip_info = _write_clip(source, start, end, clip, rate)
                 created.append(clip)
                 record = _record(
-                    asset_id, source, source_hash, clip, manifest, params, start, end,
+                    asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                     "melody_phrase_candidate", ["MELODY_MODE", "MELODY_INSTRUMENT"],
                     {"note_event_count": len(group),
                      "note_candidates": [
@@ -172,8 +157,10 @@ def prepare_sample_and_melody(
 
 
 def _record(asset_id: str, source: Path, source_hash: str, clip: Path,
-            manifest: Path, params: Any, start: int, end: int, kind: str,
+            manifest: Path, source_info: Any, clip_info: dict[str, Any],
+            start: int, end: int, kind: str,
             targets: list[str], metadata: dict[str, Any]) -> dict[str, Any]:
+    rate = int(clip_info["sample_rate"])
     return {
         "schema_version": 1,
         "asset_id": asset_id,
@@ -182,14 +169,17 @@ def _record(asset_id: str, source: Path, source_hash: str, clip: Path,
         "source_sha256": source_hash,
         "source_start_sample": start,
         "source_end_sample": end,
-        "source_start_seconds": round(start / params.framerate, 6),
-        "source_end_seconds": round(end / params.framerate, 6),
-        "duration_seconds": round((end - start) / params.framerate, 6),
+        "source_start_seconds": round(start / rate, 6),
+        "source_end_seconds": round(end / rate, 6),
+        "duration_seconds": round((end - start) / rate, 6),
         "frame_count": end - start,
-        "sample_rate": params.framerate,
-        "channels": params.nchannels,
-        "sample_width_bytes": params.sampwidth,
-        "source_format": "WAV_PCM",
+        "sample_rate": rate,
+        "channels": clip_info["channels"],
+        "sample_width_bytes": clip_info["sample_width_bytes"],
+        "source_format": source_info.source_format,
+        "source_subtype": source_info.source_subtype,
+        "derived_format": clip_info["derived_format"],
+        "derived_subtype": clip_info["derived_subtype"],
         "derived_path": str(clip),
         "derived_sha256": _sha256(clip),
         "kind": kind,
