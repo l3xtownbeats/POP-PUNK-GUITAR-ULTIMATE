@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""Prepare physical Sample Mode notes and Melody Mode phrase candidates.
+
+This is deliberately conservative: pitch events are candidate note boundaries,
+not guaranteed guitar-note truth. Outputs are new PCM WAV files under staging;
+original sources are never modified and every asset remains review/license gated.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import wave
+from pathlib import Path
+from typing import Any
+
+from audio_segmenter import STAGING_BASE, _safe_staging_root, propose_segments
+
+VERSION = "0.1.0"
+
+
+def _identity(source_hash: str, mode: str, start: int, end: int) -> str:
+    return hashlib.sha256(
+        f"{source_hash}:{mode}:{start}:{end}:{VERSION}".encode("utf-8")
+    ).hexdigest()[:24].upper()
+
+
+def _write_clip(reader: wave.Wave_read, params: Any, start: int, end: int,
+                destination: Path) -> None:
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite staged asset: {destination}")
+    reader.setpos(start)
+    frames = reader.readframes(end - start)
+    expected = (end - start) * params.nchannels * params.sampwidth
+    if len(frames) != expected:
+        raise IOError("Incomplete PCM frame range read")
+    with destination.open("xb") as raw:
+        with wave.open(raw, "wb") as writer:
+            writer.setparams(params)
+            writer.writeframes(frames)
+
+
+def prepare_sample_and_melody(
+    source: Path,
+    staging_root: Path = STAGING_BASE,
+    *,
+    max_note_events: int = 500,
+    melody_gap_seconds: float = 0.45,
+    melody_min_notes: int = 3,
+    pre_roll_ms: int = 35,
+    post_roll_ms: int = 220,
+) -> dict[str, Any]:
+    """Extract note-event WAVs and grouped melody-phrase WAV candidates."""
+    if melody_gap_seconds < 0 or melody_min_notes < 2:
+        raise ValueError("Invalid melody grouping limits")
+    root = _safe_staging_root(staging_root)
+    source = Path(source).resolve()
+    report = propose_segments(
+        source, pre_roll_ms=pre_roll_ms, post_roll_ms=post_roll_ms,
+        max_segments=max_note_events,
+    )
+    source_hash = report["source_sha256"]
+    clips_dir, manifests_dir = root / "clips", root / "manifests"
+    for folder in (clips_dir, manifests_dir):
+        folder.mkdir(parents=True, exist_ok=True)
+        folder.resolve().relative_to(root)
+        folder.resolve().relative_to(STAGING_BASE)
+
+    rate = int(report["sample_rate"])
+    events = report["segments"]
+    # Group sequential pitch events into phrase candidates. A fixed gap is only
+    # a segmentation heuristic; it does not assert a bar, riff or song section.
+    groups: list[list[dict[str, Any]]] = []
+    for event in events:
+        if not groups:
+            groups.append([event])
+            continue
+        previous = groups[-1][-1]
+        gap = event["detected_note_start_seconds"] - previous["detected_note_end_seconds"]
+        if gap <= melody_gap_seconds:
+            groups[-1].append(event)
+        else:
+            groups.append([event])
+
+    results: dict[str, list[dict[str, Any]]] = {"sample_mode": [], "melody_mode": []}
+    created: list[Path] = []
+    try:
+        with wave.open(str(source), "rb") as reader:
+            params = reader.getparams()
+            if params.comptype != "NONE":
+                raise ValueError("Only uncompressed PCM WAV can be extracted")
+            total_frames = reader.getnframes()
+            for event in events:
+                start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
+                if start < 0 or end <= start or end > total_frames:
+                    continue
+                asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
+                clip = clips_dir / f"SAMPLE-{asset_id}.wav"
+                manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
+                _write_clip(reader, params, start, end, clip)
+                created.append(clip)
+                record = _record(
+                    asset_id, source, source_hash, clip, manifest, params, start, end,
+                    "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
+                    {"midi_note_candidate": event.get("midi_note_candidate"),
+                     "note_name_candidate": event.get("note_name_candidate"),
+                     "detected_note_start_seconds": event.get("detected_note_start_seconds"),
+                     "detected_note_end_seconds": event.get("detected_note_end_seconds"),
+                     "confidence": event.get("confidence")},
+                )
+                _write_manifest(manifest, record)
+                created.append(manifest)
+                results["sample_mode"].append(record)
+
+            for group in groups:
+                if len(group) < melody_min_notes:
+                    continue
+                start = min(int(x["source_start_sample"]) for x in group)
+                end = max(int(x["source_end_sample"]) for x in group)
+                if start < 0 or end <= start or end > total_frames:
+                    continue
+                asset_id = _identity(source_hash, "MELODY_PHRASE", start, end)
+                clip = clips_dir / f"MELODY-{asset_id}.wav"
+                manifest = manifests_dir / f"MELODY-{asset_id}.json"
+                _write_clip(reader, params, start, end, clip)
+                created.append(clip)
+                record = _record(
+                    asset_id, source, source_hash, clip, manifest, params, start, end,
+                    "melody_phrase_candidate", ["MELODY_MODE", "MELODY_INSTRUMENT"],
+                    {"note_event_count": len(group),
+                     "note_candidates": [
+                         {"midi": x.get("midi_note_candidate"),
+                          "name": x.get("note_name_candidate"),
+                          "start_seconds": x.get("detected_note_start_seconds"),
+                          "end_seconds": x.get("detected_note_end_seconds")}
+                         for x in group
+                     ],
+                     "boundary_basis": "grouped_pitch_event_candidates",
+                     "grouping_gap_seconds": melody_gap_seconds},
+                )
+                _write_manifest(manifest, record)
+                created.append(manifest)
+                results["melody_mode"].append(record)
+
+        if _sha256(source) != source_hash:
+            raise RuntimeError("Source changed during Sample/Melody extraction")
+    except Exception:
+        for path in reversed(created):
+            path.unlink(missing_ok=True)
+        raise
+
+    return {
+        "pipeline_version": VERSION,
+        "source_path": str(source),
+        "source_sha256": source_hash,
+        "sample_mode_count": len(results["sample_mode"]),
+        "melody_mode_count": len(results["melody_mode"]),
+        **results,
+        "review_status": "NEEDS_MUSICAL_REVIEW",
+        "license_status": "UNREVIEWED",
+        "source_modified": False,
+        "limitations": [
+            "Pitch-event detection is monophonic and may miss chords or overlapping guitar notes.",
+            "Melody phrases are grouped by a time-gap heuristic, not verified musical bars or phrases.",
+            "Velocity layers, articulation labels, chord recognition and tuning require separate analysis/review.",
+            "No candidate is eligible for FACTORY until musical review and explicit license approval."
+        ],
+    }
+
+
+def _record(asset_id: str, source: Path, source_hash: str, clip: Path,
+            manifest: Path, params: Any, start: int, end: int, kind: str,
+            targets: list[str], metadata: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "asset_id": asset_id,
+        "parent_asset_id": source_hash,
+        "source_path": str(source),
+        "source_sha256": source_hash,
+        "source_start_sample": start,
+        "source_end_sample": end,
+        "source_start_seconds": round(start / params.framerate, 6),
+        "source_end_seconds": round(end / params.framerate, 6),
+        "duration_seconds": round((end - start) / params.framerate, 6),
+        "frame_count": end - start,
+        "sample_rate": params.framerate,
+        "channels": params.nchannels,
+        "sample_width_bytes": params.sampwidth,
+        "source_format": "WAV_PCM",
+        "derived_path": str(clip),
+        "derived_sha256": _sha256(clip),
+        "kind": kind,
+        "engine_targets": targets,
+        "musical_metadata": metadata,
+        "review_status": "NEEDS_MUSICAL_REVIEW",
+        "license_status": "UNREVIEWED",
+        "extractor": "sample_melody_pipeline",
+        "extractor_version": VERSION,
+        "automatic_destructive_action": "NONE",
+    }
+
+
+def _write_manifest(path: Path, record: dict[str, Any]) -> None:
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(record, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest().upper()
