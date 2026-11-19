@@ -319,6 +319,7 @@ class LibraryManagerApp:
                         result = prepare_sample_and_melody(
                             source, STAGING_ROOT,
                             max_note_events=min(100, remaining),
+                            max_assets=remaining,
                             pitch_candidates=record.get("pitch_candidates"),
                             expected_source_sha256=record.get("source_sha256"),
                             source_metadata=record.get("filename_metadata"),
