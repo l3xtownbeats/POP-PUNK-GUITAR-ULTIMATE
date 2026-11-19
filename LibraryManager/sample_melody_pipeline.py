@@ -136,14 +136,15 @@ def prepare_sample_and_melody(
             asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
             clip = clips_dir / f"SAMPLE-{asset_id}.wav"
             manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
-            # Refuse collisions before touching either output. The exclusive
-            # placeholder prevents another process from claiming this clip path
-            # between the check and the WAV writer opening it.
-            if manifest.exists():
-                raise FileExistsError(f"Refusing to overwrite staged manifest {manifest.name}")
-            clip.touch(exist_ok=False)
-            created.append(clip)
+            # The range writer opens the destination exclusively itself.
+            # Pre-creating an empty placeholder made every valid extraction fail
+            # with FileExistsError; record the path only after a successful write.
+            if clip.exists() or manifest.exists():
+                raise FileExistsError(f"Refusing to overwrite staged Sample asset {asset_id}")
+            if clip.exists() or manifest.exists():
+                raise FileExistsError(f"Refusing to overwrite staged Melody asset {asset_id}")
             clip_info = _write_clip(source, start, end, clip, rate)
+            created.append(clip)
             record = _record(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                 "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
