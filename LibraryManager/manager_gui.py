@@ -27,7 +27,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -380,6 +380,14 @@ class LibraryManagerApp:
                 progress=report_progress,
                 cancel_event=self._cancel_event,
                 workers=1,
+            )
+
+            mode_counts = analysis_result.get("mode_candidate_counts", {})
+            mode_report_path = Path(analysis_result["report_directory"]) / "mode_sorting_report.json"
+            report_progress(
+                "СОРТИРОВКА ПО 10 РЕЖИМАМ VST3: "
+                + "; ".join(f"{name}: {count}" for name, count in mode_counts.items())
+                + f". Отчёт: {mode_report_path}"
             )
 
             extracted_region = 0
