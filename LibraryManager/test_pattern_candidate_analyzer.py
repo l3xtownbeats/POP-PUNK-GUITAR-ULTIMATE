@@ -37,6 +37,26 @@ class RepeatingPatternCandidateTests(unittest.TestCase):
         result = find_repeating_patterns(report, min_intervals=3, max_intervals=3)
         self.assertEqual(result["candidate_count"], 0)
 
+ 
+    def test_overlapping_windows_are_not_counted_as_repetitions(self):
+        report = {
+            "duration_seconds": 2.0,
+            "onset_evidence_seconds": [0.0, 0.25, 0.50, 0.75, 1.0, 1.25],
+        }
+        result = find_repeating_patterns(report, min_intervals=3, max_intervals=3)
+        self.assertEqual(result["candidate_count"], 0)
+
+    def test_preserves_source_hash_from_rhythm_report(self):
+        report = {
+            "source": "take.wav",
+            "source_sha256": "B" * 64,
+            "duration_seconds": 4.0,
+            "onset_evidence_seconds": [0.0, 0.25, 0.50, 0.75, 1.75,
+                                       2.00, 2.25, 2.50, 3.50],
+        }
+        result = find_repeating_patterns(report, min_intervals=3, max_intervals=3)
+        self.assertEqual(result["source_sha256"], "B" * 64)
+
     def test_rejects_invalid_report_and_parameters(self):
         with self.assertRaises(ValueError):
             find_repeating_patterns({"duration_seconds": 0, "onset_evidence_seconds": []})
