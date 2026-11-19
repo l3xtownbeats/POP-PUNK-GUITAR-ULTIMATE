@@ -77,14 +77,15 @@ def _velocity_record(asset: dict[str, Any], metadata: dict[str, Any]) -> dict[st
     return {"status": "UNKNOWN", "min": None, "max": None, "layer": "UNKNOWN"}
 
 
-def _pattern_readiness(metadata: dict[str, Any]) -> tuple[str, list[str]]:
+def _pattern_readiness(metadata: dict[str, Any], frame_count: int | None = None) -> tuple[str, list[str]]:
     pattern = metadata.get("pattern_performance_review") or metadata.get("pattern") or {}
     if not isinstance(pattern, dict):
         pattern = {}
     missing: list[str] = []
     start, end = pattern.get("loop_start_sample"), pattern.get("loop_end_sample")
-    if type(start) is not int or type(end) is not int or start < 0 or end <= start:
-        missing.append("valid_loop_start_end_sample")
+    if (type(start) is not int or type(end) is not int or start < 0 or end <= start
+            or (type(frame_count) is int and end > frame_count)):
+        missing.append("valid_loop_start_end_sample_within_clip")
     tempo = pattern.get("tempo_bpm")
     if not isinstance(tempo, (int, float)) or not 20 <= tempo <= 400:
         missing.append("tempo_bpm")
@@ -130,6 +131,10 @@ def _melody_readiness(asset: dict[str, Any], metadata: dict[str, Any]) -> tuple[
                 break
             previous_start = float(start)
     boundaries = metadata.get("melody_phrase_boundaries")
+    if isinstance(events, list) and len(events) >= 2 and isinstance(notes, list):
+        event_notes = [item.get("midi_note") for item in events if isinstance(item, dict)]
+        if event_notes != notes:
+            missing.append("melody_note_sequence_mismatch")
     if not isinstance(boundaries, list) or len(boundaries) < 2 or any(
         not isinstance(value, (int, float)) or value < 0 for value in boundaries
     ) or boundaries != sorted(boundaries):
@@ -223,8 +228,12 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
                     "note_event", "sample_note_candidate", "sample_note", "one_shot_sample"
                 }
                 if is_note_zone:
-                    state = "NOTE_ZONE_READY" if pitches else "NOTE_ZONE_INCOMPLETE"
-                    missing = [] if pitches else ["confirmed_pitch_zone"]
+                    state = "NOTE_ZONE_READY" if pitches and asset.get("asset_file") else "NOTE_ZONE_INCOMPLETE"
+                    missing = [] if pitches and asset.get("asset_file") else [
+                        field for field, ok in (("confirmed_pitch_zone", bool(pitches)),
+                                                ("derived_wav_reference", bool(asset.get("asset_file"))))
+                        if not ok
+                    ]
                     pattern_records.append({
                         "asset_id": asset_id, "asset_kind": asset_kind,
                         "pattern_structure_status": state, "missing_fields": missing,
@@ -232,7 +241,7 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
                         "metadata": {},
                     })
                 else:
-                    state, missing = _pattern_readiness(metadata)
+                    state, missing = _pattern_readiness(metadata, asset.get("frame_count"))
                     pattern_records.append({
                         "asset_id": asset_id, "asset_kind": asset_kind or "UNKNOWN",
                         "pattern_structure_status": state, "missing_fields": missing,
