@@ -642,6 +642,7 @@ class LibraryManagerApp:
             extracted_pattern = 0
             extracted_chord = 0
             extracted_sample = 0
+            extracted_melody_notes = 0
             extracted_melody = 0
             max_total_assets = 500
             extraction_failures = []
@@ -726,7 +727,7 @@ class LibraryManagerApp:
                             "error": f"{type(exc).__name__}: {exc}",
                         })
 
-                report_progress("ЭТАП 6/8: извлечение отдельных нот SAMPLE MODE и фраз MELODY MODE.")
+                report_progress("ЭТАП 6/8: извлечение одиночных нот для SAMPLE MODE + MELODY MODE и дополнительных фраз MELODY MODE.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
@@ -747,6 +748,7 @@ class LibraryManagerApp:
                             source_metadata=record.get("filename_metadata"),
                         )
                         extracted_sample += result["sample_mode_count"]
+                        extracted_melody_notes += result.get("melody_note_mode_count", 0)
                         extracted_melody += result["melody_mode_count"]
                         if result["sample_mode_count"] + result["melody_mode_count"] == 0:
                             extraction_failures.append({
@@ -800,7 +802,8 @@ class LibraryManagerApp:
                     "pattern_mode_wav_count": extracted_pattern,
                     "chord_and_power_chord_wav_count": extracted_chord,
                     "sample_mode_wav_count": extracted_sample,
-                    "melody_mode_wav_count": extracted_melody,
+                    "melody_mode_single_note_bindings": extracted_melody_notes,
+                    "melody_mode_phrase_wav_count": extracted_melody,
                     "total_new_wav_candidates": extracted_region + extracted_pattern + extracted_chord + extracted_sample + extracted_melody,
                     "global_asset_limit": max_total_assets,
                     "manifest_count_in_staging": finalization_result["staging"]["manifests_checked"],
