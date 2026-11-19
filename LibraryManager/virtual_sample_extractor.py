@@ -285,7 +285,10 @@ def write_virtual_index(report: dict[str, Any], import_root: Path) -> list[Path]
     expected_hash = str(report["source_sha256"]).upper()
     if sha256_file(source) != expected_hash:
         raise RuntimeError("Source SHA-256 changed after analysis; refusing to index")
-    target_name = ("PATTERN_MODE_CANDIDATES"\n                   if report.get("engine") == "PATTERN_MODE_VIRTUAL_EXTRACTION"\n                   else "RIFF_CANDIDATES")\n    target = root / "VIRTUAL_CANDIDATES" / target_name
+    target_name = ("PATTERN_MODE_CANDIDATES"
+                   if report.get("engine") == "PATTERN_MODE_VIRTUAL_EXTRACTION"
+                   else "RIFF_CANDIDATES")
+    target = root / "VIRTUAL_CANDIDATES" / target_name
     target.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     created: list[Path] = []
