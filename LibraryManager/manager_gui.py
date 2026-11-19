@@ -15,13 +15,14 @@ from pathlib import Path
 
 from unified_manager import run_manager
 from pattern_clip_extractor import extract_pattern_occurrences
+from other_audit import audit_other_library, route_approved_to_other
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
     distribution_plan,
 )
 
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.8.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -63,6 +64,8 @@ class LibraryManagerApp:
         actions.pack(fill="x", pady=8)
         buttons = [
             ("1. Анализ библиотеки", self.scan),
+            ("Аудит папки OTHER", self.audit_other),
+            ("Распределить одобренное в OTHER", self.distribute_other),
             ("2. Извлечь найденные ритм-паттерны в WAV", self.extract_patterns),
             ("3. Распределить проверенные материалы", self.distribute),
             ("4. Удалить оригиналы после проверки", self.cleanup),
@@ -138,6 +141,43 @@ class LibraryManagerApp:
             )
         self._background("Анализ библиотеки", work)
 
+    def audit_other(self) -> None:
+        try:
+            samples = self._samples()
+        except Exception as exc:
+            messagebox.showerror("Папка Samples", str(exc))
+            return
+        report_dir = MANAGER_DIR / "reports" / ("other_audit_" + __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S"))
+        self._background("Аудит OTHER", lambda: audit_other_library(samples, report_dir))
+
+    def distribute_other(self) -> None:
+        try:
+            samples = self._samples()
+        except Exception as exc:
+            messagebox.showerror("Папка Samples", str(exc))
+            return
+        decision_file = filedialog.askopenfilename(
+            title="Выберите вручную проверенный other_decisions.json",
+            initialdir=str(samples / "OTHER"),
+            filetypes=[("OTHER decisions", "*.json")],
+        )
+        if not decision_file:
+            return
+        try:
+            plan = route_approved_to_other(samples, Path(decision_file), approve=False)
+        except Exception as exc:
+            messagebox.showerror("План OTHER", str(exc))
+            return
+        preview = "\n".join(f'{item["source_path"]} → {item["destination_path"]} ({item["reason"]})' for item in plan["entries"])
+        self._write("ПЛАН OTHER (без изменений):\n" + (preview or "Нет явно одобренных записей."))
+        if not plan["entries"]:
+            return
+        if not messagebox.askyesno("Подтверждение копирования в OTHER",
+                                   f"Будет скопировано файлов: {len(plan['entries'])}.\nSHA-256 проверяется; оригиналы останутся на месте. Продолжить?"):
+            return
+        self._background("Копирование в OTHER", lambda: route_approved_to_other(
+            samples, Path(decision_file), approve=True))
+
     def extract_patterns(self) -> None:
         report_path = filedialog.askopenfilename(
             title="Выберите unified_audio_analysis.json из отчёта анализа",
@@ -180,9 +220,13 @@ class LibraryManagerApp:
             extracted = []
             failures = []
             for item in eligible:
-                pattern_report = item["pattern_analysis"]
+                pattern_report = {
+                    "source": item["source_path"],
+                    "source_sha256": item["source_sha256"],
+                    "pattern_analysis": (item.get("pattern_analysis") or {}).get("pattern_analysis", {}),
+                }
                 try:
-                    extracted.extend(extract_pattern_occurrences(pattern_report))
+                    extracted.extend(extract_pattern_occurrences(pattern_report, STAGING_ROOT))
                 except Exception as exc:
                     failures.append({
                         "source_path": item.get("source_path"),
