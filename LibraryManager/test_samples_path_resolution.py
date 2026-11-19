@@ -13,6 +13,13 @@ class SamplesPathResolutionTests(unittest.TestCase):
             (root / "Import Sample Guitar").mkdir(parents=True)
             self.assertEqual(resolve_samples_root(root), root.resolve())
 
+    def test_accepts_realistic_factory_and_import_layout_with_spaces(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "POP PUNK GUITAR ULTIMATE" / "Samples"
+            (root / "Factory").mkdir(parents=True)
+            (root / "Import Sample Guitar").mkdir()
+            self.assertEqual(resolve_samples_root(root), root.resolve())
+
     def test_accepts_import_folder_itself(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "Samples"
