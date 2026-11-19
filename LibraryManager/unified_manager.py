@@ -29,8 +29,9 @@ from irregular_phrase_segmenter import analyze_irregular_guitar_phrases
 from other_audit import audit_other_library
 from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
 from mode_sorter import build_mode_sorting_report
+from mode_assignment_index import build_mode_assignment_index
 
-VERSION = "2.4.0"
+VERSION = "3.0.0-dev1"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 # Non-audio production assets are excluded immediately from all scan/analyze queues.
 # Source files are never deleted or moved; this is an analysis-only filter.
@@ -738,6 +739,9 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         raise RuntimeError("Invalid Pattern Mode manifest template: " + "; ".join(manifest_errors))
 
     mode_sorting = build_mode_sorting_report(audio_reports)
+    # Separate index of explicitly human-reviewed staged assets. This connects
+    # manual mode assignments to the same ten queues without trusting hypotheses.
+    mode_assignment_index = build_mode_assignment_index(manager_root / "staging")
     mode_candidate_counts = {
         item["mode"]: item["candidate_count"] for item in mode_sorting["modes"]
     }
@@ -764,6 +768,9 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "mode_sorting_report": "mode_sorting_report.json",
         "mode_candidate_counts": mode_candidate_counts,
         "mode_candidates_total": mode_sorting["total_candidates"],
+        "reviewed_mode_assignment_index": "reviewed_mode_assignment_index.json",
+        "reviewed_mode_assignment_count": mode_assignment_index["assignment_count"],
+        "reviewed_mode_assignment_status": mode_assignment_index["status"],
         "chord_sample_candidates": sum(
             (item.get("chord_analysis") or {}).get("chord_candidate_count", 0)
             for item in audio_reports
@@ -803,6 +810,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_json(reports / "unified_audio_analysis.json", audio_reports)
     _write_json(reports / "unified_asset_classification.json", classification_reports)
     _write_json(reports / "mode_sorting_report.json", mode_sorting)
+    _write_json(reports / "reviewed_mode_assignment_index.json", mode_assignment_index)
     _write_csv(reports / "mode_candidates.csv", mode_candidate_rows)
     _write_json(reports / "pattern_engine_manifest.json", pattern_manifest)
     _write_json(reports / "unified_errors.json", errors)
