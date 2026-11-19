@@ -344,14 +344,14 @@ class LibraryManagerApp:
                 write_virtual=False,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
-                workers=1,
+                workers=2,
             )
             return {
                 "quick_scan": quick_result,
                 "deep_inventory": deep_result,
                 "acoustic_analysis_performed": False,
                 "physical_extraction_performed": False,
-                "workers": 1,
+                "workers": 2,
                 "source_files_modified": False,
             }
 
