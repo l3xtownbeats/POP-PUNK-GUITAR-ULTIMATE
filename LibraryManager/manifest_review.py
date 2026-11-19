@@ -85,11 +85,15 @@ def review_manifest(
     end = int(record.get("source_end_sample", -1))
     if start < 0 or end <= start:
         raise ValueError("Invalid source sample boundaries")
-    with wave.open(str(derived), "rb") as audio:
+    with wave.open(str(source), "rb") as original_audio, wave.open(str(derived), "rb") as audio:
+        if end > original_audio.getnframes():
+            raise ValueError("Source sample boundaries exceed the original WAV")
         if audio.getnframes() != end - start:
             raise ValueError("Derived WAV frame count does not match source boundaries")
-        if audio.getcomptype() != "NONE":
+        if audio.getcomptype() != "NONE" or original_audio.getcomptype() != "NONE":
             raise ValueError("Only uncompressed PCM WAV can be promoted")
+        if audio.getframerate() != original_audio.getframerate():
+            raise ValueError("Derived WAV sample rate differs from original source")
 
     metadata = record.setdefault("musical_metadata", {})
     if not isinstance(metadata, dict):
