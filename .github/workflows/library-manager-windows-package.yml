@@ -31,6 +31,8 @@ jobs:
           # Require the embedded CPython runtime inside the distributable folder.
           $pythonRuntime = Get-ChildItem "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -Recurse -Filter "python311.dll" | Select-Object -First 1
           if (!$pythonRuntime) { throw "Bundled python311.dll is missing; package is not self-contained." }
+          $userGuide = Get-ChildItem "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -Recurse -Filter "PORTABLE_USER_GUIDE_RU.md" | Select-Object -First 1
+          if (!$userGuide) { throw "Russian user guide is missing from the portable package." }
           # Smoke-test with PATH restricted to Windows system folders. PyInstaller
           # must provide its own Python runtime and bundled dependencies.
           $oldPath = $env:PATH
@@ -48,6 +50,7 @@ jobs:
           $entries = tar -tf $zip
           if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
           if (!($entries -match "python311.dll")) { throw "Portable ZIP does not contain its bundled Python runtime." }
+          if (!($entries -match "PORTABLE_USER_GUIDE_RU.md")) { throw "Portable ZIP does not contain the Russian user guide." }
       - uses: actions/upload-artifact@v4
         with:
           name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
