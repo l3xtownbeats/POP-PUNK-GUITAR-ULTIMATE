@@ -80,6 +80,11 @@ def _is_excluded(path: Path) -> bool:
     return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
 
 
+def _is_manager_virtual_metadata(path: Path) -> bool:
+    """Recognize sidecars created by the manager, not importable audio assets."""
+    return any(part.strip().casefold() == "virtual_candidates" for part in path.parts)
+
+
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -375,7 +380,14 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         audio_record = None
         classification = None
         local_errors = []
-        if ext not in SUPPORTED:
+        if _is_manager_virtual_metadata(path.relative_to(incoming)):
+            row.update(
+                category_suggestion="MANAGER_GENERATED_METADATA",
+                audio_analysis_status="MANAGER_METADATA",
+                classification_status="NOT_AN_AUDIO_ASSET",
+                unsupported_reason="Manager-generated virtual range sidecar; source audio is referenced separately.",
+            )
+        elif ext not in SUPPORTED:
             row.update(category_suggestion="OTHER_REVIEW_REQUIRED",
                        audio_analysis_status="UNSUPPORTED_FORMAT",
                        classification_status="MANUAL_REVIEW_REQUIRED",
@@ -616,6 +628,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "errors": len(errors),
         "other_audit": other_audit_summary,
         "unsupported_import_files": sum(row.get("audio_analysis_status") == "UNSUPPORTED_FORMAT" for row in inventory),
+        "manager_generated_metadata_files": sum(row.get("audio_analysis_status") == "MANAGER_METADATA" for row in inventory),
         "source_files_modified": False, "source_files_moved_or_deleted": False,
         "automatic_factory_promotion": False,
         "hash_cache": str(cache_db),
