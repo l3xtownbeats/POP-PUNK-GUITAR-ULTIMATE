@@ -266,7 +266,7 @@ class LibraryManagerApp:
                 samples,
                 analyze_audio=analyze_audio,
                 guitar_source_confirmed=guitar_confirmed,
-                write_virtual=False,
+                write_virtual=bool(analyze_audio and guitar_confirmed),
                 progress=report_progress,
                 cancel_event=self._cancel_event,
                 workers=2,
