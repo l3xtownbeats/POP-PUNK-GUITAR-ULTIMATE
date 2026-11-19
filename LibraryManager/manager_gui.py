@@ -576,17 +576,63 @@ class LibraryManagerApp:
 
         ttk.Label(frame, text=f"Манифестов: {len(rows)}. Музыкальная проверка и лицензия подтверждаются отдельно.").pack(anchor="w", pady=6)
 
-        def review_selected() -> None:
+        def selected_manifest() -> Path | None:
             selection = tree.selection()
             if not selection:
-                messagebox.showinfo("Очередь проверки", "Выберите WAV-манифест.", parent=window)
+                messagebox.showinfo("Очередь проверки", "Сначала выберите WAV-манифест.", parent=window)
+                return None
+            return paths[selection[0]]
+
+        def audio_path_for(manifest: Path, field: str, *, require_staging: bool) -> Path:
+            record = json.loads(manifest.read_text(encoding="utf-8"))
+            raw = Path(str(record.get(field, ""))).expanduser()
+            audio = raw if raw.is_absolute() else (manifest.parent / raw)
+            audio = audio.resolve()
+            if not audio.is_file() or audio.suffix.lower() not in {".wav", ".wave"}:
+                raise ValueError(f"Файл {field} отсутствует или не является WAV: {audio}")
+            if require_staging:
+                try:
+                    audio.relative_to(STAGING_ROOT.resolve())
+                except ValueError as exc:
+                    raise ValueError("Производный WAV должен находиться внутри LibraryManager/staging.") from exc
+            return audio
+
+        def play_selected(field: str) -> None:
+            manifest = selected_manifest()
+            if manifest is None:
                 return
-            selected_path = paths[selection[0]]
+            try:
+                audio = audio_path_for(manifest, field, require_staging=(field == "derived_path"))
+                import winsound
+                winsound.PlaySound(None, 0)
+                winsound.PlaySound(str(audio), winsound.SND_FILENAME | winsound.SND_ASYNC)
+                self._write(f"Предпрослушивание {field}: {audio}")
+                self.status.set("Воспроизведение WAV-кандидата" if field == "derived_path" else "Воспроизведение оригинала")
+            except Exception as exc:
+                messagebox.showerror("Предпрослушивание", str(exc), parent=window)
+
+        def stop_selected_preview() -> None:
+            try:
+                import winsound
+                winsound.PlaySound(None, 0)
+                self.status.set("Воспроизведение остановлено")
+            except Exception as exc:
+                messagebox.showerror("Предпрослушивание", str(exc), parent=window)
+
+        def review_selected() -> None:
+            selected_path = selected_manifest()
+            if selected_path is None:
+                return
             window.destroy()
             self.review_candidate(str(selected_path))
 
-        ttk.Button(frame, text="Проверить выбранный WAV", command=review_selected).pack(anchor="e")
-        tree.bind("<Double-1>", lambda _event: review_selected())
+        controls = ttk.Frame(frame)
+        controls.pack(fill="x", pady=(4, 0))
+        ttk.Button(controls, text="▶ Прослушать фрагмент", command=lambda: play_selected("derived_path")).pack(side="left", padx=3)
+        ttk.Button(controls, text="▶ Прослушать оригинал", command=lambda: play_selected("source_path")).pack(side="left", padx=3)
+        ttk.Button(controls, text="■ Стоп", command=stop_selected_preview).pack(side="left", padx=3)
+        ttk.Button(controls, text="Проверить выбранный WAV", command=review_selected).pack(side="right", padx=3)
+        tree.bind("<Double-1>", lambda _event: play_selected("derived_path"))
         if not rows:
             self._write("Очередь ручной проверки пуста: staging/manifests не содержит JSON-манифестов.")
 
