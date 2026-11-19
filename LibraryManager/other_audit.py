@@ -206,7 +206,9 @@ def route_approved_to_other(samples_root: Path, decision_file: Path, *, approve:
         reason = str(decision.get("reason", "")).strip()
         if not reason:
             raise ValueError(f"An explicit reason is required for OTHER routing: {source}")
-        destination = other / source.relative_to(incoming)
+        destination = (other / source.relative_to(incoming)).resolve()
+        if not _inside(destination, other):
+            raise ValueError(f"OTHER destination escaped its approved root: {destination}")
         entries.append({"source_path": str(source), "destination_path": str(destination),
                         "sha256": digest, "reason": reason, "status": "READY_FOR_APPROVAL"})
     plan = {"schema_version": 1, "samples_root": str(samples_root), "entries": entries,
