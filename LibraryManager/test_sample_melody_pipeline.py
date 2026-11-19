@@ -65,9 +65,19 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                     result = pipeline.prepare_sample_and_melody(source, stage)
                     repeated = pipeline.prepare_sample_and_melody(source, stage)
                 self.assertEqual(result["sample_mode_count"], 3)
+                self.assertEqual(result["melody_note_mode_count"], 3)
+                self.assertEqual(
+                    [item["asset_id"] for item in result["sample_mode"]],
+                    [item["asset_id"] for item in result["melody_note_mode"]],
+                )
+                for asset in result["melody_note_mode"]:
+                    self.assertEqual(asset["musical_metadata"]["melody_asset_role"], "SINGLE_GUITAR_NOTE")
+                    self.assertTrue(asset["musical_metadata"]["one_sound_one_note"])
+                    self.assertIn("MELODY_MODE", asset["engine_targets"])
                 self.assertTrue(all(item.get("reused_existing") is False
                                     for item in result["sample_mode"] + result["melody_mode"]))
                 self.assertEqual(repeated["sample_mode_count"], 3)
+                self.assertEqual(repeated["melody_note_mode_count"], 3)
                 self.assertEqual(repeated["melody_mode_count"], 1)
                 self.assertTrue(all(item.get("reused_existing") is True
                                     for item in repeated["sample_mode"] + repeated["melody_mode"]))
@@ -75,7 +85,7 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                 self.assertFalse(result["source_modified"])
                 self.assertEqual(result["review_status"], "NEEDS_MUSICAL_REVIEW")
                 self.assertEqual(result["license_status"], "UNREVIEWED")
-                for asset in result["sample_mode"] + result["melody_mode"]:
+                for asset in result["sample_mode"] + result["melody_note_mode"] + result["melody_mode"]:
                     self.assertEqual(asset["source_sha256"], _hash(source))
                     self.assertTrue(Path(asset["derived_path"]).is_file())
                     with wave.open(asset["derived_path"], "rb") as clip:
