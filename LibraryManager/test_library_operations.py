@@ -128,6 +128,13 @@ class LibraryOperationsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             distribution_plan([self.manifest], self.samples, self.staging)
 
+    def test_original_source_change_after_plan_blocks_factory_copy(self) -> None:
+        plan = distribution_plan([self.manifest], self.samples, self.staging)
+        self.original.write_bytes(self.original.read_bytes() + b"changed")
+        with self.assertRaises(RuntimeError):
+            distribute_assets(plan, approve=True, journal_path=self.journal)
+        self.assertFalse(Path(plan["entries"][0]["destination_path"]).exists())
+
     def test_changed_staged_asset_is_rejected(self) -> None:
         self.staged.write_bytes(self.staged.read_bytes() + b"tampered")
         with self.assertRaises(ValueError):
