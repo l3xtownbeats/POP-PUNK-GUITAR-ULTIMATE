@@ -95,6 +95,32 @@ def prepare_sample_and_melody(
             })
     if _sha256(source) != source_hash:
         raise RuntimeError("Source SHA-256 changed since Sample/Melody analysis")
+
+    # Collapse duplicate frame hypotheses that resolve to exactly the same
+    # source sample range. Keep alternative note labels in the manifest so
+    # ambiguity remains visible instead of attempting duplicate WAV writes.
+    deduplicated: dict[tuple[int, int], dict[str, Any]] = {}
+    for event in events:
+        key = (int(event["source_start_sample"]), int(event["source_end_sample"]))
+        current = deduplicated.get(key)
+        if current is None:
+            deduplicated[key] = dict(event)
+            deduplicated[key]["alternative_pitch_candidates"] = []
+            continue
+        alternative = {
+            "midi_note_candidate": event.get("midi_note_candidate"),
+            "note_name_candidate": event.get("note_name_candidate"),
+            "confidence": event.get("confidence"),
+        }
+        current["alternative_pitch_candidates"].append(alternative)
+        if float(event.get("confidence") or 0.0) > float(current.get("confidence") or 0.0):
+            alternatives = current["alternative_pitch_candidates"]
+            deduplicated[key] = dict(event)
+            deduplicated[key]["alternative_pitch_candidates"] = alternatives
+    events = sorted(deduplicated.values(), key=lambda item: (
+        int(item["source_start_sample"]), int(item["source_end_sample"])
+    ))
+
     clips_dir, manifests_dir = root / "clips", root / "manifests"
     for folder in (clips_dir, manifests_dir):
         folder.mkdir(parents=True, exist_ok=True)
@@ -141,8 +167,7 @@ def prepare_sample_and_melody(
             # with FileExistsError; record the path only after a successful write.
             if clip.exists() or manifest.exists():
                 raise FileExistsError(f"Refusing to overwrite staged Sample asset {asset_id}")
-            if clip.exists() or manifest.exists():
-                raise FileExistsError(f"Refusing to overwrite staged Melody asset {asset_id}")
+            # The range writer creates the WAV exclusively ("x").
             clip_info = _write_clip(source, start, end, clip, rate)
             created.append(clip)
             record = _record(
@@ -153,6 +178,7 @@ def prepare_sample_and_melody(
                  "detected_note_start_seconds": event.get("detected_note_start_seconds"),
                  "detected_note_end_seconds": event.get("detected_note_end_seconds"),
                  "confidence": event.get("confidence"),
+                 "alternative_pitch_candidates": event.get("alternative_pitch_candidates", []),
                  "source_filename_metadata": source_metadata or {}},
             )
             _write_manifest(manifest, record)
@@ -169,6 +195,8 @@ def prepare_sample_and_melody(
             asset_id = _identity(source_hash, "MELODY_PHRASE", start, end)
             clip = clips_dir / f"MELODY-{asset_id}.wav"
             manifest = manifests_dir / f"MELODY-{asset_id}.json"
+            if clip.exists() or manifest.exists():
+                raise FileExistsError(f"Refusing to overwrite staged Melody asset {asset_id}")
             clip_info = _write_clip(source, start, end, clip, rate)
             created.append(clip)
             record = _record(
