@@ -83,6 +83,12 @@ class ModeSorterTests(unittest.TestCase):
                   next(x for x in report["modes"] if x["mode"] == "SAMPLE MODE")["candidates"]}
         self.assertIn("CHORD_SAMPLE", sample)
         self.assertIn("POWER_CHORD_SAMPLE", sample)
+        modes = {item["mode"]: item for item in report["modes"]}
+        self.assertGreater(modes["ARPEGGIO"]["candidate_count"], 0)
+        voicing = modes["ARPEGGIO"]["candidates"][0]["voicing_candidates"]
+        self.assertTrue(voicing)
+        self.assertTrue(all(item["review_status"] == "NEEDS_MUSICAL_REVIEW"
+                            for item in voicing))
 
     def test_strumming_arpeggio_articulations_and_ending_are_not_guessed(self):
         report = build_mode_sorting_report([record()])
