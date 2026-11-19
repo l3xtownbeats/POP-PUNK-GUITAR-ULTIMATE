@@ -123,9 +123,9 @@ def review_manifest(
     fd, temp_name = tempfile.mkstemp(prefix=manifest_path.name + ".", suffix=".tmp",
                                      dir=str(manifest_path.parent))
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\\n") as stream:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as stream:
             json.dump(record, stream, ensure_ascii=False, indent=2)
-            stream.write("\\n")
+            stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp_name, manifest_path)
