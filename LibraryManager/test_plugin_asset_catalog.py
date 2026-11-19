@@ -120,10 +120,11 @@ class PluginAssetCatalogTests(unittest.TestCase):
                 "derived_path": str(derived),
                 "derived_sha256": digest(derived),
                 "engine_targets": ["SAMPLE_MODE"],
-                "musical_metadata": {"license_evidence": "User-owned recording; verified"},
+                "musical_metadata": {"license_evidence": "User-owned recording; verified", "confirmed_midi_note": 60},
                 "review_status": "REVIEWED",
                 "license_status": "LICENSE_APPROVED",
                 "review_validation": {
+                    "musical_mapping_verified": True,
                     "source_sha256_verified": True,
                     "derived_sha256_verified": True,
                     "sample_boundaries_verified": True,
