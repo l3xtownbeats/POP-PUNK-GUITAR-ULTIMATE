@@ -66,7 +66,7 @@ def _yin_pitch(frame: list[float], sample_rate: float,
 
 
 def analyze_pitch_events(path: Path, *, frame_ms: int = 30,
-                         hop_ms: int = 40, min_hz: float = 65.0,
+                         hop_ms: int = 10, min_hz: float = 65.0,
                          max_hz: float = 1200.0,
                          min_event_seconds: float = 0.07) -> dict[str, Any]:
     if frame_ms < 20 or hop_ms < 5 or hop_ms > frame_ms:
