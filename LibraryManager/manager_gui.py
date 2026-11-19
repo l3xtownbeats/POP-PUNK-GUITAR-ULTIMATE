@@ -63,74 +63,274 @@ class LibraryManagerApp:
         self.root.after(100, self._poll_worker_events)
 
     def _build(self) -> None:
-        outer = ttk.Frame(self.root, padding=12)
-        outer.pack(fill="both", expand=True)
-        ttk.Label(outer, text="POP PUNK GUITAR LIBRARY MANAGER",
-                  font=("Segoe UI", 16, "bold")).pack(anchor="w")
-        ttk.Label(outer, text=f"Portable Library Manager • v{APP_VERSION}").pack(anchor="w", pady=(0, 10))
+        """Build the premium NEON STAGE dashboard without changing action handlers."""
+        self.root.configure(bg="#080B12")
+        self.root.geometry("1320x940")
+        self.root.minsize(1040, 760)
 
-        path_row = ttk.Frame(outer)
-        path_row.pack(fill="x", pady=4)
-        ttk.Label(path_row, text="Папка Samples / Import Sample Guitar:").pack(side="left")
-        ttk.Entry(path_row, textvariable=self.samples_root).pack(side="left", fill="x", expand=True, padx=8)
-        ttk.Button(path_row, text="Обзор…", command=self.choose_samples).pack(side="right")
+        bg = "#080B12"
+        panel = "#111824"
+        panel_alt = "#151F2D"
+        border = "#26354A"
+        text = "#EAF2FF"
+        muted = "#8D9DB4"
+        cyan = "#43E7F5"
+        violet = "#9B82FF"
+        green = "#69F0AE"
+        amber = "#FFC66D"
+        red = "#FF668A"
 
-        options = ttk.Frame(outer)
-        options.pack(fill="x", pady=6)
-        ttk.Checkbutton(options, text="ТЯЖЁЛЫЙ режим: акустический, pitch и ритмический анализ (медленнее)",
-                        variable=self.analyze_audio).pack(side="left")
-        ttk.Checkbutton(options, text="Подтверждаю гитарный материал (виртуальные кандидаты)",
-                        variable=self.guitar_confirmed).pack(side="left", padx=16)
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure(
+            "Neon.TButton", background="#1B2B3D", foreground=text,
+            bordercolor="#2C4962", lightcolor="#1B2B3D", darkcolor="#1B2B3D",
+            padding=(12, 8), font=("Segoe UI Semibold", 9), relief="flat",
+        )
+        style.map(
+            "Neon.TButton",
+            background=[("active", "#28435A"), ("disabled", "#151D29")],
+            foreground=[("disabled", "#65738A")],
+            bordercolor=[("active", cyan)],
+        )
+        style.configure(
+            "NeonDanger.TButton", background="#3B1D30", foreground="#FFEAF0",
+            bordercolor="#7D3455", padding=(12, 8),
+            font=("Segoe UI Semibold", 9), relief="flat",
+        )
+        style.map("NeonDanger.TButton", background=[("active", "#56243D")])
+        style.configure(
+            "Neon.TCheckbutton", background=panel, foreground=text,
+            font=("Segoe UI", 9), padding=(4, 4),
+        )
+        style.map(
+            "Neon.TCheckbutton",
+            background=[("active", panel)],
+            foreground=[("disabled", muted)],
+        )
 
-        actions = ttk.LabelFrame(outer, text="Рабочие операции", padding=8)
-        actions.pack(fill="x", pady=8)
-        buttons = [
-            ("1. Быстрое сканирование", self.quick_scan_only),
-            ("2. Быстрый глубокий анализ", self.deep_scan_only),
-            ("3. Полный цикл: анализ + извлечение", self.scan),
-            ("Предпрослушать WAV", self.preview_audio),
-            ("Остановить звук", self.stop_preview),
-            ("Сформировать каталог VST3", self.build_plugin_catalog),
-            ("Sample Browser / режимы VST3", self.open_plugin_browser),
+        outer = tk.Frame(self.root, bg=bg)
+        outer.pack(fill="both", expand=True, padx=18, pady=14)
+
+        # Header / brand area
+        header = tk.Frame(outer, bg=bg)
+        header.pack(fill="x", pady=(0, 12))
+        brand = tk.Frame(header, bg=bg)
+        brand.pack(side="left", fill="x", expand=True)
+        tk.Label(
+            brand, text="NEON STAGE  /  LIBRARY CONTROL",
+            bg=bg, fg=cyan, font=("Segoe UI", 9, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            brand, text="POP PUNK GUITAR",
+            bg=bg, fg=text, font=("Segoe UI", 25, "bold"),
+        ).pack(anchor="w", pady=(1, 0))
+        tk.Label(
+            brand,
+            text="Профессиональная подготовка, анализ и сборка гитарной библиотеки",
+            bg=bg, fg=muted, font=("Segoe UI", 10),
+        ).pack(anchor="w", pady=(2, 0))
+
+        version = tk.Frame(header, bg=panel, highlightbackground=border,
+                           highlightthickness=1, padx=16, pady=11)
+        version.pack(side="right", anchor="n")
+        tk.Label(version, text="MANAGER BUILD", bg=panel, fg=muted,
+                 font=("Segoe UI", 8, "bold")).pack(anchor="e")
+        tk.Label(version, text=APP_VERSION, bg=panel, fg=cyan,
+                 font=("Consolas", 11, "bold")).pack(anchor="e", pady=(3, 0))
+        tk.Label(version, text="NEON STAGE  •  DARK EDITION", bg=panel,
+                 fg=violet, font=("Segoe UI", 8, "bold")).pack(anchor="e", pady=(5, 0))
+
+        # Source folder selection
+        path_panel = tk.Frame(
+            outer, bg=panel, highlightbackground=border,
+            highlightthickness=1, padx=14, pady=10,
+        )
+        path_panel.pack(fill="x", pady=(0, 10))
+        path_head = tk.Frame(path_panel, bg=panel)
+        path_head.pack(fill="x")
+        tk.Label(path_head, text="БИБЛИОТЕКА ИСТОЧНИКОВ",
+                 bg=panel, fg=cyan, font=("Segoe UI", 9, "bold")).pack(side="left")
+        tk.Label(path_head, text="Выберите Samples или Import Sample Guitar",
+                 bg=panel, fg=muted, font=("Segoe UI", 8)).pack(side="right")
+        path_row = tk.Frame(path_panel, bg=panel)
+        path_row.pack(fill="x", pady=(7, 0))
+        self.samples_entry = tk.Entry(
+            path_row, textvariable=self.samples_root,
+            bg="#0B111B", fg=text, insertbackground=cyan,
+            relief="flat", highlightthickness=1,
+            highlightbackground=border, highlightcolor=cyan,
+            font=("Segoe UI", 10),
+        )
+        self.samples_entry.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 10))
+        browse = ttk.Button(path_row, text="ОБЗОР ПАПКИ", style="Neon.TButton",
+                            command=self.choose_samples)
+        browse.pack(side="right")
+
+        # Safe analysis options
+        settings = tk.Frame(outer, bg=panel, highlightbackground=border,
+                            highlightthickness=1, padx=12, pady=6)
+        settings.pack(fill="x", pady=(0, 12))
+        ttk.Checkbutton(
+            settings,
+            text="ТЯЖЁЛЫЙ АУДИОАНАЛИЗ  •  pitch / ритм / акустика (медленнее)",
+            variable=self.analyze_audio, style="Neon.TCheckbutton",
+        ).pack(side="left")
+        ttk.Checkbutton(
+            settings,
+            text="Подтверждаю, что источник уже отфильтрован как гитарный",
+            variable=self.guitar_confirmed, style="Neon.TCheckbutton",
+        ).pack(side="left", padx=(22, 0))
+
+        # Main workflow cards. Numbering follows the safe working order.
+        section_head = tk.Frame(outer, bg=bg)
+        section_head.pack(fill="x", pady=(0, 8))
+        tk.Label(section_head, text="ОСНОВНОЙ РАБОЧИЙ ПОТОК",
+                 bg=bg, fg=text, font=("Segoe UI", 12, "bold")).pack(side="left")
+        tk.Label(section_head, text="Выполняйте этапы по порядку  •  исходники защищены",
+                 bg=bg, fg=muted, font=("Segoe UI", 8)).pack(side="right")
+
+        cards = tk.Frame(outer, bg=bg)
+        cards.pack(fill="x")
+        for column in range(3):
+            cards.grid_columnconfigure(column, weight=1, uniform="workflow")
+
+        workflow = [
+            ("01", "Быстрое сканирование",
+             "Мгновенная инвентаризация папок и файлов. Без SHA-256 и декодирования аудио.",
+             self.quick_scan_only, cyan, "FAST SCAN"),
+            ("02", "Глубокая инвентаризация",
+             "Форматы, SHA-256, точные дубликаты и SFZ. Кэш повторно использует неизменённые файлы.",
+             self.deep_scan_only, violet, "DEEP INVENTORY"),
+            ("03", "Полный анализ и извлечение",
+             "Акустика, ноты, ритм и кандидаты фрагментов. Тяжёлый режим запускается отдельно.",
+             self.scan, green, "FULL ANALYSIS"),
+            ("04", "Извлечение PATTERN WAV",
+             "Физически экспортирует найденные повторяющиеся ритм-кандидаты в staging с provenance.",
+             self.extract_patterns, cyan, "PATTERN EXTRACT"),
+            ("05", "Очередь ручной проверки",
+             "Прослушайте исходник и WAV-кандидаты, поправьте границы и подтвердите музыкальные теги.",
+             self.open_review_queue, violet, "REVIEW QUEUE"),
+            ("06", "Каталог и структура VST3",
+             "Собирает десять режимов, карту 12 нот, velocity/technique coverage и Performance Manifest.",
+             self.build_plugin_catalog, green, "VST3 LIBRARY"),
+            ("07", "Финальная проверка",
+             "Проверяет staging и FACTORY: пути, WAV, manifests, хэши, review и license gates.",
+             self.finalize_library, cyan, "FINAL AUDIT"),
+            ("08", "Распределить одобренное",
+             "Копирует только подтверждённые материалы. Полный preflight, SHA-256, журнал и откат пакета.",
+             self.distribute, violet, "SAFE DISTRIBUTION"),
+            ("09", "Аудит перед очисткой",
+             "Проверяет все зависимости оригиналов и подтверждённые копии. Ничего не удаляет.",
+             self.audit_cleanup, amber, "CLEANUP PREFLIGHT"),
+            ("10", "Удалить оригиналы",
+             "Финальный опасный этап. Только после полного аудита и двух отдельных подтверждений.",
+             self.cleanup, red, "DESTRUCTIVE — LAST"),
+        ]
+
+        self._action_buttons = []
+        for index, (number, title, description, command, accent, tag) in enumerate(workflow):
+            row, column = divmod(index, 3)
+            card = tk.Frame(
+                cards, bg=panel, highlightbackground=border,
+                highlightthickness=1, padx=12, pady=10,
+            )
+            card.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
+            tk.Frame(card, bg=accent, height=3).pack(fill="x", pady=(0, 8))
+            top = tk.Frame(card, bg=panel)
+            top.pack(fill="x")
+            tk.Label(
+                top, text=number, bg=panel, fg=accent,
+                font=("Consolas", 16, "bold"),
+            ).pack(side="left")
+            tk.Label(
+                top, text=tag, bg=panel, fg=muted,
+                font=("Segoe UI", 8, "bold"),
+            ).pack(side="right")
+            tk.Label(
+                card, text=title, bg=panel, fg=text,
+                font=("Segoe UI", 10, "bold"), anchor="w",
+            ).pack(fill="x", pady=(3, 3))
+            tk.Label(
+                card, text=description, bg=panel, fg=muted,
+                font=("Segoe UI", 8), justify="left", anchor="nw",
+                wraplength=350, height=3,
+            ).pack(fill="both", expand=True, pady=(0, 8))
+            button_style = "NeonDanger.TButton" if number == "10" else "Neon.TButton"
+            button = ttk.Button(
+                card, text=("УДАЛИТЬ ПОСЛЕ АУДИТА" if number == "10" else "ОТКРЫТЬ ЭТАП"),
+                command=command, style=button_style,
+            )
+            button.pack(fill="x")
+            self._action_buttons.append(button)
+
+        # Secondary utilities kept available but visually separated from the
+        # mandatory numbered sequence.
+        tools_panel = tk.Frame(
+            outer, bg=panel, highlightbackground=border,
+            highlightthickness=1, padx=12, pady=9,
+        )
+        tools_panel.pack(fill="x", pady=(11, 9))
+        tools_header = tk.Frame(tools_panel, bg=panel)
+        tools_header.pack(fill="x", pady=(0, 7))
+        tk.Label(tools_header, text="СТУДИЙНЫЕ ИНСТРУМЕНТЫ",
+                 bg=panel, fg=cyan, font=("Segoe UI", 9, "bold")).pack(side="left")
+        tk.Label(tools_header, text="Вспомогательные действия",
+                 bg=panel, fg=muted, font=("Segoe UI", 8)).pack(side="right")
+        tools = [
+            ("Sample Browser / VST3", self.open_plugin_browser),
             ("Pattern Song Manager", self.open_pattern_song_library),
             ("12 нот / Auto Chords", self.open_chromatic_pitch_map),
-            ("Аудит папки OTHER", self.audit_other),
-            ("Распределить одобренное в OTHER", self.distribute_other),
-            ("Отдельное извлечение Pattern WAV", self.extract_patterns),
-            ("Очередь ручной проверки", self.open_review_queue),
-            ("4. Проверить WAV-кандидат", self.review_candidate),
-            ("5. Финализировать staging + FACTORY", self.finalize_library),
-            ("6. Распределить проверенные материалы", self.distribute),
-            ("Полный аудит очистки Import", self.audit_cleanup),
-            ("Удалить оригиналы после полного аудита", self.cleanup),
-            ("Открыть отчёты", self.open_reports),
+            ("Прослушать WAV", self.preview_audio),
+            ("Остановить звук", self.stop_preview),
+            ("Аудит OTHER", self.audit_other),
+            ("Направить в OTHER", self.distribute_other),
+            ("Отчёты", self.open_reports),
             ("История задач", self.show_task_history),
             ("Открыть staging", self.open_staging),
-            ("ИНСТРУКЦИЯ: порядок работы", self.open_user_guide),
+            ("Инструкция", self.open_user_guide),
         ]
-        for column in range(3):
-            actions.columnconfigure(column, weight=1)
-        for index, (label, command) in enumerate(buttons):
-            button = ttk.Button(actions, text=label, command=command)
-            button.grid(row=index // 3, column=index % 3, sticky="ew", padx=4, pady=3)
+        tool_grid = tk.Frame(tools_panel, bg=panel)
+        tool_grid.pack(fill="x")
+        for column in range(4):
+            tool_grid.grid_columnconfigure(column, weight=1, uniform="tools")
+        self._action_buttons.extend([])
+        for index, (label, command) in enumerate(tools):
+            button = ttk.Button(tool_grid, text=label, command=command, style="Neon.TButton")
+            button.grid(row=index // 4, column=index % 4, sticky="ew", padx=3, pady=3)
             self._action_buttons.append(button)
-        cancel_row = (len(buttons) + 2) // 3
-        self._cancel_button = ttk.Button(actions, text="ОСТАНОВИТЬ задачу", command=self.cancel_job, state="disabled")
-        self._cancel_button.grid(row=cancel_row, column=0, columnspan=3, sticky="ew", padx=4, pady=5)
 
-        log_header = ttk.Frame(outer)
-        log_header.pack(fill="x", pady=(8, 2))
-        ttk.Label(log_header, text="Журнал работы:").pack(side="left")
-        ttk.Button(log_header, text="Копировать выделенное",
-                   command=self.copy_log_selection).pack(side="right", padx=(4, 0))
-        ttk.Button(log_header, text="Копировать весь журнал",
-                   command=self.copy_log_all).pack(side="right")
-        ttk.Button(log_header, text="Выделить всё",
-                   command=self.select_log_all).pack(side="right", padx=(4, 4))
-        log_frame = ttk.Frame(outer)
+        # Persistent activity console
+        log_panel = tk.Frame(
+            outer, bg="#0C121D", highlightbackground=border,
+            highlightthickness=1, padx=10, pady=8,
+        )
+        log_panel.pack(fill="both", expand=True)
+        log_header = tk.Frame(log_panel, bg="#0C121D")
+        log_header.pack(fill="x", pady=(0, 5))
+        tk.Label(log_header, text="LIVE ACTIVITY  /  ЖУРНАЛ",
+                 bg="#0C121D", fg=cyan, font=("Segoe UI", 9, "bold")).pack(side="left")
+        log_actions = tk.Frame(log_header, bg="#0C121D")
+        log_actions.pack(side="right")
+        for label, command in (
+            ("Выделить всё", self.select_log_all),
+            ("Копировать выделенное", self.copy_log_selection),
+            ("Копировать весь журнал", self.copy_log_all),
+        ):
+            ttk.Button(log_actions, text=label, style="Neon.TButton",
+                       command=command).pack(side="left", padx=2)
+
+        log_frame = tk.Frame(log_panel, bg="#0C121D")
         log_frame.pack(fill="both", expand=True)
-        self.log = tk.Text(log_frame, wrap="word", height=22, font=("Consolas", 9),
-                           exportselection=True, undo=False)
+        self.log = tk.Text(
+            log_frame, wrap="word", height=7, font=("Consolas", 9),
+            bg="#080E17", fg="#C8D6E8", insertbackground=cyan,
+            selectbackground="#24465B", relief="flat", padx=10, pady=8,
+            exportselection=True, undo=False,
+        )
         log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log.yview)
         self.log.configure(yscrollcommand=log_scroll.set)
         self.log.pack(side="left", fill="both", expand=True)
@@ -141,11 +341,31 @@ class LibraryManagerApp:
         self.log.bind("<Control-C>", self.copy_log_selection)
         self.log.bind("<Button-3>", self.show_log_context_menu)
         self.log.configure(state="disabled")
-        ttk.Label(outer, textvariable=self.status, relief="sunken", anchor="w").pack(fill="x", pady=(8, 0))
 
-        self._write("Менеджер не перемещает и не удаляет исходники при анализе.\n"
-                    "FACTORY принимает только REVIEWED + LICENSE_APPROVED WAV.\n"
-                    "Кандидаты и неподтверждённые материалы остаются в staging/Import Sample Guitar.\n")
+        # Status line; no fake percentage is shown because stages do not yet
+        # expose a uniform measurable progress fraction.
+        status_panel = tk.Frame(
+            outer, bg="#101C2A", highlightbackground="#28516A",
+            highlightthickness=1, padx=10, pady=7,
+        )
+        status_panel.pack(fill="x", pady=(8, 0))
+        tk.Label(status_panel, text="●", bg="#101C2A", fg=green,
+                 font=("Segoe UI", 11, "bold")).pack(side="left", padx=(0, 7))
+        tk.Label(
+            status_panel, textvariable=self.status, bg="#101C2A",
+            fg=text, font=("Segoe UI", 9), anchor="w",
+        ).pack(side="left", fill="x", expand=True)
+        self._cancel_button = ttk.Button(
+            status_panel, text="ОСТАНОВИТЬ ТЕКУЩУЮ ЗАДАЧУ",
+            command=self.cancel_job, style="NeonDanger.TButton", state="disabled",
+        )
+        self._cancel_button.pack(side="right", padx=(8, 0))
+
+        self._write(
+            "NEON STAGE готов. Основной цикл пронумерован по безопасному порядку.\\n"
+            "Исходники не меняются при сканировании и анализе. FACTORY принимает только REVIEWED + LICENSE_APPROVED WAV.\\n"
+            "Длинные/неровные записи и обычные ровные лупы обрабатываются по разным правилам; автоматические кандидаты требуют прослушивания.\\n"
+        )
 
     def _copy_log_text(self, value: str) -> None:
         if not value:
