@@ -66,6 +66,24 @@ class ManifestReviewTests(unittest.TestCase):
             self.assertEqual(record["musical_metadata"]["format_family"], "WAV")
             self.assertTrue(record["review_validation"]["source_sha256_verified"])
 
+    def test_review_records_only_explicit_valid_mode_assignments(self):
+        manifest, staging, source, derived = self._staged_asset()
+        result = review_manifest(
+            manifest, staging,
+            style_family="POP_PUNK",
+            instrument_family="ELECTRIC_GUITAR",
+            asset_role="SINGLE_NOTE",
+            tone_family="CLEAN",
+            musical_review_notes="Confirmed note attack and source boundaries.",
+            license_evidence="Original user recording; rights confirmed.",
+            approve_musical_review=True,
+            approve_license=True,
+            mode_assignments=["SAMPLE MODE", "MELODY MODE"],
+        )
+        record = json.loads(manifest.read_text(encoding="utf-8"))
+        self.assertEqual(record["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
+        self.assertEqual(result["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
+
     def test_license_unknown_cannot_be_approved_without_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
