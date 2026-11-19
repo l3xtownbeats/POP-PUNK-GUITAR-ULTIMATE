@@ -172,11 +172,36 @@ def distribute_assets(plan: dict[str, Any], *, approve: bool = False,
     journal = (journal_path or (Path(plan["samples_root"]) / "FACTORY" /
                                 "LibraryManagerReports" / "operations.jsonl")).resolve()
     results = []
+    verified_originals: dict[str, str] = {}
     for entry in plan["entries"]:
         source = Path(entry["source_path"]).resolve()
         destination = Path(entry["destination_path"]).resolve()
         if not source.is_file() or sha256_file(source) != entry["source_sha256"]:
             raise RuntimeError(f"Staged source changed before distribution: {source}")
+        manifest_record = json.loads(Path(entry["manifest_path"]).read_text(encoding="utf-8"))
+        if manifest_record.get("review_status") not in APPROVED_REVIEW_STATES or manifest_record.get("license_status") != "LICENSE_APPROVED":
+            raise RuntimeError("Review/license approval changed after the distribution plan was created")
+        tags = manifest_record.get("musical_metadata") or {}
+        if not str(tags.get("license_evidence", "")).strip() or not str(tags.get("musical_review_notes", "")).strip():
+            raise RuntimeError("Review or license evidence is missing at distribution time")
+        validation = manifest_record.get("review_validation") or {}
+        if not all(validation.get(key) is True for key in (
+            "source_sha256_verified", "derived_sha256_verified",
+            "sample_boundaries_verified", "explicit_musical_approval",
+            "explicit_license_approval",
+        )):
+            raise RuntimeError("Explicit review/license validation evidence changed")
+        original = Path(manifest_record.get("source_path", ""))
+        expected_original = str(manifest_record.get("source_sha256", "")).upper()
+        original_key = str(original.resolve())
+        actual_original = verified_originals.get(original_key)
+        if actual_original is None:
+            if not original.is_file() or not expected_original:
+                raise RuntimeError("Original source is missing at distribution time")
+            actual_original = sha256_file(original)
+            verified_originals[original_key] = actual_original
+        if actual_original != expected_original:
+            raise RuntimeError("Original source changed after review; refusing Factory copy")
         factory_root = (Path(plan["samples_root"]).resolve() / "FACTORY").resolve()
         if not _inside(destination, factory_root):
             raise ValueError("Destination escaped FACTORY")
