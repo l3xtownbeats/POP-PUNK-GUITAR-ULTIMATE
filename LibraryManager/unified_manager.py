@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from audio_analysis import analyse_wav
+from asset_classifier import classify_wav
 from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, sha256_file, wav_info
 from pattern_pipeline import build_pattern_report
 from sfz_parser import parse_sfz_file
@@ -78,6 +79,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     included = [path for path in all_files if not _is_excluded(path.relative_to(incoming))]
     inventory: list[dict[str, Any]] = []
     audio_reports: list[dict[str, Any]] = []
+    classification_reports: list[dict[str, Any]] = []
     sfz_rows: list[dict[str, Any]] = []
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
     errors: list[dict[str, str]] = []
@@ -110,6 +112,11 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     try:
                         acoustic = analyse_wav(path)
                         acoustic["source_sha256"] = digest
+                        classification = classify_wav(path, analyze_pitch=True)
+                        classification["source_sha256"] = digest
+                        classification["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
+                        classification["automatic_factory_promotion"] = False
+                        classification_reports.append(classification)
                         pattern = build_pattern_report(acoustic)
                         audio_record: dict[str, Any] = {
                             "source_path": str(path.resolve()),
@@ -127,6 +134,10 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                                 ]
                         audio_reports.append(audio_record)
                         row["audio_analysis_status"] = "ANALYZED"
+                        row["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
+                        row["asset_kind_candidate"] = classification.get("asset_kind_candidate", "UNKNOWN")
+                        row["sample_subtype_candidate"] = classification.get("sample_subtype_candidate", "UNKNOWN")
+                        row["classification_confidence"] = classification.get("classification_confidence")
                         row["pattern_candidate_count"] = pattern["pattern_analysis"]["candidate_count"]
                         row["virtual_region_count"] = (
                             audio_record["virtual_extraction"]["candidate_count"]
@@ -177,6 +188,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "audio_analysis_enabled": analyze_audio,
         "guitar_source_manually_confirmed": guitar_source_confirmed,
         "audio_files_analyzed": len(audio_reports),
+        "asset_classifications_created": len(classification_reports),
+        "classification_policy": "CANDIDATE_ONLY_REQUIRES_HUMAN_REVIEW",
         "repeated_rhythm_pattern_candidates": sum(
             item["pattern_analysis"]["pattern_analysis"]["candidate_count"] for item in audio_reports
         ),
@@ -195,6 +208,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_csv(reports / "unified_sfz_references.csv", sfz_rows)
     _write_json(reports / "unified_exact_duplicates.json", duplicates)
     _write_json(reports / "unified_audio_analysis.json", audio_reports)
+    _write_json(reports / "unified_asset_classification.json", classification_reports)
     _write_json(reports / "unified_errors.json", errors)
     _write_json(reports / "unified_summary.json", summary)
     return summary
