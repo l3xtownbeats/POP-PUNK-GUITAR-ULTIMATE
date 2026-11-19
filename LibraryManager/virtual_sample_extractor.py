@@ -365,6 +365,148 @@ def extract_virtual_ranges(
         raise
 
 
+
+def extract_virtual_ranges(
+    report: dict[str, Any],
+    staging_root: Path | None = None,
+    *,
+    max_clips: int = 100,
+    min_duration_ms: int = 250,
+    cancel_event: Any = None,
+    progress: Any = None,
+) -> list[dict[str, Any]]:
+    """Materialize reviewed-range candidates as PCM_24 WAVs in staging.
+
+    This creates real audio files from the exact sample offsets discovered by
+    analyze_long_wav. It does not label a broad active region as a verified
+    riff, loop, chord or melody. Source WAVs are read-only and each manifest
+    keeps the original path/hash and exact frame range.
+    """
+    if max_clips < 0 or max_clips > 1000 or min_duration_ms < 1:
+        raise ValueError("Invalid virtual-range extraction limits")
+    if max_clips == 0:
+        return []
+
+    from audio_range_io import audio_source_info, write_pcm_wav_range
+    from audio_segmenter import STAGING_BASE, _safe_staging_root
+
+    root = _safe_staging_root(staging_root or STAGING_BASE)
+    source = Path(report.get("source_path") or "").expanduser().resolve()
+    expected_hash = str(report.get("source_sha256") or "").upper()
+    if not source.is_file() or not expected_hash:
+        raise ValueError("Virtual range report must identify an existing source and SHA-256")
+    if sha256_file(source) != expected_hash:
+        raise RuntimeError("Source SHA-256 changed since virtual-range analysis")
+
+    info = audio_source_info(source)
+    expected_rate = int(report.get("sample_rate") or 0)
+    if expected_rate != info.framerate:
+        raise RuntimeError("Virtual-range sample rate no longer matches source")
+    if int(report.get("total_frames") or -1) != info.frames:
+        raise RuntimeError("Virtual-range frame count no longer matches source")
+
+    clips_dir = root / "clips"
+    manifests_dir = root / "manifests"
+    for folder in (clips_dir, manifests_dir):
+        folder.mkdir(parents=True, exist_ok=True)
+        try:
+            folder.resolve().relative_to(root)
+            folder.resolve().relative_to(STAGING_BASE)
+        except ValueError as exc:
+            raise ValueError("Staging subdirectories must not resolve outside LibraryManager/staging") from exc
+
+    candidates = report.get("candidates")
+    if not isinstance(candidates, list):
+        raise ValueError("Virtual-range report has no candidate list")
+
+    results: list[dict[str, Any]] = []
+    created: list[Path] = []
+    try:
+        for candidate in candidates[:max_clips]:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Virtual-range extraction stopped by user")
+            start = int(candidate.get("source_start_sample", -1))
+            end = int(candidate.get("source_end_sample", -1))
+            if start < 0 or end <= start or end > info.frames:
+                raise ValueError("Virtual candidate contains an invalid source frame range")
+            duration_ms = (end - start) * 1000.0 / info.framerate
+            if duration_ms < min_duration_ms:
+                continue
+
+            identity = hashlib.sha256(
+                f"{expected_hash}:SOUND_ACTIVE_REGION:{start}:{end}:{VERSION}".encode("utf-8")
+            ).hexdigest()[:24].upper()
+            clip = clips_dir / f"REGION-{identity}.wav"
+            manifest = manifests_dir / f"REGION-{identity}.json"
+            if clip.exists() or manifest.exists():
+                raise FileExistsError(f"Refusing to overwrite staged virtual-range asset {identity}")
+
+            clip_info = write_pcm_wav_range(
+                source, start, end, clip, expected_rate=info.framerate,
+            )
+            created.append(clip)
+            record = {
+                "schema_version": 1,
+                "asset_id": identity,
+                "parent_asset_id": expected_hash,
+                "source_path": str(source),
+                "source_sha256": expected_hash,
+                "source_start_sample": start,
+                "source_end_sample": end,
+                "source_start_seconds": round(start / info.framerate, 6),
+                "source_end_seconds": round(end / info.framerate, 6),
+                "sample_rate": info.framerate,
+                "channels": clip_info["channels"],
+                "source_sample_width_bytes": info.sampwidth,
+                "sample_width_bytes": clip_info["sample_width_bytes"],
+                "source_format": info.source_format,
+                "source_subtype": info.source_subtype,
+                "derived_format": clip_info["derived_format"],
+                "derived_subtype": clip_info["derived_subtype"],
+                "frame_count": end - start,
+                "duration_seconds": round((end - start) / info.framerate, 6),
+                "derived_path": str(clip),
+                "derived_sha256": sha256_file(clip),
+                "kind": "sound_active_region_candidate",
+                "engine_targets": [],
+                "musical_metadata": {
+                    "candidate_type": candidate.get("candidate_type", "SOUND_ACTIVE_REGION"),
+                    "acoustic_fingerprint": candidate.get("acoustic_fingerprint", ""),
+                    "fingerprint_algorithm": candidate.get("fingerprint_algorithm", ""),
+                    "proposed_group": candidate.get("proposed_group", "REVIEW_REQUIRED"),
+                    "classification": "UNKNOWN_REQUIRES_LISTENING",
+                    "musical_review_notes": "",
+                    "license_evidence": "",
+                },
+                "confidence": None,
+                "review_status": "NEEDS_MUSICAL_REVIEW",
+                "license_status": "UNREVIEWED",
+                "extractor": "virtual_sample_extractor",
+                "extractor_version": VERSION,
+                "automatic_factory_promotion": False,
+                "automatic_destructive_action": "NONE",
+            }
+            try:
+                with manifest.open("x", encoding="utf-8") as stream:
+                    json.dump(record, stream, ensure_ascii=False, indent=2)
+                    stream.write("\\n")
+            except Exception:
+                clip.unlink(missing_ok=True)
+                raise
+            created.append(manifest)
+            results.append(record)
+            if progress and (len(results) == 1 or len(results) % 10 == 0):
+                progress(f"Извлечено WAV-отрывков из длинной записи: {len(results)}/{min(max_clips, len(candidates))}")
+
+        if sha256_file(source) != expected_hash:
+            raise RuntimeError("Source SHA-256 changed during virtual-range extraction")
+        return results
+    except Exception:
+        for path in reversed(created):
+            path.unlink(missing_ok=True)
+        raise
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Index useful ranges in a guitar WAV without slicing the audio.")
     parser.add_argument("wav", type=Path)
