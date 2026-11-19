@@ -434,3 +434,13 @@ The unified run now emits `reviewed_mode_assignment_index.json` beside the analy
 All ten approved modes are always represented. One staged WAV can be logically assigned to several modes without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
 
 Version 3.0 remains a development build until the complete Windows regression suite, portable package smoke test, real-library validation, and user-side workflow checks are successful.
+
+## Manager 3.0 — plugin library structure and coverage
+
+The **Сформировать каталог VST3** action now produces four coordinated artifacts beside the catalog:
+- `plugin_asset_catalog_*.json` — validated asset and ten-mode queues;
+- `plugin_library_structure_*.json` — logical library layout for SAMPLE, PATTERN and MELODY engines, with all ten Manager mode sections and provenance-linked asset references;
+- `plugin_library_coverage_*.json` — explicit coverage/gap report for 12 pitch classes, LOW/MEDIUM/HIGH velocity layers, confirmed techniques, Pattern event structure and Melody note/event timing;
+- `chromatic_pitch_map_*.json` and `performance_manifest_*.json` — shared chromatic mapping and runtime contract.
+
+The structure builder does not copy WAV files. One physical staged asset may be referenced from several modes by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
