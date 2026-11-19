@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Unified, non-destructive POP PUNK GUITAR Library Manager entry point.
+
+Combines inventory/SHA-256/WAV metadata/SFZ audit with the existing acoustic,
+rhythm, repeated-pattern and optional virtual-range analyzers. Original assets
+are read-only. Derived reports live under LibraryManager/reports; virtual
+sidecars are opt-in and live under Import Sample Guitar.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import os
+import re
+import sys
+from collections import defaultdict
+from pathlib import Path
+from typing import Any
+
+from audio_analysis import analyse_wav
+from library_manager import AUDIO_EXT, ARCHIVE_EXT, EXCLUDED_LABEL_RE, sha256_file, wav_info
+from pattern_pipeline import build_pattern_report
+from sfz_parser import parse_sfz_file
+from virtual_sample_extractor import analyze_long_wav, write_virtual_index
+
+VERSION = "1.0.0"
+SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
+
+
+def _is_excluded(path: Path) -> bool:
+    return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
+
+
+def _write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if path.exists():
+        raise FileExistsError(f"Refusing to overwrite report: {path}")
+    temporary.replace(path)
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise FileExistsError(f"Refusing to overwrite report: {path}")
+    if not rows:
+        path.write_text("", encoding="utf-8-sig")
+        return
+    fields = list(dict.fromkeys(key for row in rows for key in row))
+    with path.open("x", newline="", encoding="utf-8-sig") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def run_manager(samples_root: Path, *, analyze_audio: bool = False,
+                guitar_source_confirmed: bool = False,
+                write_virtual: bool = False) -> dict[str, Any]:
+    samples_root = samples_root.expanduser().resolve()
+    incoming = samples_root / "Import Sample Guitar"
+    if not incoming.is_dir():
+        raise FileNotFoundError(f"Expected incoming folder not found: {incoming}")
+    if write_virtual and not (analyze_audio and guitar_source_confirmed):
+        raise ValueError("--write-virtual-index requires --analyze-audio and --guitar-source-confirmed")
+
+    manager_root = Path(__file__).resolve().parent
+    reports = manager_root / "reports"
+    reports.mkdir(parents=True, exist_ok=True)
+
+    all_files = sorted(path for path in incoming.rglob("*") if path.is_file())
+    excluded = [path for path in all_files if _is_excluded(path.relative_to(incoming))]
+    included = [path for path in all_files if not _is_excluded(path.relative_to(incoming))]
+    inventory: list[dict[str, Any]] = []
+    audio_reports: list[dict[str, Any]] = []
+    sfz_rows: list[dict[str, Any]] = []
+    duplicate_groups: dict[str, list[str]] = defaultdict(list)
+    errors: list[dict[str, str]] = []
+
+    for path in included:
+        ext = path.suffix.lower()
+        if ext not in SUPPORTED:
+            continue
+        relative = str(path.relative_to(incoming))
+        try:
+            stat = path.stat()
+            digest = sha256_file(path)
+            row: dict[str, Any] = {
+                "relative_path": relative,
+                "filename": path.name,
+                "extension": ext,
+                "bytes": stat.st_size,
+                "sha256": digest,
+                "source_path": str(path.resolve()),
+                "source_modified_by_manager": False,
+            }
+            if ext in AUDIO_EXT:
+                meta = wav_info(path)
+                row.update(meta)
+                row["category_suggestion"] = (
+                    "AUDIO_SAMPLE" if meta.get("wav_status") in {"OK", "NON_PCM_OR_EXTENSIBLE"}
+                    else "OTHER_REVIEW_REQUIRED"
+                )
+                if analyze_audio and row.get("wav_status") in {"OK", "NON_PCM_OR_EXTENSIBLE"}:
+                    try:
+                        acoustic = analyse_wav(path)
+                        acoustic["source_sha256"] = digest
+                        pattern = build_pattern_report(acoustic)
+                        audio_record: dict[str, Any] = {
+                            "source_path": str(path.resolve()),
+                            "source_sha256": digest,
+                            "acoustic_analysis": acoustic,
+                            "pattern_analysis": pattern,
+                            "virtual_extraction": None,
+                        }
+                        if guitar_source_confirmed:
+                            virtual = analyze_long_wav(path, guitar_source_confirmed=True)
+                            audio_record["virtual_extraction"] = virtual
+                            if write_virtual:
+                                audio_record["virtual_index_files"] = [
+                                    str(p) for p in write_virtual_index(virtual, incoming)
+                                ]
+                        audio_reports.append(audio_record)
+                        row["audio_analysis_status"] = "ANALYZED"
+                        row["pattern_candidate_count"] = pattern["pattern_analysis"]["candidate_count"]
+                        row["virtual_region_count"] = (
+                            audio_record["virtual_extraction"]["candidate_count"]
+                            if audio_record["virtual_extraction"] else ""
+                        )
+                    except Exception as exc:
+                        row["audio_analysis_status"] = "ERROR"
+                        errors.append({"path": relative, "stage": "AUDIO_ANALYSIS",
+                                       "error": f"{type(exc).__name__}: {exc}"})
+                elif analyze_audio:
+                    row["audio_analysis_status"] = "SKIPPED_INVALID_WAV"
+            elif ext == ".sfz":
+                row["category_suggestion"] = "SFZ_INSTRUMENT"
+            else:
+                row["category_suggestion"] = "ARCHIVE_REVIEW_REQUIRED"
+            inventory.append(row)
+            duplicate_groups[digest].append(relative)
+        except Exception as exc:
+            errors.append({"path": relative, "stage": "INVENTORY",
+                           "error": f"{type(exc).__name__}: {exc}"})
+
+    for sfz in (p for p in included if p.suffix.lower() == ".sfz"):
+        try:
+            sfz_rows.extend(parse_sfz_file(sfz, incoming))
+        except Exception as exc:
+            errors.append({"path": str(sfz.relative_to(incoming)), "stage": "SFZ_PARSE",
+                           "error": f"{type(exc).__name__}: {exc}"})
+
+    duplicates = [
+        {"sha256": digest, "count": len(paths), "paths": paths}
+        for digest, paths in sorted(duplicate_groups.items()) if len(paths) > 1
+    ]
+    summary = {
+        "manager_version": VERSION,
+        "samples_root": str(samples_root),
+        "incoming_folder": str(incoming),
+        "files_scanned": len(inventory),
+        "files_excluded_by_piano_bell_drum_path_label": len(excluded),
+        "wav_files": sum(row["extension"] in AUDIO_EXT for row in inventory),
+        "sfz_files": sum(row["extension"] == ".sfz" for row in inventory),
+        "archives_for_manual_review": sum(row["extension"] in ARCHIVE_EXT for row in inventory),
+        "exact_duplicate_groups": len(duplicates),
+        "sfz_sample_references": len(sfz_rows),
+        "sfz_missing_references": sum(row.get("status") == "MISSING" for row in sfz_rows),
+        "sfz_outside_library_references": sum(row.get("status") == "OUTSIDE_LIBRARY" for row in sfz_rows),
+        "audio_analysis_enabled": analyze_audio,
+        "guitar_source_manually_confirmed": guitar_source_confirmed,
+        "audio_files_analyzed": len(audio_reports),
+        "repeated_rhythm_pattern_candidates": sum(
+            item["pattern_analysis"]["pattern_analysis"]["candidate_count"] for item in audio_reports
+        ),
+        "virtual_active_region_candidates": sum(
+            item["virtual_extraction"]["candidate_count"]
+            for item in audio_reports if item["virtual_extraction"] is not None
+        ),
+        "errors": len(errors),
+        "source_files_modified": False,
+        "source_files_moved_or_deleted": False,
+        "automatic_factory_promotion": False,
+        "note": "Candidates are evidence for review, not confirmed riffs/notes/chords/sections. No source asset is changed."
+    }
+
+    _write_csv(reports / "unified_inventory.csv", inventory)
+    _write_csv(reports / "unified_sfz_references.csv", sfz_rows)
+    _write_json(reports / "unified_exact_duplicates.json", duplicates)
+    _write_json(reports / "unified_audio_analysis.json", audio_reports)
+    _write_json(reports / "unified_errors.json", errors)
+    _write_json(reports / "unified_summary.json", summary)
+    return summary
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Unified safe Library Manager: inventory, SFZ audit and optional audio analysis."
+    )
+    parser.add_argument("--samples", type=Path,
+                        default=Path(__file__).resolve().parent.parent / "Samples")
+    parser.add_argument("--analyze-audio", action="store_true",
+                        help="Run acoustic/rhythm/repeated-pattern analysis on valid WAV files.")
+    parser.add_argument("--guitar-source-confirmed", action="store_true",
+                        help="Operator confirms that input has already excluded Piano, Bell and Drum.")
+    parser.add_argument("--write-virtual-index", action="store_true",
+                        help="Write non-audio JSON range sidecars under Import Sample Guitar (never slices WAV).")
+    args = parser.parse_args()
+    try:
+        summary = run_manager(
+            args.samples,
+            analyze_audio=args.analyze_audio,
+            guitar_source_confirmed=args.guitar_source_confirmed,
+            write_virtual=args.write_virtual_index,
+        )
+    except Exception as exc:
+        print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    print(f"Reports: {Path(__file__).resolve().parent / 'reports'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
