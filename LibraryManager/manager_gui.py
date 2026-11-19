@@ -107,7 +107,7 @@ class LibraryManagerApp:
                 self.root.after(0, lambda: self._finish(title, result))
             except Exception as exc:
                 details = traceback.format_exc()
-                self.root.after(0, lambda: self._error(title, exc, details))
+                self.root.after(0, lambda error=exc, trace=details: self._error(title, error, trace))
         threading.Thread(target=runner, daemon=True).start()
 
     def _finish(self, title: str, result) -> None:
@@ -125,11 +125,13 @@ class LibraryManagerApp:
         except Exception as exc:
             messagebox.showerror("Папка Samples", str(exc))
             return
+        analyze_audio = self.analyze_audio.get()
+        guitar_confirmed = self.guitar_confirmed.get()
         def work():
             return run_manager(
                 samples,
-                analyze_audio=self.analyze_audio.get(),
-                guitar_source_confirmed=self.guitar_confirmed.get(),
+                analyze_audio=analyze_audio,
+                guitar_source_confirmed=guitar_confirmed,
                 write_virtual=False,
             )
         self._background("Анализ библиотеки", work)
