@@ -24,6 +24,17 @@ jobs:
         run: |
           $exe = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
           if (!(Test-Path $exe)) { throw "Portable GUI executable was not produced: $exe" }
+          # Smoke-test with PATH restricted to Windows system folders. PyInstaller
+          # must provide its own Python runtime and bundled dependencies.
+          $oldPath = $env:PATH
+          try {
+            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+            $p = Start-Process -FilePath (Resolve-Path $exe) -PassThru
+            Start-Sleep -Seconds 5
+            $p.Refresh()
+            if ($p.HasExited) { throw "Portable app exited during startup (code $($p.ExitCode))." }
+            Stop-Process -Id $p.Id -Force
+          } finally { $env:PATH = $oldPath }
           $zip = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip"
           Compress-Archive -Path dist/POP_PUNK_GUITAR_LIBRARY_MANAGER -DestinationPath $zip
           if (!(Test-Path $zip) -or (Get-Item $zip).Length -lt 1024) { throw "Portable ZIP is missing or unexpectedly small." }
