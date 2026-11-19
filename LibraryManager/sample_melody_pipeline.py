@@ -44,8 +44,8 @@ def prepare_sample_and_melody(
     expected_source_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Extract note-event WAVs and grouped melody-phrase WAV candidates."""
-    if melody_gap_seconds < 0 or melody_min_notes < 2:
-        raise ValueError("Invalid melody grouping limits")
+    if melody_gap_seconds < 0 or melody_min_notes < 2 or max_note_events < 1:
+        raise ValueError("Invalid Sample/Melody extraction limits")
     root = _safe_staging_root(staging_root)
     source = Path(source).resolve()
     source_info = audio_source_info(source)
