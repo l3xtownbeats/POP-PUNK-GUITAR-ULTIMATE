@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from audio_range_io import audio_source_info
+
 CATALOG_SCHEMA = "ppgu.plugin_asset_catalog/1.0.0"
 STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
 MODE_ORDER = (
@@ -169,6 +171,26 @@ def _manifest_to_asset(
         source_ok = source_hash_cache[cache_key]
         if not source_ok:
             errors.append("original source SHA-256 mismatch")
+
+    # Independently validate the exact frame mapping and PCM container before
+    # any asset can be advertised as loadable by the future plugin.
+    if source is not None and source.is_file() and derived is not None and derived.is_file() and _inside(derived, staging_root):
+        if isinstance(start, int) and isinstance(end, int) and end > start:
+            try:
+                source_info = audio_source_info(source)
+                derived_info = audio_source_info(derived)
+                if end > source_info.frames:
+                    errors.append("source sample offsets exceed original audio length")
+                if derived_info.frames != end - start:
+                    errors.append("derived WAV frame count does not match source offsets")
+                if derived_info.framerate != source_info.framerate:
+                    errors.append("derived WAV sample rate differs from original source")
+                if derived_info.source_format.upper() != "WAV" or derived_info.source_subtype not in {
+                    "PCM_16", "PCM_24", "PCM_32", "PCM_U8", "PCM"
+                }:
+                    errors.append("derived asset is not uncompressed PCM WAV")
+            except Exception as exc:
+                errors.append(f"audio range validation failed: {type(exc).__name__}: {exc}")
 
     approvals_ok = (
         review_status == "REVIEWED"
