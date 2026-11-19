@@ -529,3 +529,13 @@ Manager 3.0 разделяет два слоя данных:
 ### Обязательное правило выпуска
 
 Название 3.0.0 не означает готовность. Финальный релиз запрещён до успешных Windows regression tests, portable package smoke test, проверки на реальной Samples library, проверки review/distribution/rollback и подтверждения всех release gates. Неизвестные музыкальные факты и лицензии не превращаются в подтверждённые данные.
+
+
+## PPGU-MANAGER-30-REVIEW-020 — утверждённый источник данных для техники и Pattern/Melody структуры
+
+- **Статус:** IMPLEMENTED IN DEVELOPMENT BUILD / CI NOT VERIFIED
+- GUI review обязан принимать только явные пользовательские подтверждения техник и velocity layer; аналитические кандидаты не становятся фактами автоматически.
+- Pattern review хранит проверенные loop bounds, tempo, meter, beat grid, attack events, technique events, harmonic events, cycle integrity и музыкальное подтверждение.
+- Melody review хранит MIDI event pitch, start/duration, velocity, phrase boundaries и mapping verification.
+- Повторный review очищает старые подтверждения перед записью новых, чтобы не сохранять устаревшую разметку.
+- Эти данные передаются в plugin asset catalog и далее в структурный library/coverage manifest. Неизвестные значения остаются UNKNOWN/GAP/INCOMPLETE.
