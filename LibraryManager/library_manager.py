@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from sfz_parser import parse_sfz_file
 
-AUDIO_EXT = {".wav", ".wave"}
+AUDIO_EXT = {".wav", ".wave", ".aif", ".aiff", ".flac", ".ogg", ".oga", ".mp3"}
 SFZ_EXT = {".sfz"}
 ARCHIVE_EXT = {".zip", ".7z", ".rar"}
 SUPPORTED = AUDIO_EXT | SFZ_EXT | ARCHIVE_EXT
@@ -33,8 +33,45 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest().upper()
 
 def wav_info(path: Path) -> dict:
+    """Return audio metadata for WAV and libsndfile-supported formats.
+
+    The legacy field names are retained for compatibility with existing reports
+    and callers. Non-WAV formats are decoded only through python-soundfile;
+    unsupported codecs are reported instead of silently ignored.
+    """
+    path = Path(path)
     result = {"wav_status": "UNKNOWN", "sample_rate": "", "channels": "",
-              "bit_depth": "", "frames": "", "duration_seconds": ""}
+              "bit_depth": "", "frames": "", "duration_seconds": "",
+              "audio_format": path.suffix.lower().lstrip(".").upper(),
+              "audio_subtype": ""}
+    if path.suffix.lower() not in {".wav", ".wave"}:
+        try:
+            import soundfile as sf
+            info = sf.info(str(path))
+            if info.frames <= 0 or info.samplerate <= 0 or info.channels <= 0:
+                result["wav_status"] = "INVALID_OR_EMPTY_AUDIO"
+                return result
+            result.update(
+                wav_status="OK",
+                sample_rate=int(info.samplerate),
+                channels=int(info.channels),
+                bit_depth=info.subtype or "UNKNOWN",
+                frames=int(info.frames),
+                duration_seconds=round(info.frames / info.samplerate, 6),
+                audio_format=info.format or result["audio_format"],
+                audio_subtype=info.subtype or "UNKNOWN",
+                decoder_backend="libsndfile",
+            )
+            return result
+        except ImportError:
+            result["wav_status"] = "DECODER_NOT_BUNDLED"
+            result["unsupported_reason"] = "This format requires the bundled soundfile/libsndfile decoder."
+            return result
+        except Exception as exc:
+            result["wav_status"] = "DECODE_ERROR:" + type(exc).__name__
+            result["unsupported_reason"] = str(exc)[:240]
+            return result
+
     try:
         with path.open("rb") as f:
             head = f.read(12)
@@ -66,7 +103,8 @@ def wav_info(path: Path) -> dict:
             frames = int(data_size / align) if data_size is not None and align else 0
             result.update(sample_rate=rate, channels=channels, bit_depth=bits, frames=frames,
                           duration_seconds=round(frames / rate, 6) if rate else "",
-                          wav_status="OK" if data_size is not None else "MISSING_DATA_CHUNK")
+                          wav_status="OK" if data_size is not None else "MISSING_DATA_CHUNK",
+                          audio_format="WAV", audio_subtype=f"{bits}-bit")
             if audio_fmt not in (1, 3, 0xFFFE): result["wav_status"] = "NON_PCM_OR_EXTENSIBLE"
     except Exception as e:
         result["wav_status"] = "READ_ERROR:" + type(e).__name__
