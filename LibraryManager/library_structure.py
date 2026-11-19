@@ -88,9 +88,12 @@ def _pattern_readiness(metadata: dict[str, Any]) -> tuple[str, list[str]]:
         "attack_events": pattern.get("attack_events"),
     }
     missing = [key for key, value in required.items() if value in (None, "", [])]
-    if not missing and pattern.get("cycle_integrity_verified") is not True:
+    for key in ("beat_grid", "technique_events", "harmonic_events"):
+        if pattern.get(key) in (None, "", []):
+            missing.append(key)
+    if pattern.get("cycle_integrity_verified") is not True:
         missing.append("cycle_integrity_verified")
-    if not missing and pattern.get("musical_review_verified") is not True:
+    if pattern.get("musical_review_verified") is not True:
         missing.append("musical_review_verified")
     return ("STRUCTURE_VERIFIED" if not missing else "INCOMPLETE"), missing
 
@@ -103,9 +106,17 @@ def _melody_readiness(asset: dict[str, Any], metadata: dict[str, Any]) -> tuple[
         missing.append("confirmed_note_sequence")
     if not isinstance(events, list) or len(events) < 2:
         missing.append("confirmed_melody_events_with_timing")
-    elif any(not isinstance(item, dict) or item.get("duration_beats") is None
-             or item.get("start_beats") is None for item in events):
-        missing.append("melody_event_timing_or_duration")
+    elif any(
+        not isinstance(item, dict)
+        or item.get("duration_beats") is None
+        or item.get("start_beats") is None
+        or _as_int(item.get("midi_note")) is None
+        or _as_int(item.get("velocity"), 1, 127) is None
+        for item in events
+    ):
+        missing.append("melody_event_pitch_timing_duration_or_velocity")
+    if not metadata.get("melody_phrase_boundaries"):
+        missing.append("melody_phrase_boundaries")
     if metadata.get("melody_mapping_verified") is not True:
         missing.append("melody_mapping_verified")
     return ("STRUCTURE_VERIFIED" if not missing else "INCOMPLETE"), missing
@@ -136,9 +147,16 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
             metadata = asset.get("musical_metadata") or {}
             if not isinstance(metadata, dict):
                 metadata = {}
-            techniques = _reviewed_techniques(asset, metadata)
-            pitches = _pitch_records(asset, metadata)
-            velocity = _velocity_record(asset, metadata)
+            approved_evidence = (
+                asset.get("review_status") == "REVIEWED"
+                and asset.get("license_status") == "LICENSE_APPROVED"
+                and asset.get("integrity_status") == "VERIFIED"
+            )
+            techniques = _reviewed_techniques(asset, metadata) if approved_evidence else []
+            pitches = _pitch_records(asset, metadata) if approved_evidence else []
+            velocity = _velocity_record(asset, metadata) if approved_evidence else {
+                "status": "UNKNOWN", "min": None, "max": None, "layer": "UNKNOWN"
+            }
             playable = bool(
                 asset.get("playable") and asset.get("playable_in_mode")
                 and asset.get("review_status") == "REVIEWED"
