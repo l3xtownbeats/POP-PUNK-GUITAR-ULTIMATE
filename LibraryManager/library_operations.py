@@ -21,7 +21,7 @@ from typing import Any
 from factory_curator import INSTRUMENTS, ROLES, STYLES, TONES
 from audio_range_io import audio_source_info
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 APPROVED_REVIEW_STATES = {"REVIEWED", "BOUNDARIES_USER_OR_REVIEWER_APPROVED"}
 
 
