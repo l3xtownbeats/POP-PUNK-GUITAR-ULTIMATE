@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -121,11 +122,19 @@ def review_manifest(
         tempo = pattern.get("tempo_bpm")
         if not isinstance(tempo, (int, float)) or not 20 <= tempo <= 400:
             raise ValueError("Pattern tempo_bpm must be between 20 and 400")
-        if not isinstance(pattern.get("time_signature"), str) or "/" not in pattern["time_signature"]:
-            raise ValueError("Pattern time_signature must be like 4/4")
-        for field in ("attack_events", "beat_grid", "technique_events", "harmonic_events"):
-            if not isinstance(pattern.get(field), list) or not pattern[field]:
-                raise ValueError(f"Pattern {field} must be a non-empty list")
+        signature = pattern.get("time_signature")
+        if not isinstance(signature, str) or not re.fullmatch(r"[1-9][0-9]*/[1-9][0-9]*", signature):
+            raise ValueError("Pattern time_signature must be a valid ratio like 4/4")
+        for field in ("attack_events", "technique_events", "harmonic_events"):
+            if not isinstance(pattern.get(field), list) or not pattern[field] or any(
+                not isinstance(event, dict) for event in pattern[field]
+            ):
+                raise ValueError(f"Pattern {field} must be a non-empty list of event objects")
+        beat_grid = pattern.get("beat_grid")
+        if not isinstance(beat_grid, list) or not beat_grid or any(
+            not isinstance(value, (int, float)) or value < 0 for value in beat_grid
+        ) or beat_grid != sorted(beat_grid):
+            raise ValueError("Pattern beat_grid must be a non-empty ordered list of non-negative beat positions")
         if pattern.get("cycle_integrity_verified") is not True or pattern.get("musical_review_verified") is not True:
             raise ValueError("Pattern cycle integrity and musical review must be explicitly verified")
     melody_events = extra.get("confirmed_melody_events")
@@ -150,10 +159,12 @@ def review_manifest(
     boundaries = extra.get("melody_phrase_boundaries")
     if boundaries is not None and (
         not isinstance(boundaries, list) or len(boundaries) < 2
-        or any(not isinstance(value, (int, float)) for value in boundaries)
+        or any(not isinstance(value, (int, float)) or value < 0 for value in boundaries)
         or boundaries != sorted(boundaries)
     ):
         raise ValueError("melody_phrase_boundaries must be an ordered list of at least two beat positions")
+    if "melody_mapping_verified" in extra and type(extra["melody_mapping_verified"]) is not bool:
+        raise ValueError("melody_mapping_verified must be true or false")
     for field in ("velocity_min", "velocity_max"):
         value = extra.get(field)
         if value is not None and (type(value) is not int or not 1 <= value <= 127):
