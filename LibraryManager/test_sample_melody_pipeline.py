@@ -72,7 +72,9 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                 )
                 for asset in result["melody_note_mode"]:
                     self.assertEqual(asset["musical_metadata"]["melody_asset_role"], "SINGLE_GUITAR_NOTE")
-                    self.assertTrue(asset["musical_metadata"]["one_sound_one_note"])
+                    self.assertTrue(asset["musical_metadata"]["one_sound_one_note_candidate"])
+                    self.assertFalse(asset["musical_metadata"]["single_note_identity_verified"])
+                    self.assertTrue(asset["musical_metadata"]["requires_single_note_review"])
                     self.assertIn("MELODY_MODE", asset["engine_targets"])
                 self.assertTrue(all(item.get("reused_existing") is False
                                     for item in result["sample_mode"] + result["melody_mode"]))
