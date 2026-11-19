@@ -21,13 +21,14 @@ from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
 from finalization import finalize_library as finalize_library_audit
 from manifest_review import review_manifest
 from task_journal import TaskJournal
+from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
     distribution_plan,
 )
 
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -85,6 +86,8 @@ class LibraryManagerApp:
             ("3. Полный цикл: анализ + извлечение", self.scan),
             ("Предпрослушать WAV", self.preview_audio),
             ("Остановить звук", self.stop_preview),
+            ("Сформировать каталог VST3", self.build_plugin_catalog),
+            ("Sample Browser / режимы VST3", self.open_plugin_browser),
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("Отдельное извлечение Pattern WAV", self.extract_patterns),
@@ -500,7 +503,22 @@ class LibraryManagerApp:
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
-            report_progress("ЭТАП 6/6: проверены staging и FACTORY; исходники и готовые WAV не изменялись.")
+            report_progress("ЭТАП 7/7: проверка и сборка plugin_asset_catalog для всех 10 режимов VST3.")
+            catalog_path = Path(analysis_result["report_directory"]) / "plugin_asset_catalog.json"
+            catalog_result = build_plugin_asset_catalog(
+                STAGING_ROOT,
+                catalog_path,
+                mode_report_path=mode_report_path if mode_report_path.is_file() else None,
+                pattern_engine_manifest_path=(
+                    Path(analysis_result["report_directory"]) / "pattern_engine_manifest.json"
+                ),
+            )
+            report_progress(
+                f"Каталог VST3 создан: {catalog_result['asset_count']} staged assets, "
+                f"{catalog_result['playable_asset_count']} runtime-ready, "
+                f"{catalog_result['candidate_count']} analysis candidates. "
+                f"Файл: {catalog_path}"
+            )
             return {
                 "quick_scan": quick_result,
                 "deep_analysis": analysis_result,
@@ -517,6 +535,7 @@ class LibraryManagerApp:
                     "license_status": "UNREVIEWED",
                 },
                 "finalization": finalization_result,
+                "plugin_asset_catalog": catalog_result,
                 "source_files_modified": False,
                 "source_files_moved_or_deleted": False,
             }
@@ -576,6 +595,185 @@ class LibraryManagerApp:
             self.status.set("Воспроизведение остановлено")
         except Exception as exc:
             messagebox.showerror("Предпрослушивание", str(exc))
+
+    def build_plugin_catalog(self) -> None:
+        """Build a validated plugin catalog from existing staged WAV manifests."""
+        reports_root = MANAGER_DIR / "reports"
+        mode_reports = sorted(
+            reports_root.glob("run_*/mode_sorting_report.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        pattern_manifests = sorted(
+            reports_root.glob("run_*/pattern_engine_manifest.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        stamp = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        output = reports_root / f"plugin_asset_catalog_{stamp}.json"
+
+        def work():
+            return build_plugin_asset_catalog(
+                STAGING_ROOT,
+                output,
+                mode_report_path=mode_reports[0] if mode_reports else None,
+                pattern_engine_manifest_path=pattern_manifests[0] if pattern_manifests else None,
+            )
+
+        self._write("=== СБОРКА КАТАЛОГА ДЛЯ VST3 ===")
+        self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и все 10 режимов. Непроверенные WAV не становятся playable.")
+        self._background("Сборка каталога VST3", work)
+
+    def open_plugin_browser(self) -> None:
+        """Browse the latest plugin catalog and audition staged WAV candidates."""
+        reports_root = MANAGER_DIR / "reports"
+        catalogs = sorted(
+            reports_root.rglob("plugin_asset_catalog*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        if not catalogs:
+            messagebox.showinfo(
+                "Sample Browser",
+                "Каталог VST3 ещё не создан. Сначала выполните полный цикл подготовки "
+                "или нажмите «Сформировать каталог VST3».",
+            )
+            return
+        catalog_path = catalogs[0]
+        try:
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Sample Browser", f"Не удалось прочитать каталог: {exc}")
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("POP PUNK GUITAR ULTIMATE — Sample Browser / VST3 Modes")
+        window.geometry("1120x650")
+        window.transient(self.root)
+        frame = ttk.Frame(window, padding=10)
+        frame.pack(fill="both", expand=True)
+
+        top = ttk.Frame(frame)
+        top.pack(fill="x")
+        ttk.Label(top, text="Режим VST3:").pack(side="left")
+        mode_var = tk.StringVar(value=MODE_ORDER[0])
+        mode_box = ttk.Combobox(
+            top, textvariable=mode_var, values=list(MODE_ORDER),
+            state="readonly", width=24,
+        )
+        mode_box.pack(side="left", padx=8)
+        ttk.Label(
+            top,
+            text=f"Каталог: {catalog_path.name} • статус: {catalog.get('status', 'UNKNOWN')}",
+        ).pack(side="left", padx=8)
+
+        columns = ("kind", "review", "license", "duration", "asset")
+        tree = ttk.Treeview(frame, columns=columns, show="headings", selectmode="browse")
+        for column, label, width in (
+            ("kind", "Тип / кандидат", 220),
+            ("review", "Музыкальная проверка", 180),
+            ("license", "Лицензия", 150),
+            ("duration", "Длительность, сек", 120),
+            ("asset", "WAV / ID", 360),
+        ):
+            tree.heading(column, text=label)
+            tree.column(column, width=width, anchor="w")
+        tree.pack(fill="both", expand=True, pady=(8, 6))
+
+        details = tk.Text(frame, height=7, wrap="word", font=("Consolas", 9))
+        details.pack(fill="x")
+        item_records = {}
+
+        def refresh_mode(*_args):
+            tree.delete(*tree.get_children())
+            item_records.clear()
+            selected_mode = next(
+                (item for item in catalog.get("modes", []) if item.get("mode") == mode_var.get()),
+                {},
+            )
+            for candidate in selected_mode.get("candidates", []):
+                values = (
+                    candidate.get("candidate_type", "ANALYSIS_CANDIDATE"),
+                    candidate.get("review_status", "NEEDS_MUSICAL_REVIEW"),
+                    candidate.get("license_status", "UNREVIEWED"),
+                    "",
+                    str(candidate.get("candidate_id") or candidate.get("source_path") or "analysis only"),
+                )
+                row_id = tree.insert("", "end", values=values, tags=("candidate",))
+                item_records[row_id] = candidate
+            for asset in selected_mode.get("assets", []):
+                values = (
+                    asset.get("kind", "STAGED_WAV"),
+                    asset.get("review_status", "NEEDS_MUSICAL_REVIEW"),
+                    asset.get("license_status", "UNREVIEWED"),
+                    asset.get("duration_seconds", ""),
+                    asset.get("asset_id", ""),
+                )
+                row_id = tree.insert("", "end", values=values,
+                                     tags=("playable" if asset.get("playable") else "staged",))
+                item_records[row_id] = asset
+            details.delete("1.0", "end")
+            details.insert("end", json.dumps({
+                "mode": selected_mode.get("mode"),
+                "status": selected_mode.get("status"),
+                "assets": selected_mode.get("asset_count", 0),
+                "playable_assets": selected_mode.get("playable_asset_count", 0),
+                "analysis_candidates": selected_mode.get("candidate_count", 0),
+                "description": selected_mode.get("description", ""),
+            }, ensure_ascii=False, indent=2))
+
+        def show_selected(_event=None):
+            selection = tree.selection()
+            if not selection:
+                return
+            details.delete("1.0", "end")
+            details.insert("end", json.dumps(item_records[selection[0]], ensure_ascii=False, indent=2))
+
+        def preview_selected():
+            selection = tree.selection()
+            if not selection:
+                messagebox.showinfo("Предпрослушивание", "Выберите WAV-кандидат.", parent=window)
+                return
+            record = item_records[selection[0]]
+            relative = record.get("asset_file")
+            if not relative:
+                messagebox.showinfo(
+                    "Предпрослушивание",
+                    "Это аналитический кандидат без извлечённого WAV. Сначала выполните извлечение.",
+                    parent=window,
+                )
+                return
+            audio = (catalog_path.parent / relative).resolve()
+            try:
+                audio.relative_to(STAGING_ROOT.resolve())
+            except ValueError:
+                messagebox.showerror("Предпрослушивание", "Путь WAV выходит за пределы staging.", parent=window)
+                return
+            if not audio.is_file() or audio.suffix.lower() not in {".wav", ".wave"}:
+                messagebox.showerror("Предпрослушивание", f"WAV не найден: {audio}", parent=window)
+                return
+            try:
+                import winsound
+                winsound.PlaySound(None, 0)
+                winsound.PlaySound(str(audio), winsound.SND_FILENAME | winsound.SND_ASYNC)
+                self.status.set("Предпрослушивание staging WAV-кандидата")
+                self._write(f"[SAMPLE BROWSER] Предпрослушивание: {audio}")
+            except Exception as exc:
+                messagebox.showerror("Предпрослушивание", str(exc), parent=window)
+
+        mode_box.bind("<<ComboboxSelected>>", refresh_mode)
+        tree.bind("<<TreeviewSelect>>", show_selected)
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(6, 0))
+        ttk.Button(buttons, text="Прослушать выбранный WAV", command=preview_selected).pack(side="left")
+        ttk.Button(buttons, text="Остановить", command=self.stop_preview).pack(side="left", padx=6)
+        ttk.Button(buttons, text="Обновить", command=refresh_mode).pack(side="left", padx=6)
+        ttk.Label(
+            frame,
+            text="Playable допускается только при REVIEWED + LICENSE_APPROVED и подтверждённой целостности. "
+                 "Все остальные записи остаются кандидатами.",
+        ).pack(anchor="w", pady=(6, 0))
+        refresh_mode()
 
     def audit_other(self) -> None:
         try:
