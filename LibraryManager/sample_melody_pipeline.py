@@ -40,17 +40,56 @@ def prepare_sample_and_melody(
     melody_min_notes: int = 3,
     pre_roll_ms: int = 35,
     post_roll_ms: int = 220,
+    pitch_candidates: list[dict[str, Any]] | None = None,
+    expected_source_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Extract note-event WAVs and grouped melody-phrase WAV candidates."""
     if melody_gap_seconds < 0 or melody_min_notes < 2:
         raise ValueError("Invalid melody grouping limits")
     root = _safe_staging_root(staging_root)
     source = Path(source).resolve()
-    report = propose_segments(
-        source, pre_roll_ms=pre_roll_ms, post_roll_ms=post_roll_ms,
-        max_segments=max_note_events,
-    )
-    source_hash = str(report["source_sha256"]).upper()
+    source_info = audio_source_info(source)
+    rate = source_info.framerate
+    total_frames = source_info.frames
+
+    if pitch_candidates is None:
+        report = propose_segments(
+            source, pre_roll_ms=pre_roll_ms, post_roll_ms=post_roll_ms,
+            max_segments=max_note_events,
+        )
+        source_hash = str(report["source_sha256"]).upper()
+        if source_info.framerate != int(report["sample_rate"]):
+            raise RuntimeError("Source sample rate changed since Sample/Melody analysis")
+        events = report["segments"]
+    else:
+        source_hash = str(expected_source_sha256 or _sha256(source)).upper()
+        pre_roll = round(rate * pre_roll_ms / 1000)
+        post_roll = round(rate * post_roll_ms / 1000)
+        events = []
+        ordered_candidates = sorted(
+            pitch_candidates,
+            key=lambda item: float(item.get("start_seconds", 0.0)),
+        )
+        for candidate in ordered_candidates[:max_note_events]:
+            note_start = float(candidate.get("start_seconds", 0.0))
+            note_end = float(candidate.get("end_seconds", 0.0))
+            if note_start < 0 or note_end <= note_start:
+                continue
+            raw_start = round(note_start * rate)
+            raw_end = round(note_end * rate)
+            start = max(0, raw_start - pre_roll)
+            end = min(total_frames, raw_end + post_roll)
+            if end <= start:
+                continue
+            events.append({
+                "source_start_sample": start,
+                "source_end_sample": end,
+                "detected_note_start_seconds": note_start,
+                "detected_note_end_seconds": note_end,
+                "midi_note_candidate": candidate.get("midi_note_candidate"),
+                "note_name_candidate": candidate.get("note_name_candidate"),
+                "confidence": candidate.get("confidence"),
+            })
     if _sha256(source) != source_hash:
         raise RuntimeError("Source SHA-256 changed since Sample/Melody analysis")
     clips_dir, manifests_dir = root / "clips", root / "manifests"
