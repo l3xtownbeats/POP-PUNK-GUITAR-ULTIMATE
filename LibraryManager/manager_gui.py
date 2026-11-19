@@ -22,6 +22,7 @@ from finalization import finalize_library as finalize_library_audit
 from manifest_review import review_manifest
 from task_journal import TaskJournal
 from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
+from performance_manifest import build_performance_manifest
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -537,11 +538,15 @@ class LibraryManagerApp:
                     Path(analysis_result["report_directory"]) / "pattern_engine_manifest.json"
                 ),
             )
+            performance_path = Path(analysis_result["report_directory"]) / "performance_manifest.json"
+            performance_result = build_performance_manifest(catalog_path, performance_path)
             report_progress(
-                f"Каталог VST3 создан: {catalog_result['asset_count']} staged assets, "
+                f"Каталог VST3: {catalog_result['asset_count']} staged assets, "
                 f"{catalog_result['playable_asset_count']} runtime-ready, "
                 f"{catalog_result['candidate_count']} analysis candidates. "
-                f"Файл: {catalog_path}"
+                f"Performance Manifest: {performance_result['asset_binding_count']} bindings, "
+                f"{performance_result['event_count']} reviewed events. "
+                f"Файлы: {catalog_path}; {performance_path}"
             )
             return {
                 "quick_scan": quick_result,
@@ -561,6 +566,7 @@ class LibraryManagerApp:
                 },
                 "finalization": finalization_result,
                 "plugin_asset_catalog": catalog_result,
+                "performance_manifest": performance_result,
                 "source_files_modified": False,
                 "source_files_moved_or_deleted": False,
             }
@@ -638,12 +644,20 @@ class LibraryManagerApp:
         output = reports_root / f"plugin_asset_catalog_{stamp}.json"
 
         def work():
-            return build_plugin_asset_catalog(
+            catalog_result = build_plugin_asset_catalog(
                 STAGING_ROOT,
                 output,
                 mode_report_path=mode_reports[0] if mode_reports else None,
                 pattern_engine_manifest_path=pattern_manifests[0] if pattern_manifests else None,
             )
+            performance_output = output.with_name(output.stem.replace(
+                "plugin_asset_catalog", "performance_manifest"
+            ) + ".json")
+            performance_result = build_performance_manifest(output, performance_output)
+            return {
+                "plugin_asset_catalog": catalog_result,
+                "performance_manifest": performance_result,
+            }
 
         self._write("=== СБОРКА КАТАЛОГА ДЛЯ VST3 ===")
         self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и все 10 режимов. Непроверенные WAV не становятся playable.")
