@@ -10,7 +10,9 @@ import unittest
 import wave
 from pathlib import Path
 
-from unified_manager import run_manager
+from unittest.mock import patch
+
+from unified_manager import quick_scan, run_manager
 
 
 def make_test_wav(path: Path, seconds: float = 2.0, rate: int = 8000) -> None:
@@ -42,6 +44,20 @@ class UnifiedManagerTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temp.cleanup()
+
+    def test_quick_scan_never_hashes_or_decodes_audio(self) -> None:
+        with patch("unified_manager.sha256_file", side_effect=AssertionError("hash called")), \
+             patch("unified_manager.wav_info", side_effect=AssertionError("decoder called")), \
+             patch("unified_manager.analyse_wav", side_effect=AssertionError("acoustic analyzer called")):
+            summary = quick_scan(self.samples, reports_root=self.reports)
+        self.assertEqual(summary["scan_type"], "FAST_FILESYSTEM_ONLY")
+        self.assertEqual(summary["files_found"], 1)
+        self.assertFalse(summary["sha256_performed"])
+        self.assertFalse(summary["audio_decoding_performed"])
+        self.assertFalse(summary["source_files_modified"])
+        self.assertTrue((Path(summary["report_directory"]) / "quick_inventory.csv").is_file())
+        self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
+                         self.original_hash)
 
     def test_inventory_sfz_and_exact_duplicates(self) -> None:
         duplicate = self.incoming / "copy.wav"
