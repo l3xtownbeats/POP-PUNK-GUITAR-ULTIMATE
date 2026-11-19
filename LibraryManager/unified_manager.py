@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -57,7 +58,8 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 guitar_source_confirmed: bool = False,
-                write_virtual: bool = False) -> dict[str, Any]:
+                write_virtual: bool = False,
+                reports_root: Path | None = None) -> dict[str, Any]:
     samples_root = samples_root.expanduser().resolve()
     incoming = samples_root / "Import Sample Guitar"
     if not incoming.is_dir():
@@ -66,8 +68,10 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         raise ValueError("--write-virtual-index requires --analyze-audio and --guitar-source-confirmed")
 
     manager_root = Path(__file__).resolve().parent
-    reports = manager_root / "reports"
-    reports.mkdir(parents=True, exist_ok=True)
+    report_base = (reports_root or (manager_root / "reports")).expanduser().resolve()
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    reports = report_base / f"run_{run_id}"
+    reports.mkdir(parents=True, exist_ok=False)
 
     all_files = sorted(path for path in incoming.rglob("*") if path.is_file())
     excluded = [path for path in all_files if _is_excluded(path.relative_to(incoming))]
@@ -157,6 +161,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     ]
     summary = {
         "manager_version": VERSION,
+        "run_id": run_id,
+        "report_directory": str(reports),
         "samples_root": str(samples_root),
         "incoming_folder": str(incoming),
         "files_scanned": len(inventory),
@@ -218,7 +224,7 @@ def main() -> int:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(summary, ensure_ascii=False, indent=2))
-    print(f"Reports: {Path(__file__).resolve().parent / 'reports'}")
+    print(f"Reports: {summary['report_directory']}")
     return 0
 
 
