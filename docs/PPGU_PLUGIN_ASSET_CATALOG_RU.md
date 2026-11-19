@@ -69,7 +69,7 @@ STRUMMING, ARPEGGIO, ARTICULATIONS and ENDING are not inferred from generic onse
 - `READY_FOR_PLUGIN_IMPORT`: at least one asset passed every gate; this still does not mean the plugin has loaded or played it.
 
 
-## Performance Manifest
+## Voicing candidates for ARPEGGIO\n\nWhen chord-analysis candidates include root and pitch classes, Manager enumerates compact fretboard shapes under standard EADGBE as an explicit assumption (strings 6→1, bounded fret range and hand-span candidate). Each shape includes MIDI-note and string/fret hypotheses, but finger assignment, barre feasibility, tuning confirmation and physical playability remain unknown/review-required. These are not approved guitar fingerings.\n\n## Performance Manifest
 
 The same full cycle writes `performance_manifest.json` beside the asset catalog. Its schema is `ppgu.performance_manifest/1.0.0`. It carries all ten mode execution-model identifiers, mode-to-asset bindings, deduplicated source/derived provenance, and an event contract for future DAW-PPQ-tick events.
 
