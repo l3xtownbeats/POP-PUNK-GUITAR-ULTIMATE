@@ -33,10 +33,14 @@ def _write_clip(reader: wave.Wave_read, params: Any, start: int, end: int,
     expected = (end - start) * params.nchannels * params.sampwidth
     if len(frames) != expected:
         raise IOError("Incomplete PCM frame range read")
-    with destination.open("xb") as raw:
-        with wave.open(raw, "wb") as writer:
-            writer.setparams(params)
-            writer.writeframes(frames)
+    try:
+        with destination.open("xb") as raw:
+            with wave.open(raw, "wb") as writer:
+                writer.setparams(params)
+                writer.writeframes(frames)
+    except Exception:
+        destination.unlink(missing_ok=True)
+        raise
 
 
 def prepare_sample_and_melody(
@@ -200,9 +204,13 @@ def _record(asset_id: str, source: Path, source_hash: str, clip: Path,
 
 
 def _write_manifest(path: Path, record: dict[str, Any]) -> None:
-    with path.open("x", encoding="utf-8") as stream:
-        json.dump(record, stream, ensure_ascii=False, indent=2)
-        stream.write("\n")
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            json.dump(record, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
 
 
 def _sha256(path: Path) -> str:
