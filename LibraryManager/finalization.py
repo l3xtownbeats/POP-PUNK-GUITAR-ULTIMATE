@@ -113,19 +113,26 @@ def finalize_staging(
             tags = record.get("musical_metadata") or {}
             if not isinstance(tags, dict):
                 raise ValueError("musical_metadata must be an object")
-            for field, allowed in (
-                ("style_family", STYLES),
-                ("instrument_family", INSTRUMENTS),
-                ("asset_role", ROLES),
-                ("tone_family", TONES),
-            ):
-                value = tags.get(field)
-                if value not in allowed:
-                    raise ValueError(f"Missing or invalid reviewed tag: {field}")
-                row[field] = value
+            for field in ("style_family", "instrument_family", "asset_role", "tone_family"):
+                if tags.get(field) in (STYLES if field == "style_family" else
+                                       INSTRUMENTS if field == "instrument_family" else
+                                       ROLES if field == "asset_role" else TONES):
+                    row[field] = tags[field]
             row["format_family"] = "WAV"
             validation = record.get("review_validation") or {}
-            if row["review_status"] == "REVIEWED" and row["license_status"] == "LICENSE_APPROVED":
+            if row["review_status"] != "REVIEWED":
+                row["status"] = "MUSICAL_REVIEW_REQUIRED"
+            elif row["license_status"] != "LICENSE_APPROVED":
+                row["status"] = "LICENSE_REVIEW_REQUIRED"
+            else:
+                for field, allowed in (
+                    ("style_family", STYLES),
+                    ("instrument_family", INSTRUMENTS),
+                    ("asset_role", ROLES),
+                    ("tone_family", TONES),
+                ):
+                    if tags.get(field) not in allowed:
+                        raise ValueError(f"Missing or invalid reviewed tag: {field}")
                 if not str(tags.get("license_evidence", "")).strip() or not str(tags.get("musical_review_notes", "")).strip():
                     raise ValueError("Missing explicit license evidence or musical review notes")
                 if not all(validation.get(key) is True for key in (
@@ -136,10 +143,6 @@ def finalize_staging(
                     raise ValueError("Missing explicit review/license validation evidence")
                 row["status"] = "FACTORY_READY"
                 style_counts[row["style_family"]] += 1
-            elif row["review_status"] != "REVIEWED":
-                row["status"] = "MUSICAL_REVIEW_REQUIRED"
-            else:
-                row["status"] = "LICENSE_REVIEW_REQUIRED"
         except Exception as exc:
             row["error"] = f"{type(exc).__name__}: {exc}"
             if row["status"] == "INVALID" and row["review_status"] == "REVIEWED" and row["license_status"] != "LICENSE_APPROVED":
