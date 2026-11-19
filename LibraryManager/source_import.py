@@ -65,7 +65,7 @@ def register_sources(
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         data = json.loads(target.read_text(encoding="utf-8"))
-        if data.get("registry_version") != REGISTRY_VERSION:
+        if data.get("registry_version") not in {1, REGISTRY_VERSION}:
             raise ValueError("Неизвестная версия реестра импорта; исходный реестр не изменён.")
         records = data.get("sources", [])
     else:
