@@ -100,10 +100,13 @@ class ManifestReviewTests(unittest.TestCase):
                 approve_musical_review=True,
                 approve_license=True,
                 mode_assignments=["SAMPLE MODE", "MELODY MODE"],
+                confirmed_midi_note=60,
             )
             record = json.loads(manifest.read_text(encoding="utf-8"))
             self.assertEqual(record["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
             self.assertEqual(result["mode_assignments"], ["SAMPLE MODE", "MELODY MODE"])
+            self.assertEqual(record["musical_metadata"]["confirmed_midi_note"], 60)
+            self.assertTrue(result["musical_mapping_verified"])
 
     def test_license_unknown_cannot_be_approved_without_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
