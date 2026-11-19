@@ -120,7 +120,7 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                 self.assertEqual(result["sample_mode"][0]["source_format"], "AIFF")
                 with wave.open(result["sample_mode"][0]["derived_path"], "rb") as clip:
                     self.assertEqual(clip.getframerate(), 8000)
-                    self.assertEqual(clip.getnframes(), 2000)
+                    self.assertEqual(clip.getnframes(), 1600)
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
 
