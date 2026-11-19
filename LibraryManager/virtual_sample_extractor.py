@@ -202,7 +202,7 @@ def analyze_pattern_ranges(source: Path, pattern_report: dict[str, Any], *,
         "schema_version": 1, "engine": "PATTERN_MODE_VIRTUAL_EXTRACTION",
         "engine_version": VERSION, "source_path": str(source),
         "source_sha256": source_sha256.upper(), "sample_rate": rate,
-        "channels": info.channels, "sample_width_bytes": info.sample_width,
+        "channels": info.nchannels, "sample_width_bytes": info.sampwidth,
         "total_frames": total, "candidate_count": len(candidates),
         "audio_copied": False, "audio_modified": False,
         "extraction_policy": "REPEATED_RHYTHM_ONLY_NO_BROAD_RMS_ACTIVE_REGIONS",
@@ -285,7 +285,7 @@ def write_virtual_index(report: dict[str, Any], import_root: Path) -> list[Path]
     expected_hash = str(report["source_sha256"]).upper()
     if sha256_file(source) != expected_hash:
         raise RuntimeError("Source SHA-256 changed after analysis; refusing to index")
-    target = root / "VIRTUAL_CANDIDATES" / "RIFF_CANDIDATES"
+    target_name = ("PATTERN_MODE_CANDIDATES"\n                   if report.get("engine") == "PATTERN_MODE_VIRTUAL_EXTRACTION"\n                   else "RIFF_CANDIDATES")\n    target = root / "VIRTUAL_CANDIDATES" / target_name
     target.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     created: list[Path] = []
