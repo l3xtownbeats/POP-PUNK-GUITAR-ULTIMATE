@@ -27,7 +27,7 @@ from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_long_wav, write_virtual_index
 from other_audit import audit_other_library
 
-VERSION = "1.9.1"
+VERSION = "2.0.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 
 
@@ -145,7 +145,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     included = [path for path in all_files if not _is_excluded(path.relative_to(incoming))]
     total_files = len(included)
     emit(f"Найдено файлов: {len(all_files)}; к обработке: {total_files}; исключено по меткам: {len(excluded)}.")
-    emit("Запускаю параллельную инвентаризацию. Кэш SHA-256 включён; исходники только читаются.")
+    emit("ЭТАП 1/4: быстрый обход дерева и подсчёт файлов завершён.")
+    emit("ЭТАП 2/4: параллельная инвентаризация, SHA-256 и метаданные. Кэш SHA-256 включён; исходники только читаются.")
 
     cache_db = report_base / "scan_cache.sqlite3"
     con = sqlite3.connect(str(cache_db), timeout=30)
@@ -175,6 +176,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         if cancel_event is not None and cancel_event.is_set():
             raise RuntimeError("Анализ остановлен пользователем.")
         stat = path.stat()
+        emit(f"[ФАЙЛ] {path.name} — {stat.st_size:,} байт; подготовка SHA-256…")
         key = str(path.resolve())
         cached = cached_rows.get(key)
         if cached and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
@@ -197,6 +199,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                        classification_status="MANUAL_REVIEW_REQUIRED",
                        unsupported_reason="File extension is not currently supported by the analysis pipeline.")
         elif ext in AUDIO_EXT:
+            emit(f"[МЕТАДАННЫЕ] {path.name} — чтение заголовка аудио…")
             meta = wav_info(path)
             row.update(meta)
             row["category_suggestion"] = (
@@ -207,6 +210,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 try:
                     if cancel_event is not None and cancel_event.is_set():
                         raise RuntimeError("Анализ остановлен пользователем.")
+                    emit(f"[АКУСТИКА] {path.name} — анализ аудио и ритма…")
                     acoustic = analyse_wav(path)
                     acoustic["source_sha256"] = digest
                     classification = classify_wav(path, analyze_pitch=True)
@@ -332,7 +336,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             errors.append({"path": str(path.relative_to(incoming)), "stage": "STAT",
                            "error": f"{type(exc).__name__}: {exc}"})
 
-    emit(f"Инвентаризация завершена: {len(inventory)} файлов, ошибок: {len(errors)}. Проверяю SFZ-ссылки…")
+    emit(f"ЭТАП 2/4 ЗАВЕРШЁН: {len(inventory)} файлов, ошибок: {len(errors)}. ЭТАП 3/4: проверка SFZ-ссылок…")
     sfz_rows: list[dict[str, Any]] = []
     for index, sfz in enumerate((p for p in included if p.suffix.lower() == ".sfz"), 1):
         if cancel_event is not None and cancel_event.is_set():
@@ -349,7 +353,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         {"sha256": digest, "count": len(paths), "paths": paths}
         for digest, paths in sorted(duplicate_groups.items()) if len(paths) > 1
     ]
-    emit("SFZ-проверка завершена. Выполняю аудит OTHER…")
+    emit("ЭТАП 3/4 ЗАВЕРШЁН: SFZ-проверка. ЭТАП 4/4: аудит OTHER и подготовка отчётов…")
     try:
         other_audit_summary = audit_other_library(samples_root, reports / "other_audit")
     except Exception as exc:
@@ -396,7 +400,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_json(reports / "unified_asset_classification.json", classification_reports)
     _write_json(reports / "unified_errors.json", errors)
     _write_json(reports / "unified_summary.json", summary)
-    emit(f"ГОТОВО. Обработано: {len(inventory)}; ошибок: {len(errors)}. Отчёт: {reports}")
+    emit(f"ВСЕ 4 ЭТАПА ЗАВЕРШЕНЫ. Обработано: {len(inventory)}; ошибок: {len(errors)}. Отчёт: {reports}")
     return summary
 
 def main() -> int:
