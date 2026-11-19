@@ -24,7 +24,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "1.9.1"
+APP_VERSION = "2.0.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -45,7 +45,9 @@ class LibraryManagerApp:
         self._worker_events = queue.Queue()
         self._job_running = False
         self._worker_thread = None
+        self._cancel_event = threading.Event()
         self._action_buttons = []
+        self._cancel_button = None
         self._build()
         self.root.after(100, self._poll_worker_events)
 
@@ -88,6 +90,8 @@ class LibraryManagerApp:
             button = ttk.Button(actions, text=label, command=command)
             button.pack(side="left", padx=4, pady=3)
             self._action_buttons.append(button)
+        self._cancel_button = ttk.Button(actions, text="ОСТАНОВИТЬ задачу", command=self.cancel_job, state="disabled")
+        self._cancel_button.pack(side="left", padx=8, pady=3)
 
         ttk.Label(outer, text="Журнал работы:").pack(anchor="w", pady=(8, 2))
         self.log = tk.Text(outer, wrap="word", height=22, font=("Consolas", 9))
@@ -132,6 +136,8 @@ class LibraryManagerApp:
             return
 
         self._job_running = True
+        self._cancel_event.clear()
+        self._cancel_button.configure(state="normal")
         self.status.set(title + " — запуск…")
         for button in self._action_buttons:
             button.configure(state="disabled")
@@ -168,6 +174,7 @@ class LibraryManagerApp:
                     _, title, result = event
                     self._job_running = False
                     self._worker_thread = None
+                    self._cancel_button.configure(state="disabled")
                     for button in self._action_buttons:
                         button.configure(state="normal")
                     self._finish(title, result)
@@ -175,6 +182,7 @@ class LibraryManagerApp:
                     _, title, error_text, details = event
                     self._job_running = False
                     self._worker_thread = None
+                    self._cancel_button.configure(state="disabled")
                     for button in self._action_buttons:
                         button.configure(state="normal")
                     self._write(f"[ОШИБКА] {error_text}")
@@ -199,6 +207,13 @@ class LibraryManagerApp:
         self.status.set(title + ": ошибка")
         messagebox.showerror("Ошибка", f"{type(exc).__name__}: {exc}")
 
+    def cancel_job(self) -> None:
+        if self._job_running:
+            self._cancel_event.set()
+            self._cancel_button.configure(state="disabled")
+            self.status.set("Остановка запрошена — завершаю текущий безопасный блок…")
+            self._write("[ОТМЕНА] Запрошена остановка. Исходные файлы не затрагиваются.")
+
     def scan(self) -> None:
         try:
             samples = self._samples()
@@ -216,8 +231,11 @@ class LibraryManagerApp:
                 guitar_source_confirmed=guitar_confirmed,
                 write_virtual=False,
                 progress=report_progress,
+                cancel_event=self._cancel_event,
             )
-        self._write("=== ЗАПУСК АНАЛИЗА БИБЛИОТЕКИ ===")
+        self._write("=== ПОЛНЫЙ ЦИКЛ АНАЛИЗА БИБЛИОТЕКИ 2.0.0 ===")
+        self._write("Этапы: быстрый обход → параллельная инвентаризация/SHA-256 → акустика/ритм/SFZ → OTHER/отчёты.")
+        self._write("Извлечение, распределение и финализация выполняются отдельными подтверждаемыми операциями; анализ не перемещает и не удаляет исходники.")
         self._write(f"Акустический анализ: {'ВКЛЮЧЁН' if analyze_audio else 'ВЫКЛЮЧЕН'}")
         self._write(f"Гитарный источник подтверждён: {'ДА' if guitar_confirmed else 'НЕТ'}")
         self._background("Анализ библиотеки", work)
