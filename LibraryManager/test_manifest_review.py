@@ -108,6 +108,59 @@ class ManifestReviewTests(unittest.TestCase):
             self.assertEqual(record["musical_metadata"]["confirmed_midi_note"], 60)
             self.assertTrue(result["musical_mapping_verified"])
 
+    def test_review_records_confirmed_techniques_velocity_and_mode_event_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            staging = root / "staging"
+            (staging / "clips").mkdir(parents=True)
+            (staging / "manifests").mkdir()
+            source = root / "original.wav"
+            clip = staging / "clips" / "clip.wav"
+            write_wav(source, 1000)
+            write_wav(clip, 400)
+            manifest = staging / "manifests" / "clip.json"
+            manifest.write_text(json.dumps({
+                "asset_id": "STRUCTURE-TEST", "source_path": str(source),
+                "source_sha256": sha(source), "source_start_sample": 100,
+                "source_end_sample": 500, "derived_path": str(clip),
+                "derived_sha256": sha(clip), "musical_metadata": {},
+            }), encoding="utf-8")
+            pattern = {
+                "loop_start_sample": 0, "loop_end_sample": 400, "tempo_bpm": 170,
+                "time_signature": "4/4", "attack_events": [{"sample": 0}],
+                "beat_grid": [0, 100, 200, 300],
+                "technique_events": [{"sample": 0, "technique": "DOWNSTROKE"}],
+                "harmonic_events": [{"sample": 0, "chord": "C5"}],
+                "cycle_integrity_verified": True, "musical_review_verified": True,
+            }
+            melody_events = [
+                {"midi_note": 60, "start_beats": 0, "duration_beats": 1, "velocity": 90},
+                {"midi_note": 62, "start_beats": 1, "duration_beats": 1, "velocity": 100},
+            ]
+            review_manifest(
+                manifest, staging, style_family="POP_PUNK",
+                instrument_family="ELECTRIC_GUITAR", asset_role="RHYTHM_PATTERN",
+                tone_family="CRUNCH", musical_review_notes="Pattern and melody events checked.",
+                license_evidence="Distribution license verified.", approve_musical_review=True,
+                approve_license=True, mode_assignments=["PATTERN MODE", "MELODY MODE"],
+                confirmed_note_sequence=[60, 62],
+                confirmed_techniques=["DOWNSTROKE", "PALM_MUTE"],
+                confirmed_velocity_layer="HIGH",
+                advanced_metadata={
+                    "pattern_performance_review": pattern,
+                    "confirmed_melody_events": melody_events,
+                    "melody_phrase_boundaries": [0, 2],
+                    "melody_mapping_verified": True,
+                    "velocity_min": 90, "velocity_max": 110,
+                },
+            )
+            metadata = json.loads(manifest.read_text(encoding="utf-8"))["musical_metadata"]
+            self.assertEqual(metadata["confirmed_techniques"], ["DOWNSTROKE", "PALM_MUTE"])
+            self.assertEqual(metadata["confirmed_velocity_layer"], "HIGH")
+            self.assertEqual(metadata["pattern_performance_review"]["loop_end_sample"], 400)
+            self.assertEqual(len(metadata["confirmed_melody_events"]), 2)
+            self.assertTrue(metadata["melody_mapping_verified"])
+
     def test_license_unknown_cannot_be_approved_without_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
