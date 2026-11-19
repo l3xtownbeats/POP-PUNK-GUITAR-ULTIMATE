@@ -62,7 +62,7 @@ def _candidate_mode_assignments(record: dict[str, Any]) -> list[str]:
     kind = str(record.get("kind") or "").casefold()
     targets = {str(item).upper() for item in (record.get("engine_targets") or [])}
     modes: list[str] = []
-    if kind in {"sample_note_candidate", "one_shot_sample", "note_event"} or "SAMPLE_MODE" in targets:
+    if kind in {"sample_note_candidate", "one_shot_sample", "note_event", "chord_sample_candidate", "power_chord_sample_candidate"} or "SAMPLE_MODE" in targets:
         modes.append("SAMPLE MODE")
     if kind == "melody_phrase_candidate" or "MELODY_MODE" in targets:
         modes.append("MELODY MODE")
@@ -210,6 +210,12 @@ def _manifest_to_asset(
         "midi_note_candidate": metadata.get("midi_note_candidate"),
         "note_name_candidate": metadata.get("note_name_candidate"),
         "note_candidates": metadata.get("note_candidates", []),
+        "chord_name_candidate": metadata.get("chord_name_candidate"),
+        "root_pitch_class_candidate": metadata.get("root_pitch_class_candidate"),
+        "quality_candidate": metadata.get("quality_candidate"),
+        "pitch_classes_candidate": metadata.get("pitch_classes_candidate", []),
+        "voicing_candidate": metadata.get("voicing_candidate", "UNKNOWN"),
+        "string_fret_positions": metadata.get("string_fret_positions"),
         "articulation_candidates": metadata.get("articulation_candidates", ["UNKNOWN"]),
         "velocity_candidate": metadata.get("velocity_candidate"),
         "review_status": review_status,
