@@ -16,6 +16,8 @@ class AudioAnalysisTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/"a440.wav"; self.make_tone(p); r=analyse_wav(p)
             self.assertEqual(r["duration_seconds"],1.0)
+            self.assertEqual(r["analysis_sample_cap"],350_000)
+            self.assertEqual(r["decoder_block_frames"],65_536)
             self.assertIsNotNone(r["dominant_pitch_candidate"])
             self.assertEqual(r["dominant_pitch_candidate"]["midi_note"],69)
 
