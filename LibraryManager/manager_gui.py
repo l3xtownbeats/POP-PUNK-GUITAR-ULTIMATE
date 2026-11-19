@@ -27,7 +27,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.2.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -96,6 +96,7 @@ class LibraryManagerApp:
             ("Открыть отчёты", self.open_reports),
             ("История задач", self.show_task_history),
             ("Открыть staging", self.open_staging),
+            ("ИНСТРУКЦИЯ: порядок работы", self.open_user_guide),
         ]
         for column in range(3):
             actions.columnconfigure(column, weight=1)
@@ -281,7 +282,7 @@ class LibraryManagerApp:
                 write_virtual=bool(analyze_audio and guitar_confirmed),
                 progress=report_progress,
                 cancel_event=self._cancel_event,
-                workers=2,
+                workers=1,
             )
 
             extracted_pattern = 0
@@ -813,6 +814,18 @@ class LibraryManagerApp:
             samples, STAGING_ROOT, Path(audit_path), approve=True,
             confirm_all_dependents_accounted_for=True,
             journal_path=samples / "LibraryManagerReports" / "cleanup.jsonl"))
+
+    def open_user_guide(self) -> None:
+        """Open the numbered Russian quick-start guide in the default browser."""
+        guide = MANAGER_DIR / "PORTABLE_USER_GUIDE_RU.md"
+        if not guide.is_file():
+            messagebox.showinfo("Инструкция", "Файл PORTABLE_USER_GUIDE_RU.md не найден рядом с приложением.")
+            return
+        try:
+            import os
+            os.startfile(str(guide))
+        except Exception as exc:
+            messagebox.showerror("Инструкция", str(exc))
 
     def open_reports(self) -> None:
         path = MANAGER_DIR / "reports"
