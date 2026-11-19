@@ -339,17 +339,45 @@ class LibraryManagerApp:
                 workers=1,
             )
 
+            extracted_region = 0
             extracted_pattern = 0
             extracted_sample = 0
             extracted_melody = 0
+            max_total_assets = 500
             extraction_failures = []
             report_file = Path(analysis_result["report_directory"]) / "unified_audio_analysis.json"
             if analyze_audio and guitar_confirmed and report_file.is_file():
                 records = json.loads(report_file.read_text(encoding="utf-8"))
                 from pattern_clip_extractor import extract_pattern_occurrences
                 from sample_melody_pipeline import prepare_sample_and_melody
+                from virtual_sample_extractor import extract_virtual_ranges
 
-                report_progress("ЭТАП 3/6: физическое извлечение повторяющихся ритм-паттернов в WAV.")
+                report_progress("ЭТАП 3/6: извлечение реальных WAV-отрывков из длинных гитарных записей.")
+                for record in records:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Извлечение остановлено; уже созданные staging-кандидаты сохранены.")
+                    virtual = record.get("virtual_extraction")
+                    if not isinstance(virtual, dict) or not virtual.get("candidates"):
+                        continue
+                    remaining = max_total_assets - extracted_region
+                    if remaining <= 0:
+                        break
+                    try:
+                        clips = extract_virtual_ranges(
+                            virtual, STAGING_ROOT,
+                            max_clips=min(100, remaining),
+                            cancel_event=self._cancel_event,
+                            progress=report_progress,
+                        )
+                        extracted_region += len(clips)
+                    except Exception as exc:
+                        extraction_failures.append({
+                            "source_path": record.get("source_path"),
+                            "stage": "LONG_RECORDING_RANGE_EXTRACTION",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
+
+                report_progress("ЭТАП 4/6: извлечение WAV повторяющихся ритм-паттернов.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
@@ -357,11 +385,14 @@ class LibraryManagerApp:
                     if not pattern_data.get("patterns"):
                         continue
                     try:
+                        remaining = max_total_assets - extracted_region - extracted_pattern
+                        if remaining <= 0:
+                            break
                         clips = extract_pattern_occurrences({
                             "source": record["source_path"],
                             "source_sha256": record["source_sha256"],
                             "pattern_analysis": pattern_data,
-                        }, STAGING_ROOT, max_clips=max(0, min(100, 500 - extracted_pattern)))
+                        }, STAGING_ROOT, max_clips=min(100, remaining))
                         extracted_pattern += len(clips)
                     except Exception as exc:
                         extraction_failures.append({
@@ -369,20 +400,21 @@ class LibraryManagerApp:
                             "stage": "PATTERN_EXTRACTION",
                             "error": f"{type(exc).__name__}: {exc}",
                         })
-                    if extracted_pattern >= 500:
+                    if extracted_region + extracted_pattern >= max_total_assets:
                         break
 
-                report_progress("ЭТАП 4/6: извлечение отдельных нот для SAMPLE MODE и фраз для MELODY MODE.")
+                report_progress("ЭТАП 5/6: извлечение отдельных нот SAMPLE MODE и фраз MELODY MODE.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
-                    if extracted_sample + extracted_melody >= 500:
+                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_sample - extracted_melody
+                    if remaining <= 0:
                         break
                     source = Path(record.get("source_path", ""))
                     if source.suffix.lower() not in AUDIO_EXT:
                         continue
                     try:
-                        remaining = max(1, 500 - extracted_sample - extracted_melody)
+                        remaining = max_total_assets - extracted_region - extracted_pattern - extracted_sample - extracted_melody
                         result = prepare_sample_and_melody(
                             source, STAGING_ROOT,
                             max_note_events=min(100, remaining),
@@ -411,7 +443,7 @@ class LibraryManagerApp:
                     "error": "Физическое извлечение пропущено: оператор не подтвердил гитарный источник.",
                 })
 
-            report_progress("ЭТАП 5/6: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
+            report_progress("ЭТАП 6/6: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
             finalization_result = finalize_library_audit(
                 samples, STAGING_ROOT,
                 progress=report_progress,
@@ -422,10 +454,12 @@ class LibraryManagerApp:
                 "quick_scan": quick_result,
                 "deep_analysis": analysis_result,
                 "physical_extraction": {
+                    "long_recording_region_wav_count": extracted_region,
                     "pattern_mode_wav_count": extracted_pattern,
                     "sample_mode_wav_count": extracted_sample,
                     "melody_mode_wav_count": extracted_melody,
-                    "total_new_wav_candidates": extracted_pattern + extracted_sample + extracted_melody,
+                    "total_new_wav_candidates": extracted_region + extracted_pattern + extracted_sample + extracted_melody,
+                    "global_asset_limit": max_total_assets,
                     "manifest_count_in_staging": finalization_result["staging"]["manifests_checked"],
                     "failures": extraction_failures,
                     "review_status": "NEEDS_MUSICAL_REVIEW",
@@ -437,7 +471,7 @@ class LibraryManagerApp:
             }
 
         self._write("=== ПОЛНЫЙ ЦИКЛ ПОДГОТОВКИ БИБЛИОТЕКИ ===")
-        self._write("Быстрый scan → глубокая инвентаризация → анализ → физическое извлечение Pattern/Sample/Melody WAV → проверка staging.")
+        self._write("Быстрый scan → глубокая инвентаризация → акустика/ритм → извлечение длинных отрывков + Pattern/Sample/Melody WAV → аудит staging.")
         self._write("Извлечение запускается только после ручного подтверждения гитарного источника. FACTORY остаётся защищённой review/license gate.")
         self._write(f"Акустический анализ: {'ВКЛЮЧЁН' if analyze_audio else 'ВЫКЛЮЧЕН'}")
         self._write(f"Гитарный источник подтверждён: {'ДА' if guitar_confirmed else 'НЕТ'}")
