@@ -392,3 +392,19 @@ See [V1_8_RELEASE_NOTES_RU.md](V1_8_RELEASE_NOTES_RU.md) for implemented behavio
 ## Журнал задач 2.1.0
 
 История фоновых задач, этапов, успешных завершений и ошибок описана в [TASK_JOURNAL_RU.md](TASK_JOURNAL_RU.md). Журнал расположен в `LibraryManager/reports/task_history.jsonl` и не возобновляет прерванные операции автоматически.
+
+
+## VST3 integration catalog — Library Manager 2.4.0
+
+The full preparation cycle now produces a versioned `plugin_asset_catalog.json` after extraction and staging audit. The catalog contains all ten approved Manager/VST3 mode sections, analysis-only candidates, staged WAV references, source hashes, exact source sample offsets, pitch/chord hypotheses, articulation and velocity metadata where available, and explicit review/license/integrity states.
+
+- SAMPLE MODE receives pitch-specific note clips plus review-only chord and Power Chord sample clips.
+- PATTERN MODE receives repeated-rhythm pattern clips and note-event zones that are explicitly marked for this note-playable mode.
+- MELODY MODE receives grouped melody phrase candidates and pitch-specific source notes.
+- RIFF MODE and PHRASE MODE receive only evidence-backed candidate references; irregular onset groups are not asserted to be finished riffs or complete phrases.
+- STRUMMING, ARPEGGIO, ARTICULATIONS and ENDING remain explicit manual-review queues until source evidence supports their musical identity. Generic onset/RMS analysis is not used to invent stroke direction, string/fret voicing, articulation or ending role.
+- Long RMS-active regions are retained as unassigned review assets; they are not automatically labeled Pattern, Riff or Phrase.
+
+The catalog's WAV paths are relative to the catalog file and resolve into `LibraryManager/staging`. It is a bridge contract for the future VST3 loader, not a compiled plugin or a packaged factory sound bank. A staged asset becomes runtime-playable only after its derived/source hashes and sample boundaries validate and its manifest contains explicit `REVIEWED` + `LICENSE_APPROVED` evidence. No automatic FACTORY promotion occurs.
+
+The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog automatically. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
