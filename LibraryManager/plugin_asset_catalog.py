@@ -308,7 +308,7 @@ def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
                 or not (
                     type(asset.get("confirmed_midi_note")) is int
                     or bool(asset.get("confirmed_chord_name"))
-                    or len(asset.get("confirmed_note_sequence", [])) >= 2
+                    or len(asset.get("confirmed_note_sequence") or []) >= 2
                 )
             ):
                 errors.append(f"Playable asset does not satisfy review/integrity gates: {asset_id}")
