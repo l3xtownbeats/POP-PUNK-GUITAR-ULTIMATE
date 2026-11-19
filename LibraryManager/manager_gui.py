@@ -1082,6 +1082,46 @@ class LibraryManagerApp:
             parent=self.root,
         ):
             return
+        mapping_text = simpledialog.askstring(
+            "Подтверждённая музыкальная привязка",
+            "Введите только подтверждённые данные из прослушивания: "
+            "MIDI:60, CHORD:C или NOTES:60,62,64. "
+            "Оставьте пустым, если нота/аккорд/последовательность не подтверждены.",
+            parent=self.root,
+        )
+        if mapping_text is None:
+            return
+        confirmed_midi_note = None
+        confirmed_chord_name = None
+        confirmed_note_sequence = []
+        token = mapping_text.strip()
+        try:
+            if token.upper().startswith("MIDI:"):
+                confirmed_midi_note = int(token.split(":", 1)[1].strip())
+                if not 0 <= confirmed_midi_note <= 127:
+                    raise ValueError
+            elif token.upper().startswith("CHORD:"):
+                confirmed_chord_name = token.split(":", 1)[1].strip()
+                if not confirmed_chord_name or len(confirmed_chord_name) > 24:
+                    raise ValueError
+            elif token.upper().startswith("NOTES:"):
+                confirmed_note_sequence = [
+                    int(item.strip()) for item in token.split(":", 1)[1].split(",") if item.strip()
+                ]
+                if len(confirmed_note_sequence) < 2 or any(
+                    note < 0 or note > 127 for note in confirmed_note_sequence
+                ):
+                    raise ValueError
+            elif token:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(
+                "Музыкальная привязка",
+                "Формат: MIDI:60, CHORD:C или NOTES:60,62,64. "
+                "MIDI-ноты должны быть в диапазоне 0–127.",
+                parent=self.root,
+            )
+            return
         if not messagebox.askyesno(
             "Подтверждение LICENSE_APPROVED",
             "Подтверждаете, что указанное лицензионное основание действительно разрешает распространение этого материала?",
@@ -1101,6 +1141,9 @@ class LibraryManagerApp:
                 approve_musical_review=True,
                 approve_license=True,
                 mode_assignments=selected_modes,
+                confirmed_midi_note=confirmed_midi_note,
+                confirmed_chord_name=confirmed_chord_name,
+                confirmed_note_sequence=confirmed_note_sequence,
             )
         self._background("Музыкальная и лицензионная проверка WAV", work)
 
