@@ -15,7 +15,7 @@ from library_operations import (
 )
 
 
-def write_wav(path: Path) -> None:
+def write_wav(path: Path, frames: int = 800) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(path), "wb") as output:
         output.setnchannels(1)
@@ -40,7 +40,7 @@ class LibraryOperationsTests(unittest.TestCase):
         self.original = self.incoming / "long_take.wav"
         self.staged = self.staging / "clips" / "riff_001.wav"
         write_wav(self.original)
-        shutil.copyfile(self.original, self.staged)
+        write_wav(self.staged, 400)
         self.manifest = self.staging / "clips" / "riff_001.wav.json"
         record = {
             "schema_version": 1,
