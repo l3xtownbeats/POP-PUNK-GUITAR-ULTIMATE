@@ -347,3 +347,12 @@
 ### Граница готовности
 
 В текущем дереве репозитория нет отдельного C++/JUCE VST3 plugin source tree. Поэтому на этом этапе реализованы Manager-side pitch map и контракт Performance Manifest для будущего VST3, но не сам realtime playback engine. Наличие всех 12 записей в JSON не является доказательством, что каждая клавиша уже звучит. Необходимо дождаться CI, а затем реализовать VST3 exact-sample/fallback playback и проверить все ноты на слух в FL Studio 20.
+
+
+
+### Дополнение к TJ-2026-11-19-CHROMATIC-AUTOCHORDS-016
+
+- Performance Manifest и отдельный chromatic_pitch_map JSON теперь получают один и тот же объект карты, сформированный один раз за операцию Manager: commit 8f8024f4fbb2da189fe403bd8f4a97cf197f05fb и commit bf5092e1a87dc643fd706f50f553b8853f32b7f3.
+- Добавлены дополнительные assertions карты в test_performance_manifest.py: commit 849e0259d05beea0e673d3588325568cc263628d.
+- Последний GitHub Actions Library Manager Tests для ревизии bf5092e1a87dc643fd706f50f553b8853f32b7f3 завершился failure до запуска шагов: job steps=null, logs_url=null (run 44557472830). Следовательно, тесты кода на этой ревизии пока не подтверждены; причина раннего отказа по доступным данным не установлена.
+- Никаких заявлений об успешном CI, Portable ZIP или звуковом тесте VST3 не делается.
