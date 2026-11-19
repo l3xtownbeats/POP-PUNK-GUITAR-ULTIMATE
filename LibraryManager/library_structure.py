@@ -202,7 +202,7 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
     return {
         "schema": SCHEMA,
         "project": "POP PUNK GUITAR ULTIMATE",
-        "manager_version": "3.0.0-dev1",
+        "manager_version": "3.0.0-dev2",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "catalog_path": str(Path(catalog_path).resolve()) if catalog_path else None,
         "library_policy": {
