@@ -36,6 +36,7 @@ class FinalizationTests(unittest.TestCase):
                 "asset_id": "FACTORY-001",
                 "distributed_path": str(wav_path),
                 "distributed_sha256": digest,
+                "derived_sha256": digest,
                 "distribution_status": "VERIFIED_COPIED",
                 "distribution_category": "POP_PUNK/WAV/ELECTRIC_GUITAR/RHYTHM_PATTERN/CRUNCH",
                 "review_status": "REVIEWED",
