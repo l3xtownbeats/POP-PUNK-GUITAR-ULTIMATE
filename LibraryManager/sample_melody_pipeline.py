@@ -136,8 +136,14 @@ def prepare_sample_and_melody(
             asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
             clip = clips_dir / f"SAMPLE-{asset_id}.wav"
             manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
-            clip_info = _write_clip(source, start, end, clip, rate)
+            # Refuse collisions before touching either output. The exclusive
+            # placeholder prevents another process from claiming this clip path
+            # between the check and the WAV writer opening it.
+            if manifest.exists():
+                raise FileExistsError(f"Refusing to overwrite staged manifest {manifest.name}")
+            clip.touch(exist_ok=False)
             created.append(clip)
+            clip_info = _write_clip(source, start, end, clip, rate)
             record = _record(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                 "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
@@ -249,12 +255,17 @@ def _record(asset_id: str, source: Path, source_hash: str, clip: Path,
 
 
 def _write_manifest(path: Path, record: dict[str, Any]) -> None:
+    # An exclusive-open collision belongs to the existing user file and must
+    # never cause that file to be unlinked.
+    opened = False
     try:
         with path.open("x", encoding="utf-8") as stream:
+            opened = True
             json.dump(record, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
     except Exception:
-        path.unlink(missing_ok=True)
+        if opened:
+            path.unlink(missing_ok=True)
         raise
 
 
