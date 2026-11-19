@@ -204,24 +204,33 @@ def _manifest_to_asset(
             except Exception as exc:
                 errors.append(f"audio range validation failed: {type(exc).__name__}: {exc}")
 
-    approvals_ok = (
-        review_status == "REVIEWED"
-        and license_status == "LICENSE_APPROVED"
-        and bool(str(metadata.get("license_evidence") or "").strip())
-        and review_validation.get("source_sha256_verified") is True
-        and review_validation.get("derived_sha256_verified") is True
-        and review_validation.get("sample_boundaries_verified") is True
-        and review_validation.get("explicit_musical_approval") is True
-        and review_validation.get("explicit_license_approval") is True
+    confirmed_mapping = (
+        type(metadata.get("confirmed_midi_note")) is int
+        and 0 <= metadata.get("confirmed_midi_note") <= 127
+    ) or bool(str(metadata.get("confirmed_chord_name") or "").strip()) or (
+        isinstance(metadata.get("confirmed_note_sequence"), list)
+        and len(metadata.get("confirmed_note_sequence")) >= 2
+        and all(type(note) is int and 0 <= note <= 127
+                for note in metadata.get("confirmed_note_sequence"))
     )
-    if review_status == "REVIEWED" and license_status == "LICENSE_APPROVED" and not approvals_ok:
-        errors.append("approval metadata/evidence is incomplete")
+    approval_reasons = []
+    if review_status != "REVIEWED":
+        approval_reasons.append("requires REVIEWED musical approval")
+    if license_status != "LICENSE_APPROVED" or not str(metadata.get("license_evidence") or "").strip():
+        approval_reasons.append("requires LICENSE_APPROVED status and evidence")
+    for field in (
+        "source_sha256_verified", "derived_sha256_verified", "sample_boundaries_verified",
+        "explicit_musical_approval", "explicit_license_approval", "musical_mapping_verified",
+    ):
+        if review_validation.get(field) is not True:
+            approval_reasons.append(f"review_validation.{field} is not confirmed")
+    if not confirmed_mapping:
+        approval_reasons.append("confirmed MIDI note, chord label or note sequence is missing")
+    approvals_ok = not approval_reasons
 
     valid_integrity = not errors and source_ok and derived_ok
     playable = valid_integrity and approvals_ok
-    blocking = list(errors)
-    if not approvals_ok:
-        blocking.append("requires explicit musical review and license approval")
+    blocking = list(errors) + approval_reasons
     relative_audio = None
     if derived is not None and derived.is_file() and _inside(derived, staging_root):
         relative_audio = Path(os.path.relpath(derived, catalog_parent)).as_posix()
@@ -245,6 +254,9 @@ def _manifest_to_asset(
         "midi_note_candidate": metadata.get("midi_note_candidate"),
         "note_name_candidate": metadata.get("note_name_candidate"),
         "note_candidates": metadata.get("note_candidates", []),
+        "confirmed_midi_note": metadata.get("confirmed_midi_note"),
+        "confirmed_chord_name": metadata.get("confirmed_chord_name"),
+        "confirmed_note_sequence": metadata.get("confirmed_note_sequence", []),
         "chord_name_candidate": metadata.get("chord_name_candidate"),
         "root_pitch_class_candidate": metadata.get("root_pitch_class_candidate"),
         "quality_candidate": metadata.get("quality_candidate"),
@@ -293,6 +305,11 @@ def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
                 or asset.get("license_status") != "LICENSE_APPROVED"
                 or asset.get("integrity_status") != "VERIFIED"
                 or not asset.get("asset_file")
+                or not (
+                    type(asset.get("confirmed_midi_note")) is int
+                    or bool(asset.get("confirmed_chord_name"))
+                    or len(asset.get("confirmed_note_sequence", [])) >= 2
+                )
             ):
                 errors.append(f"Playable asset does not satisfy review/integrity gates: {asset_id}")
     return errors
