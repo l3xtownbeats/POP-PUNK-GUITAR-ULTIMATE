@@ -19,12 +19,13 @@ class RepeatingPatternCandidateTests(unittest.TestCase):
         matching = [
             item for item in result["patterns"]
             if [occurrence["start_seconds"] for occurrence in item["occurrences"]]
-            == [0.0, 2.0]
+            == [0.0, 1.75]
         ]
         self.assertTrue(matching)
         candidate = matching[0]
         self.assertEqual(candidate["candidate_type"], "REPEATED_RHYTHM_MOTIF")
         self.assertEqual(candidate["occurrence_count"], 2)
+        self.assertEqual([o["end_seconds"] for o in candidate["occurrences"]], [0.75, 2.5])
         self.assertEqual(candidate["pattern_role_candidate"], "RHYTHM_PATTERN")
         self.assertEqual(candidate["musical_section_candidate"], "UNKNOWN")
         self.assertEqual(candidate["review_status"], "NEEDS_MUSICAL_REVIEW")
