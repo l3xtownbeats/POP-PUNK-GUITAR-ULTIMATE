@@ -59,6 +59,18 @@ def _load_approved_manifest(manifest_path: Path, staging_root: Path) -> tuple[di
         raise ValueError("Musical content/boundaries must be reviewed before distribution")
     if record.get("license_status") != "LICENSE_APPROVED":
         raise ValueError("Only LICENSE_APPROVED material can enter FACTORY")
+    tags = record.get("musical_metadata") or {}
+    if not isinstance(tags, dict) or not str(tags.get("license_evidence", "")).strip():
+        raise ValueError("Explicit license evidence is required before FACTORY distribution")
+    if not str(tags.get("musical_review_notes", "")).strip():
+        raise ValueError("Musical review notes are required before FACTORY distribution")
+    validation = record.get("review_validation") or {}
+    if not all(validation.get(key) is True for key in (
+        "source_sha256_verified", "derived_sha256_verified",
+        "sample_boundaries_verified", "explicit_musical_approval",
+        "explicit_license_approval",
+    )):
+        raise ValueError("Manifest is missing explicit review/license validation evidence")
     source = Path(record.get("derived_path", ""))
     if not source.is_absolute():
         source = (manifest_path.parent / source).resolve()
