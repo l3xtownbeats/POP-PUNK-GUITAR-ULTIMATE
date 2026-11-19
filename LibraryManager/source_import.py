@@ -113,6 +113,15 @@ def register_sources(
             except OSError as exc:
                 errors.append({"path": str(file_path), "error": f"{type(exc).__name__}: {exc}"})
 
+    # Re-audit every registered SFZ on each import pass, including duplicate
+    # selections, so dependency status never silently goes stale.
+    sfz_roots = {
+        item["identity"]: Path(item.get("selected_root") or Path(item["source_path"]).parent)
+        for item in records
+        if str(item.get("extension", "")).lower() == ".sfz"
+        and item.get("identity") and item.get("source_path")
+    }
+
     # Resolve SFZ sample= and #include dependencies before the import is
     # considered scan-ready. The parser is read-only and confines samples to
     # the selected library root; unresolved references remain explicit.
