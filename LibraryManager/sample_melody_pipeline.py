@@ -179,6 +179,7 @@ def prepare_sample_and_melody(
                     raise RuntimeError(f"Existing staged Sample asset failed provenance/hash validation: {asset_id}")
                 existing["reused_existing"] = True
                 results["sample_mode"].append(existing)
+                results["melody_note_mode"].append(existing)
                 continue
             # The range writer creates the WAV exclusively ("x").
             clip_info = _write_clip(source, start, end, clip, rate)
