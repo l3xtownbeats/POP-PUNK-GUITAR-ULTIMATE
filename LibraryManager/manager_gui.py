@@ -15,6 +15,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 
 from unified_manager import AUDIO_EXT, run_manager, quick_scan, resolve_samples_root
+from source_import import register_sources
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
@@ -199,36 +200,24 @@ class LibraryManagerApp:
             cards.grid_columnconfigure(column, weight=1, uniform="workflow")
 
         workflow = [
-            ("01", "Быстрое сканирование",
-             "Мгновенная инвентаризация папок и файлов. Без SHA-256 и декодирования аудио.",
-             self.quick_scan_only, cyan, "FAST SCAN"),
-            ("02", "Глубокая инвентаризация",
-             "Форматы, SHA-256, точные дубликаты и SFZ. Кэш повторно использует неизменённые файлы.",
-             self.deep_scan_only, violet, "DEEP INVENTORY"),
-            ("03", "Полный анализ и извлечение",
-             "Акустика, ноты, ритм и кандидаты фрагментов. Тяжёлый режим запускается отдельно.",
-             self.scan, green, "FULL ANALYSIS"),
-            ("04", "Извлечение PATTERN WAV",
-             "Физически экспортирует найденные повторяющиеся ритм-кандидаты в staging с provenance.",
-             self.extract_patterns, cyan, "PATTERN EXTRACT"),
-            ("05", "Очередь ручной проверки",
-             "Прослушайте исходник и WAV-кандидаты, поправьте границы и подтвердите музыкальные теги.",
-             self.open_review_queue, violet, "REVIEW QUEUE"),
-            ("06", "Каталог и структура VST3",
-             "Собирает десять режимов, карту 12 нот, velocity/technique coverage и Performance Manifest.",
-             self.build_plugin_catalog, green, "VST3 LIBRARY"),
-            ("07", "Финальная проверка",
-             "Проверяет staging и FACTORY: пути, WAV, manifests, хэши, review и license gates.",
-             self.finalize_library, cyan, "FINAL AUDIT"),
-            ("08", "Распределить одобренное",
-             "Копирует только подтверждённые материалы. Полный preflight, SHA-256, журнал и откат пакета.",
-             self.distribute, violet, "SAFE DISTRIBUTION"),
-            ("09", "Аудит перед очисткой",
-             "Проверяет все зависимости оригиналов и подтверждённые копии. Ничего не удаляет.",
-             self.audit_cleanup, amber, "CLEANUP PREFLIGHT"),
-            ("10", "Удалить оригиналы",
-             "Финальный опасный этап. Только после полного аудита и двух отдельных подтверждений.",
-             self.cleanup, red, "DESTRUCTIVE — LAST"),
+            ("01", "IMPORT GUITAR",
+             "Отдельная входная точка: несколько аудиофайлов и папок, вложенные библиотеки, SFZ. Только регистрация ссылок на оригиналы.",
+             self.import_guitar, cyan, "SOURCE REGISTRATION"),
+            ("02", "SCAN LIBRARY",
+             "Инвентаризация структуры, форматов, SFZ-зависимостей, SHA-256 и дубликатов.",
+             self.deep_scan_only, violet, "LIBRARY SCAN"),
+            ("03", "START HUNTING",
+             "Автоматический анализ, поиск паттернов, мелодий и кандидатов извлечения. Тяжёлый анализ — отдельно.",
+             self.scan, green, "AUTO ANALYSIS"),
+            ("04", "REVIEW QUEUE",
+             "Прослушивание оригиналов и производных, сравнение, исправление границ и подтверждение тегов.",
+             self.open_review_queue, violet, "MANUAL REVIEW"),
+            ("05", "BUILD LIBRARY",
+             "Формирование каталогов, карт режимов, velocity/technique coverage и безопасная сборка одобренного.",
+             self.build_plugin_catalog, green, "LIBRARY BUILD"),
+            ("06", "VERIFY / RECOVERY",
+             "Проверка staging/FACTORY, путей, WAV, manifests, SHA-256, лицензий и доступных операций восстановления.",
+             self.finalize_library, cyan, "INTEGRITY GATES"),
         ]
 
         self._action_buttons = []
@@ -362,9 +351,9 @@ class LibraryManagerApp:
         self._cancel_button.pack(side="right", padx=(8, 0))
 
         self._write(
-            "NEON STAGE готов. Основной цикл пронумерован по безопасному порядку.\\n"
-            "Исходники не меняются при сканировании и анализе. FACTORY принимает только REVIEWED + LICENSE_APPROVED WAV.\\n"
-            "Длинные/неровные записи и обычные ровные лупы обрабатываются по разным правилам; автоматические кандидаты требуют прослушивания.\\n"
+            "NEON STAGE готов. AUTO SOUND HUNTER: шесть основных этапов.\\n"
+            "IMPORT GUITAR только регистрирует оригиналы; исходники не перемещаются и не изменяются.\\n"
+            "FACTORY принимает только REVIEWED + LICENSE_APPROVED + VERIFIED материалы.\\n"
         )
 
     def _copy_log_text(self, value: str) -> None:
@@ -518,6 +507,36 @@ class LibraryManagerApp:
             self._cancel_button.configure(state="disabled")
             self.status.set("Остановка запрошена — завершаю текущий безопасный блок…")
             self._write("[ОТМЕНА] Запрошена остановка. Исходные файлы не затрагиваются.")
+
+    def import_guitar(self) -> None:
+        """Register user-selected files and folders without copying or altering them."""
+        selected = list(filedialog.askopenfilenames(
+            title="IMPORT GUITAR — выберите аудио, SFZ или архивы",
+            filetypes=[
+                ("Поддерживаемые материалы", "*.wav *.wave *.aif *.aiff *.flac *.ogg *.oga *.mp3 *.m4a *.aac *.wma *.opus *.sfz *.zip *.7z *.rar"),
+                ("Все файлы", "*.*"),
+            ],
+        ))
+        while messagebox.askyesno(
+            "IMPORT GUITAR",
+            "Добавить целую папку библиотеки? Можно добавить несколько папок подряд.",
+        ):
+            folder = filedialog.askdirectory(title="Выберите папку гитарной библиотеки")
+            if not folder:
+                break
+            selected.append(folder)
+        if not selected:
+            self.status.set("IMPORT GUITAR: источники не выбраны.")
+            return
+
+        registry = MANAGER_DIR / "reports" / "import_registry.json"
+
+        def work():
+            return register_sources(selected, registry)
+
+        self._write("=== IMPORT GUITAR ===")
+        self._write(f"Выбрано источников: {len(selected)}. Регистрация без копирования, перемещения и изменения оригиналов.")
+        self._background("IMPORT GUITAR — регистрация источников", work)
 
     def quick_scan_only(self) -> None:
         """Run only the fast filesystem inventory; never start deep analysis."""
