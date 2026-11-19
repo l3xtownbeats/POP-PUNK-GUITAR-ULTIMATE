@@ -35,6 +35,28 @@ def _valid_onsets(report: dict[str, Any]) -> tuple[list[float], float]:
     return onsets, float(duration)
 
 
+def _duration_beat_candidates(duration_seconds: float, tempo_candidates: list[Any]) -> list[dict[str, Any]]:
+    """Estimate integer beat counts from upstream tempo hypotheses, never meter."""
+    results = []
+    for item in tempo_candidates[:5]:
+        if not isinstance(item, dict):
+            continue
+        bpm = item.get("bpm")
+        if not isinstance(bpm, (int, float)) or not math.isfinite(float(bpm)) or bpm <= 0:
+            continue
+        exact_beats = duration_seconds * float(bpm) / 60.0
+        beat_count = round(exact_beats)
+        deviation = abs(exact_beats - beat_count)
+        if beat_count >= 1 and deviation <= 0.15:
+            results.append({
+                "bpm": round(float(bpm), 3),
+                "estimated_beat_count": int(beat_count),
+                "beat_count_deviation": round(deviation, 4),
+                "evidence": "DURATION_NEAR_INTEGER_BEATS_ONLY",
+            })
+    return results
+
+
 def find_repeating_patterns(
     report: dict[str, Any], *, min_intervals: int = 3,
     max_intervals: int = 16, quantization_steps: int = 8,
@@ -118,15 +140,22 @@ def find_repeating_patterns(
     patterns = []
     for signature, occurrences in selected:
         occurrence_records = []
+        tempo_candidates = report.get("tempo_candidates", [])
+        if not isinstance(tempo_candidates, list):
+            tempo_candidates = []
         for first_interval, after_last_interval in occurrences:
             start_seconds = onsets[first_interval]
             end_seconds = onsets[after_last_interval]
+            duration_seconds = end_seconds - start_seconds
             occurrence_records.append({
                 "start_seconds": round(start_seconds, 6),
                 "end_seconds": round(end_seconds, 6),
-                "duration_seconds": round(end_seconds - start_seconds, 6),
+                "duration_seconds": round(duration_seconds, 6),
                 "start_onset_index": first_interval,
                 "end_onset_index_exclusive": after_last_interval + 1,
+                "duration_beat_count_candidates": _duration_beat_candidates(
+                    duration_seconds, tempo_candidates
+                ),
             })
         signature_text = ",".join(map(str, signature))
         identity = hashlib.sha256(signature_text.encode("ascii")).hexdigest().upper()[:24]
@@ -158,6 +187,8 @@ def find_repeating_patterns(
         "source_sha256": report.get("source_sha256"),
         "duration_seconds": duration,
         "onset_count": len(onsets),
+        "tempo_candidates": report.get("tempo_candidates", []),
+        "rhythmic_regularity_candidate": report.get("rhythmic_regularity_candidate"),
         "candidate_count": len(patterns),
         "patterns": patterns,
         "review_status": "NEEDS_MUSICAL_REVIEW",
