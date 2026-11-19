@@ -265,6 +265,7 @@ def tap_intervals(tap_times_seconds: list[float]) -> list[float]:
 def open_pattern_song_manager(parent, library_path: Path) -> None:
     """Open a small Tk editor for Songs/Patterns metadata; never edits source WAVs."""
     import tkinter as tk
+    import time
     from tkinter import filedialog, messagebox, simpledialog, ttk
 
     path = Path(library_path)
@@ -326,7 +327,7 @@ def open_pattern_song_manager(parent, library_path: Path) -> None:
     def refresh():
         tree.delete(*tree.get_children())
         for song in library["songs"]:
-            sid = tree.insert("", "end", text=song["name"], values=("SONG", "", ""), open=True)
+            sid = tree.insert("", "end", iid=song["song_id"], text=song["name"], values=("SONG", "", ""), open=True)
             for pattern in song["patterns"]:
                 tree.insert(sid, "end", iid=pattern["pattern_id"], text=pattern["name"],
                             values=(pattern["role"], pattern.get("selector_midi_note") or "", pattern.get("review_status", "")))
@@ -421,6 +422,37 @@ def open_pattern_song_manager(parent, library_path: Path) -> None:
         except Exception as exc:
             messagebox.showerror("Ошибка проверки", str(exc), parent=window)
 
+    tap_state = {"times": []}
+    tap_button = {"widget": None}
+
+    def tap_rhythm():
+        now = time.monotonic()
+        tap_state["times"].append(now)
+        if len(tap_state["times"]) > 17:
+            tap_state["times"] = tap_state["times"][-17:]
+        if len(tap_state["times"]) >= 3:
+            intervals = tap_intervals(tap_state["times"])
+            fields["rhythm"].set(", ".join(str(round(x * 1000, 1)) for x in intervals))
+        if tap_button["widget"] is not None:
+            tap_button["widget"].configure(text=f"Tap ритм ({len(tap_state['times'])})")
+
+    def reset_taps():
+        tap_state["times"] = []
+        if tap_button["widget"] is not None:
+            tap_button["widget"].configure(text="Tap ритм")
+
+    def rhythm_search():
+        try:
+            values = [float(x.strip()) / 1000.0 for x in fields["rhythm"].get().split(",") if x.strip()]
+            results = search_similar_patterns(library, values)
+            if not results:
+                messagebox.showinfo("Rhythm Search", "Совпадений нет. Добавьте rhythm signature проверенным паттернам.", parent=window)
+                return
+            lines = [f'{item["song_name"]} — {item["pattern_name"]} [{item["role"]}] | distance={item["distance"]:.3f}' for item in results]
+            messagebox.showinfo("Rhythm Search", "\\n".join(lines), parent=window)
+        except Exception as exc:
+            messagebox.showerror("Rhythm Search", str(exc), parent=window)
+
     def delete_selected():
         pattern, song = selected.get("pattern"), selected.get("song")
         if pattern is None or song is None:
@@ -438,5 +470,9 @@ def open_pattern_song_manager(parent, library_path: Path) -> None:
     ttk.Button(controls, text="Добавить Pattern WAV", command=add_pattern_ui).pack(side="left", padx=3)
     ttk.Button(controls, text="Сохранить параметры", command=save_selected).pack(side="left", padx=3)
     ttk.Button(controls, text="Удалить запись (не WAV)", command=delete_selected).pack(side="left", padx=3)
+    tap_button["widget"] = ttk.Button(controls, text="Tap ритм", command=tap_rhythm)
+    tap_button["widget"].pack(side="left", padx=3)
+    ttk.Button(controls, text="Сброс Tap", command=reset_taps).pack(side="left", padx=3)
+    ttk.Button(controls, text="Rhythm Search", command=rhythm_search).pack(side="left", padx=3)
     ttk.Button(controls, text="Закрыть", command=window.destroy).pack(side="right", padx=3)
     refresh()
