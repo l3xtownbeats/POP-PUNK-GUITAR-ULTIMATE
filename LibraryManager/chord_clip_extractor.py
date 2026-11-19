@@ -51,6 +51,7 @@ def extract_chord_samples(
 
     results: list[dict[str, Any]] = []
     created: list[Path] = []
+    seen_ranges: set[tuple[int, int]] = set()
     try:
         for candidate in candidates:
             if len(results) >= max_clips:
@@ -65,8 +66,9 @@ def extract_chord_samples(
             raw_end = round(float(end_seconds) * rate)
             start = max(0, raw_start - before)
             end = min(total_frames, raw_end + after)
-            if end <= start:
+            if end <= start or (start, end) in seen_ranges:
                 continue
+            seen_ranges.add((start, end))
             quality = str(candidate.get("quality") or "UNKNOWN").upper()
             kind = "power_chord_sample_candidate" if quality == "POWER5" else "chord_sample_candidate"
             prefix = "POWER5" if quality == "POWER5" else "CHORD"
