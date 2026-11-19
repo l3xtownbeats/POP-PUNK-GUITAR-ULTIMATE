@@ -347,12 +347,13 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 try:
                     if cancel_event is not None and cancel_event.is_set():
                         raise RuntimeError("Анализ остановлен пользователем.")
-                    # Low-load discovery pass: reduced analysis sample budget and
-                    # envelope-only classification. Expensive monophonic YIN tracking
-                    # is deferred to selected assets during dedicated Sample/Melody work.
+                    # Bounded discovery view for acoustics; the optional deep/full
+                    # cycle also runs the monophonic tracker on eligible clips so the
+                    # Sample/Melody extraction stage receives actual note candidates.
+                    # YIN is internally skipped for sources longer than 45 seconds.
                     acoustic = analyse_wav(path, max_samples=90_000)
                     acoustic["source_sha256"] = digest
-                    classification = classify_wav(path, analyze_pitch=False)
+                    classification = classify_wav(path, analyze_pitch=True, max_samples=90_000)
                     classification["source_sha256"] = digest
                     classification["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
                     classification["automatic_factory_promotion"] = False
@@ -369,13 +370,19 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         },
                         "virtual_extraction": None,
                     }
-                    if guitar_source_confirmed:
+                    duration_seconds = float(meta.get("duration_seconds") or 0.0)
+                    if (guitar_source_confirmed and ext in {".wav", ".wave"}
+                            and 5.0 <= duration_seconds <= 600.0):
                         virtual = analyze_long_wav(path, guitar_source_confirmed=True)
                         audio_record["virtual_extraction"] = virtual
-                        if write_virtual:
+                        if write_virtual and virtual.get("candidate_count", 0):
                             audio_record["virtual_index_files"] = [
                                 str(p) for p in write_virtual_index(virtual, incoming)
                             ]
+                    elif guitar_source_confirmed:
+                        audio_record["virtual_extraction_status"] = (
+                            "SKIPPED_NON_WAV_OR_OUTSIDE_5_TO_600_SECONDS"
+                        )
                     row["audio_analysis_status"] = "ANALYZED"
                     row["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
                     row["asset_kind_candidate"] = classification.get("asset_kind_candidate", "UNKNOWN")
