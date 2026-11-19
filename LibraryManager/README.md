@@ -1,6 +1,6 @@
 # POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
 
-## Library Manager 2.4.0 — inventory, extraction and VST3 preparation
+## Library Manager 2.5.0 — inventory, extraction and VST3 preparation
 
 This is a read-only inventory and SFZ audit stage. It never moves, renames, deletes, rewrites, or overwrites source audio or SFZ files.
 
@@ -408,3 +408,18 @@ The full preparation cycle now produces a versioned `plugin_asset_catalog.json` 
 The catalog's WAV paths are relative to the catalog file and resolve into `LibraryManager/staging`. It is a bridge contract for the future VST3 loader, not a compiled plugin or a packaged factory sound bank. A staged asset becomes runtime-playable only after its derived/source hashes and sample boundaries validate and its manifest contains explicit `REVIEWED` + `LICENSE_APPROVED` evidence. No automatic FACTORY promotion occurs.
 
 The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
+
+
+## Единая карта всех 12 нот и Auto Chords
+
+Manager 2.5.0 формирует единую хроматическую карту для будущего VST3:
+- все 12 pitch classes представлены отдельно и доступны в объявленном MIDI-диапазоне;
+- Sharp/Flat — два способа подписать одну высоту, а не разные ноты;
+- C# = Db, D# = Eb, F# = Gb, G# = Ab, A# = Bb;
+- E и F остаются двумя разными нотами;
+- Auto Chords использует ту же карту pitch class и объединяет только энгармонические дубликаты;
+- хроматические ноты не удаляются из клавиатурного диапазона из-за выбранной тональности или текущего аккорда.
+
+При сборке каталога Manager экспортирует chromatic_pitch_map JSON и включает эту же карту в Performance Manifest для VST3. Точные sample mappings требуют подтверждённых MIDI-нот, лицензии и integrity status. Fallback для отсутствующего WAV записывается как предложение QA, а не как готовый runtime asset.
+
+**Граница реализации:** текущий репозиторий содержит Manager и manifests, но отдельного C++/JUCE VST3 playback source tree здесь пока нет. Поэтому карта и контракт подготовлены для плагина; реальное звучание каждой клавиши требует реализации VST3 playback/fallback engine и аудио-QA.
