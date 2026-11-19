@@ -287,7 +287,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                        classification_status="MANUAL_REVIEW_REQUIRED",
                        unsupported_reason="File extension is not currently supported by the analysis pipeline.")
         elif ext in AUDIO_EXT:
-                meta = wav_info(path)
+            meta = wav_info(path)
             row.update(meta)
             row["category_suggestion"] = (
                 "AUDIO_SAMPLE" if meta.get("wav_status") in {"OK", "NON_PCM_OR_EXTENSIBLE"}
@@ -340,7 +340,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             row["category_suggestion"] = "ARCHIVE_REVIEW_REQUIRED"
         return {
             "row": row, "audio_record": audio_record, "classification": classification,
-            "errors": local_errors, "cache": (key, stat.st_size, stat.st_mtime_ns, digest),
+            "errors": local_errors,
+            "cache": (key, stat.st_size, stat.st_mtime_ns, digest) if hash_required and digest else None,
         }
 
     def safe_process_one(path: Path) -> dict[str, Any]:
