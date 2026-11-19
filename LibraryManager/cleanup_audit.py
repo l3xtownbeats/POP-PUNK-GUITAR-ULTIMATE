@@ -53,6 +53,13 @@ def audit_all_import_sources(samples_root: Path, staging_root: Path,
 
     for source in sorted(p for p in incoming.rglob("*") if p.is_file()):
         try:
+            if source.suffix.lower() == ".json":
+                try:
+                    sidecar_data = json.loads(source.read_text(encoding="utf-8"))
+                    if isinstance(sidecar_data, dict) and sidecar_data.get("source_path") and sidecar_data.get("source_sha256"):
+                        continue
+                except (ValueError, OSError, UnicodeDecodeError):
+                    pass
             source_records[str(source.resolve())] = {
                 "source_path": str(source.resolve()),
                 "source_sha256": sha256_file(source),
@@ -109,7 +116,9 @@ def audit_all_import_sources(samples_root: Path, staging_root: Path,
                 if destination_text:
                     destination = Path(destination_text).expanduser().resolve()
                     dependent["destination_path"] = str(destination)
-                    if destination.is_file() and destination_hash:
+                    if not (_inside(destination, samples_root / "FACTORY") or _inside(destination, samples_root / "OTHER")):
+                        dependent["blockers"].append("DESTINATION_OUTSIDE_APPROVED_ROOT")
+                    elif destination.is_file() and destination_hash:
                         actual = sha256_file(destination)
                         if actual == str(destination_hash).upper():
                             dependent["destination_verified"] = True
@@ -152,7 +161,30 @@ def audit_all_import_sources(samples_root: Path, staging_root: Path,
             record["blockers"] = sorted(set(blockers))
         rows.append(record)
 
+    referenced_staged = set()
+    for row in rows:
+        for dep in row["dependents"]:
+            if dep.get("manifest_path"):
+                try:
+                    manifest_record = json.loads(Path(dep["manifest_path"]).read_text(encoding="utf-8"))
+                    if manifest_record.get("derived_path"):
+                        referenced_staged.add(str(Path(manifest_record["derived_path"]).resolve()))
+                except Exception:
+                    pass
+    staging_clips = Path(staging_root).expanduser().resolve() / "clips"
+    if staging_clips.is_dir():
+        for staged_audio in staging_clips.rglob("*"):
+            if staged_audio.is_file() and staged_audio.suffix.lower() in {".wav", ".wave"} and str(staged_audio.resolve()) not in referenced_staged:
+                errors.append({"path": str(staged_audio), "stage": "DEPENDENCY",
+                               "error": "Unmanifested staged audio clip; source dependency cannot be proven complete."})
+
     eligible = sum(row["can_cleanup"] for row in rows)
+    if errors:
+        for row in rows:
+            row["can_cleanup"] = False
+            if "GLOBAL_AUDIT_ERRORS" not in row["blockers"]:
+                row["blockers"].append("GLOBAL_AUDIT_ERRORS")
+        eligible = 0
     summary = {
         "schema_version": 1,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
