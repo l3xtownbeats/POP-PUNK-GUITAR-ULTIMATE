@@ -15,7 +15,7 @@ from typing import Any
 from audio_segmenter import STAGING_BASE, _safe_staging_root, propose_segments
 from audio_range_io import audio_source_info, write_pcm_wav_range
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def _identity(source_hash: str, mode: str, start: int, end: int) -> str:
@@ -188,7 +188,9 @@ def prepare_sample_and_melody(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                 "sample_note_candidate", ["SAMPLE_MODE", "MELODY_MODE", "KEYBOARD_PLAYBACK"],
                 {"melody_asset_role": "SINGLE_GUITAR_NOTE",
-                 "one_sound_one_note": True,
+                 "one_sound_one_note_candidate": True,
+                 "single_note_identity_verified": False,
+                 "requires_single_note_review": True,
                  "midi_note_candidate": event.get("midi_note_candidate"),
                  "note_name_candidate": event.get("note_name_candidate"),
                  "detected_note_start_seconds": event.get("detected_note_start_seconds"),
