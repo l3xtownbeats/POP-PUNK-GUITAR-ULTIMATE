@@ -70,6 +70,40 @@ class LibraryStructureTests(unittest.TestCase):
         self.assertEqual(result["melody_mode"]["assets"][0]["melody_structure_status"], "INCOMPLETE")
         self.assertIn("confirmed_melody_events_with_timing", result["melody_mode"]["assets"][0]["missing_fields"])
 
+    def test_complete_pattern_and_melody_metadata_is_recognized(self):
+        pattern = {
+            "asset_id": "P2", "review_status": "REVIEWED",
+            "license_status": "LICENSE_APPROVED", "integrity_status": "VERIFIED",
+            "musical_metadata": {"pattern_performance_review": {
+                "loop_start_sample": 0, "loop_end_sample": 48000,
+                "tempo_bpm": 170, "time_signature": "4/4",
+                "attack_events": [{"sample": 0, "stroke": "DOWNSTROKE"}],
+                "beat_grid": [0, 12000, 24000, 36000],
+                "technique_events": [{"sample": 0, "technique": "DOWNSTROKE"}],
+                "harmonic_events": [{"sample": 0, "chord": "C5"}],
+                "cycle_integrity_verified": True, "musical_review_verified": True,
+            }},
+        }
+        melody = {
+            "asset_id": "M2", "review_status": "REVIEWED",
+            "license_status": "LICENSE_APPROVED", "integrity_status": "VERIFIED",
+            "confirmed_note_sequence": [60, 62],
+            "musical_metadata": {
+                "confirmed_note_sequence": [60, 62],
+                "confirmed_melody_events": [
+                    {"midi_note": 60, "start_beats": 0, "duration_beats": 1, "velocity": 92},
+                    {"midi_note": 62, "start_beats": 1, "duration_beats": 1, "velocity": 100},
+                ],
+                "melody_phrase_boundaries": [0, 2],
+                "melody_mapping_verified": True,
+            },
+        }
+        result = build_library_structure(_catalog({
+            "PATTERN MODE": [pattern], "MELODY MODE": [melody],
+        }))
+        self.assertEqual(result["pattern_mode"]["assets"][0]["pattern_structure_status"], "STRUCTURE_VERIFIED")
+        self.assertEqual(result["melody_mode"]["assets"][0]["melody_structure_status"], "STRUCTURE_VERIFIED")
+
     def test_runtime_ready_requires_review_license_and_integrity(self):
         bad = {"asset_id": "X", "asset_file": "x.wav", "playable": True,
                "playable_in_mode": True, "review_status": "NEEDS_MUSICAL_REVIEW",
