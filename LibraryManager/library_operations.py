@@ -150,6 +150,7 @@ def distribution_plan(manifest_paths: list[Path], samples_root: Path,
         "manager_version": VERSION,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "samples_root": str(samples_root),
+        "staging_root": str(Path(staging_root).resolve()),
         "entries": entries,
         "automatic_factory_promotion": False,
         "source_originals_deleted": False,
@@ -350,6 +351,203 @@ def cleanup_original_sources(distributed_manifest_paths: list[Path], *,
             "journal_path": str(journal)}
 
 
+def distribute_assets_transactional(
+    plan: dict[str, Any],
+    *,
+    staging_root: Path,
+    approve: bool = False,
+    journal_path: Path | None = None,
+    cancel_event: Any = None,
+) -> dict[str, Any]:
+    """Preflight and copy a complete approved batch, rolling back this batch on error.
+
+    Originals and staged assets are never moved or deleted. Only destinations
+    opened by this invocation are eligible for rollback. Existing files are
+    never overwritten, including when a destination appears after preflight.
+    """
+    if not approve:
+        return {**plan, "executed": False, "status": "DRY_RUN"}
+
+    samples_root = Path(plan.get("samples_root", "")).resolve()
+    staging_root = Path(staging_root).resolve()
+    factory_root = (samples_root / "FACTORY").resolve()
+    entries = plan.get("entries")
+    if not samples_root.is_dir() or not isinstance(entries, list):
+        raise ValueError("Distribution plan is missing a valid Samples root or entries list")
+    if not entries:
+        return {**plan, "executed": True, "status": "NOTHING_TO_DISTRIBUTE", "results": []}
+
+    manifests = []
+    for entry in entries:
+        manifest_value = entry.get("manifest_path")
+        if not isinstance(manifest_value, str) or not manifest_value:
+            raise ValueError("Every distribution entry must reference its staging manifest")
+        manifest = Path(manifest_value).resolve()
+        if not _inside(manifest, staging_root) or not manifest.is_file():
+            raise ValueError(f"Manifest is missing or outside staging: {manifest}")
+        manifests.append(manifest)
+
+    # Rebuild the plan immediately before writing. This rechecks musical and
+    # license approvals, source/derived hashes, PCM format and sample bounds,
+    # and prevents a stale or edited plan from changing a destination.
+    canonical = distribution_plan(manifests, samples_root, staging_root)
+    def signature(items: list[dict[str, Any]]) -> list[tuple[str, str, str, str, str]]:
+        return sorted(
+            (
+                str(Path(item["manifest_path"]).resolve()),
+                str(Path(item["source_path"]).resolve()),
+                str(item["source_sha256"]).upper(),
+                str(Path(item["destination_path"]).resolve()),
+                str(item["category_path"]),
+            )
+            for item in items
+        )
+    if signature(entries) != signature(canonical["entries"]):
+        raise RuntimeError("Distribution plan is stale or was modified; regenerate the plan before copying")
+
+    destinations: set[str] = set()
+    hashes: set[str] = set()
+    # Complete preflight before creating any output directory or file.
+    for entry in canonical["entries"]:
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("Distribution cancelled during preflight; no files were copied")
+        destination = Path(entry["destination_path"]).resolve()
+        source = Path(entry["source_path"]).resolve()
+        digest = str(entry["source_sha256"]).upper()
+        destination_key = str(destination).casefold()
+        if not _inside(destination, factory_root):
+            raise ValueError(f"Destination escaped FACTORY: {destination}")
+        if destination_key in destinations:
+            raise ValueError(f"Two assets target the same destination: {destination}")
+        if digest in hashes:
+            raise ValueError(f"Duplicate staged content in the distribution batch: {digest}")
+        destinations.add(destination_key)
+        hashes.add(digest)
+        if not source.is_file() or sha256_file(source) != digest:
+            raise RuntimeError(f"Staged source changed during preflight: {source}")
+        sidecar = destination.with_suffix(destination.suffix + ".json")
+        if destination.exists() or sidecar.exists():
+            raise FileExistsError(f"Refusing to overwrite existing destination or manifest: {destination}")
+
+    journal = (journal_path or (factory_root / "LibraryManagerReports" / "operations.jsonl")).resolve()
+    results: list[dict[str, Any]] = []
+    created: list[dict[str, Any]] = []
+
+    try:
+        for index, entry in enumerate(canonical["entries"], 1):
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Distribution cancelled; rolling back the current batch")
+            manifest_path = Path(entry["manifest_path"]).resolve()
+            source = Path(entry["source_path"]).resolve()
+            destination = Path(entry["destination_path"]).resolve()
+            sidecar = destination.with_suffix(destination.suffix + ".json")
+            digest = str(entry["source_sha256"]).upper()
+
+            # Revalidate each source immediately before opening its destination.
+            record = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if record.get("review_status") not in APPROVED_REVIEW_STATES or record.get("license_status") != "LICENSE_APPROVED":
+                raise RuntimeError(f"Review/license approval changed before copy: {manifest_path}")
+            if not source.is_file() or sha256_file(source) != digest:
+                raise RuntimeError(f"Staged source changed before copy: {source}")
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            created_item = {
+                "destination": destination,
+                "sidecar": sidecar,
+                "sha256": digest,
+                "audio_created": False,
+                "sidecar_created": False,
+            }
+            # Exclusive create protects against races and never overwrites.
+            with source.open("rb") as src, destination.open("xb") as dst:
+                created_item["audio_created"] = True
+                created.append(created_item)
+                shutil.copyfileobj(src, dst, length=1024 * 1024)
+                dst.flush()
+                os.fsync(dst.fileno())
+
+            copied_hash = sha256_file(destination)
+            if copied_hash != digest:
+                raise IOError(f"Destination SHA-256 mismatch: {destination}")
+
+            distributed_record = dict(record)
+            distributed_record.update({
+                "distributed_path": str(destination),
+                "distributed_sha256": copied_hash,
+                "distribution_status": "VERIFIED_COPIED",
+                "distribution_operation": "COPY_TO_FACTORY_TRANSACTION",
+                "distribution_category": entry["category_path"],
+                "distribution_verified_at_utc": datetime.now(timezone.utc).isoformat(),
+            })
+            with sidecar.open("x", encoding="utf-8") as stream:
+                created_item["sidecar_created"] = True
+                json.dump(distributed_record, stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+
+            event = {
+                "event": "ASSET_DISTRIBUTED",
+                "transaction": "BATCH",
+                "batch_index": index,
+                "batch_count": len(canonical["entries"]),
+                "at_utc": datetime.now(timezone.utc).isoformat(),
+                "source": str(source),
+                "destination": str(destination),
+                "sha256": copied_hash,
+                "category": entry["category_path"],
+                "status": "VERIFIED_COPIED",
+            }
+            _append_journal(journal, event)
+            results.append(event)
+
+    except Exception as failure:
+        rollback_errors: list[str] = []
+        for item in reversed(created):
+            destination = item["destination"]
+            sidecar = item["sidecar"]
+            try:
+                if item["sidecar_created"] and sidecar.exists():
+                    sidecar_record = json.loads(sidecar.read_text(encoding="utf-8"))
+                    if (sidecar_record.get("distributed_path") == str(destination)
+                            and str(sidecar_record.get("distributed_sha256", "")).upper() == item["sha256"]):
+                        sidecar.unlink()
+                if item["audio_created"] and destination.exists():
+                    # This file was opened with exclusive creation by this run.
+                    destination.unlink()
+                _append_journal(journal, {
+                    "event": "BATCH_ROLLBACK",
+                    "transaction": "BATCH",
+                    "at_utc": datetime.now(timezone.utc).isoformat(),
+                    "destination": str(destination),
+                    "sha256": item["sha256"],
+                    "status": "ROLLED_BACK",
+                })
+            except Exception as rollback_exc:
+                rollback_errors.append(
+                    f"{destination}: {type(rollback_exc).__name__}: {rollback_exc}"
+                )
+        if rollback_errors:
+            raise RuntimeError(
+                f"Batch distribution failed ({type(failure).__name__}: {failure}); "
+                "rollback was incomplete: " + "; ".join(rollback_errors)
+            ) from failure
+        raise RuntimeError(
+            f"Batch distribution failed and all files created by this batch were rolled back: "
+            f"{type(failure).__name__}: {failure}"
+        ) from failure
+
+    return {
+        **canonical,
+        "executed": True,
+        "status": "DISTRIBUTION_COMPLETE",
+        "transactional": True,
+        "results": results,
+        "journal_path": str(journal),
+        "source_originals_deleted": False,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Review-gated asset distribution and source cleanup.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -361,6 +559,8 @@ def main() -> int:
     copy_parser.add_argument("plan", type=Path)
     copy_parser.add_argument("--approve", action="store_true")
     copy_parser.add_argument("--journal", type=Path)
+    copy_parser.add_argument("--staging", type=Path,
+                             default=Path(__file__).resolve().parent / "staging")
     cleanup_parser = sub.add_parser("cleanup-originals")
     cleanup_parser.add_argument("samples_root", type=Path)
     cleanup_parser.add_argument("distributed_manifests", nargs="+", type=Path)
@@ -372,7 +572,10 @@ def main() -> int:
         result = distribution_plan(args.manifests, args.samples_root, args.staging_root)
     elif args.command == "distribute":
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
-        result = distribute_assets(plan, approve=args.approve, journal_path=args.journal)
+        result = distribute_assets_transactional(
+            plan, staging_root=args.staging, approve=args.approve,
+            journal_path=args.journal,
+        )
     else:
         result = cleanup_original_sources(
             args.distributed_manifests, samples_root=args.samples_root,
