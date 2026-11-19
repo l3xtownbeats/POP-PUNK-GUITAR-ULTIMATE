@@ -7,7 +7,7 @@ import unittest
 import wave
 from pathlib import Path
 
-from virtual_sample_extractor import analyze_long_wav, write_virtual_index
+from virtual_sample_extractor import analyze_long_wav, write_virtual_index, extract_virtual_ranges, STAGING_BASE
 
 
 def write_test_wav(path: Path, rate: int = 11025) -> None:
@@ -69,6 +69,46 @@ class VirtualSampleExtractorTests(unittest.TestCase):
             self.assertEqual(record["source_sha256"], report["source_sha256"])
             with self.assertRaises(FileExistsError):
                 write_virtual_index(report, import_root)
+
+
+    def test_extracts_long_recording_regions_to_staging_wav_with_exact_provenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "long_riff.wav"
+            write_test_wav(source)
+            before = hashlib.sha256(source.read_bytes()).hexdigest().upper()
+            report = analyze_long_wav(source, guitar_source_confirmed=True)
+            stage = STAGING_BASE / ("test-long-regions-" + next(tempfile._get_candidate_names()))
+            try:
+                records = extract_virtual_ranges(report, stage, max_clips=10)
+                self.assertGreaterEqual(len(records), 2)
+                self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest().upper(), before)
+                for record in records:
+                    clip = Path(record["derived_path"])
+                    manifest = stage / "manifests" / (clip.stem + ".json")
+                    self.assertTrue(clip.is_file())
+                    self.assertTrue(manifest.is_file())
+                    self.assertEqual(record["source_sha256"], before)
+                    self.assertEqual(record["review_status"], "NEEDS_MUSICAL_REVIEW")
+                    self.assertEqual(record["license_status"], "UNREVIEWED")
+                    self.assertEqual(record["kind"], "long_recording_region_candidate")
+                    with wave.open(str(clip), "rb") as audio:
+                        self.assertEqual(audio.getnframes(), record["frame_count"])
+                        self.assertEqual(audio.getframerate(), 11025)
+                        self.assertEqual(audio.getnchannels(), 1)
+                        self.assertEqual(audio.getsampwidth(), 3)
+                with self.assertRaises(FileExistsError):
+                    extract_virtual_ranges(report, stage, max_clips=10)
+                self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest().upper(), before)
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
+    def test_long_region_extraction_refuses_output_outside_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "long_riff.wav"
+            write_test_wav(source)
+            report = analyze_long_wav(source, guitar_source_confirmed=True)
+            with self.assertRaises(ValueError):
+                extract_virtual_ranges(report, Path(tmp) / "outside")
 
     def test_refuses_wrong_destination_and_changed_source(self):
         with tempfile.TemporaryDirectory() as tmp:
