@@ -83,6 +83,30 @@ class UnifiedManagerTests(unittest.TestCase):
                          self.original_hash)
         self.assertFalse(summary["source_files_moved_or_deleted"])
 
+    def test_aiff_flac_ogg_are_inventoried_when_bundled_decoder_supports_them(self) -> None:
+        try:
+            import numpy as np
+            import soundfile as sf
+        except ImportError:
+            self.skipTest("bundled soundfile decoder is unavailable in this test environment")
+        samples = (0.25 * np.sin(2 * np.pi * 330 * np.arange(8000) / 8000)).astype("float32")
+        written = []
+        for ext, fmt, subtype in ((".aiff", "AIFF", "PCM_16"),
+                                  (".flac", "FLAC", "PCM_16"),
+                                  (".ogg", "OGG", "VORBIS")):
+            path = self.incoming / ("tone" + ext)
+            try:
+                sf.write(str(path), samples, 8000, format=fmt, subtype=subtype)
+            except Exception:
+                self.skipTest(f"libsndfile cannot encode {fmt} in this environment")
+            written.append(path)
+        summary = run_manager(self.samples, reports_root=self.reports)
+        self.assertEqual(summary["wav_files"], 4)  # includes WAV + 3 decoded audio formats
+        inventory = (Path(summary["report_directory"]) / "unified_inventory.csv").read_text(encoding="utf-8-sig")
+        for path in written:
+            self.assertIn(path.name, inventory)
+            self.assertIn("OK", inventory)
+
     def test_unsupported_files_are_visible_and_other_audit_is_generated(self) -> None:
         unsupported = self.incoming / "unhandled.bin"
         unsupported.write_bytes(b"not a supported library format")
