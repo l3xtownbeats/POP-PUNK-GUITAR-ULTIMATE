@@ -8,6 +8,7 @@ All musical facts must already be present as reviewed metadata in the catalog.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -80,17 +81,25 @@ def _pattern_readiness(metadata: dict[str, Any]) -> tuple[str, list[str]]:
     pattern = metadata.get("pattern_performance_review") or metadata.get("pattern") or {}
     if not isinstance(pattern, dict):
         pattern = {}
-    required = {
-        "loop_start_sample": pattern.get("loop_start_sample"),
-        "loop_end_sample": pattern.get("loop_end_sample"),
-        "tempo_bpm": pattern.get("tempo_bpm"),
-        "time_signature": pattern.get("time_signature"),
-        "attack_events": pattern.get("attack_events"),
-    }
-    missing = [key for key, value in required.items() if value in (None, "", [])]
-    for key in ("beat_grid", "technique_events", "harmonic_events"):
-        if pattern.get(key) in (None, "", []):
-            missing.append(key)
+    missing: list[str] = []
+    start, end = pattern.get("loop_start_sample"), pattern.get("loop_end_sample")
+    if type(start) is not int or type(end) is not int or start < 0 or end <= start:
+        missing.append("valid_loop_start_end_sample")
+    tempo = pattern.get("tempo_bpm")
+    if not isinstance(tempo, (int, float)) or not 20 <= tempo <= 400:
+        missing.append("tempo_bpm")
+    signature = pattern.get("time_signature")
+    if not isinstance(signature, str) or not re.fullmatch(r"[1-9][0-9]*/[1-9][0-9]*", signature):
+        missing.append("time_signature")
+    for field in ("attack_events", "technique_events", "harmonic_events"):
+        values = pattern.get(field)
+        if not isinstance(values, list) or not values or any(not isinstance(x, dict) for x in values):
+            missing.append(field)
+    beat_grid = pattern.get("beat_grid")
+    if not isinstance(beat_grid, list) or not beat_grid or any(
+        not isinstance(x, (int, float)) or x < 0 for x in beat_grid
+    ) or beat_grid != sorted(beat_grid):
+        missing.append("beat_grid")
     if pattern.get("cycle_integrity_verified") is not True:
         missing.append("cycle_integrity_verified")
     if pattern.get("musical_review_verified") is not True:
@@ -101,21 +110,29 @@ def _pattern_readiness(metadata: dict[str, Any]) -> tuple[str, list[str]]:
 def _melody_readiness(asset: dict[str, Any], metadata: dict[str, Any]) -> tuple[str, list[str]]:
     notes = asset.get("confirmed_note_sequence") or metadata.get("confirmed_note_sequence") or []
     events = metadata.get("confirmed_melody_events") or metadata.get("melody_events") or []
-    missing = []
-    if not isinstance(notes, list) or len(notes) < 2:
+    missing: list[str] = []
+    if not isinstance(notes, list) or len(notes) < 2 or any(_as_int(x) is None for x in notes):
         missing.append("confirmed_note_sequence")
     if not isinstance(events, list) or len(events) < 2:
         missing.append("confirmed_melody_events_with_timing")
-    elif any(
-        not isinstance(item, dict)
-        or item.get("duration_beats") is None
-        or item.get("start_beats") is None
-        or _as_int(item.get("midi_note")) is None
-        or _as_int(item.get("velocity"), 1, 127) is None
-        for item in events
-    ):
-        missing.append("melody_event_pitch_timing_duration_or_velocity")
-    if not metadata.get("melody_phrase_boundaries"):
+    else:
+        previous_start = -1.0
+        for item in events:
+            if not isinstance(item, dict):
+                missing.append("melody_event_objects")
+                break
+            note, velocity = _as_int(item.get("midi_note")), _as_int(item.get("velocity"), 1, 127)
+            start, duration = item.get("start_beats"), item.get("duration_beats")
+            if (note is None or velocity is None
+                    or not isinstance(start, (int, float)) or start < 0 or start < previous_start
+                    or not isinstance(duration, (int, float)) or duration <= 0):
+                missing.append("melody_event_pitch_timing_duration_or_velocity")
+                break
+            previous_start = float(start)
+    boundaries = metadata.get("melody_phrase_boundaries")
+    if not isinstance(boundaries, list) or len(boundaries) < 2 or any(
+        not isinstance(value, (int, float)) or value < 0 for value in boundaries
+    ) or boundaries != sorted(boundaries):
         missing.append("melody_phrase_boundaries")
     if metadata.get("melody_mapping_verified") is not True:
         missing.append("melody_mapping_verified")
@@ -201,10 +218,27 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
             for technique in techniques:
                 technique_coverage[technique].append(asset_id)
             if mode == "PATTERN MODE":
-                state, missing = _pattern_readiness(metadata)
-                pattern_records.append({"asset_id": asset_id, "pattern_structure_status": state,
-                                        "missing_fields": missing, "reviewed_techniques": techniques,
-                                        "metadata": metadata.get("pattern_performance_review") or metadata.get("pattern") or {}})
+                asset_kind = str(asset.get("kind") or "").casefold()
+                is_note_zone = asset_kind in {
+                    "note_event", "sample_note_candidate", "sample_note", "one_shot_sample"
+                }
+                if is_note_zone:
+                    state = "NOTE_ZONE_READY" if pitches else "NOTE_ZONE_INCOMPLETE"
+                    missing = [] if pitches else ["confirmed_pitch_zone"]
+                    pattern_records.append({
+                        "asset_id": asset_id, "asset_kind": asset_kind,
+                        "pattern_structure_status": state, "missing_fields": missing,
+                        "confirmed_pitches": pitches, "reviewed_techniques": techniques,
+                        "metadata": {},
+                    })
+                else:
+                    state, missing = _pattern_readiness(metadata)
+                    pattern_records.append({
+                        "asset_id": asset_id, "asset_kind": asset_kind or "UNKNOWN",
+                        "pattern_structure_status": state, "missing_fields": missing,
+                        "reviewed_techniques": techniques,
+                        "metadata": metadata.get("pattern_performance_review") or metadata.get("pattern") or {},
+                    })
             if mode == "MELODY MODE":
                 state, missing = _melody_readiness(asset, metadata)
                 melody_records.append({"asset_id": asset_id, "melody_structure_status": state,
@@ -259,6 +293,8 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
         "pattern_mode": {
             "asset_count": len(pattern_records),
             "structure_verified_count": sum(x["pattern_structure_status"] == "STRUCTURE_VERIFIED" for x in pattern_records),
+            "note_zone_ready_count": sum(x["pattern_structure_status"] == "NOTE_ZONE_READY" for x in pattern_records),
+            "note_zone_incomplete_count": sum(x["pattern_structure_status"] == "NOTE_ZONE_INCOMPLETE" for x in pattern_records),
             "assets": pattern_records,
         },
         "melody_mode": {
