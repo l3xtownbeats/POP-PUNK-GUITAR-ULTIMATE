@@ -6,12 +6,12 @@ import hashlib
 import json
 import os
 import tempfile
-import wave
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from factory_curator import INSTRUMENTS, ROLES, STYLES, TONES
+from audio_range_io import audio_source_info
 
 
 def _sha256(path: Path) -> str:
@@ -85,15 +85,16 @@ def review_manifest(
     end = int(record.get("source_end_sample", -1))
     if start < 0 or end <= start:
         raise ValueError("Invalid source sample boundaries")
-    with wave.open(str(source), "rb") as original_audio, wave.open(str(derived), "rb") as audio:
-        if end > original_audio.getnframes():
-            raise ValueError("Source sample boundaries exceed the original WAV")
-        if audio.getnframes() != end - start:
-            raise ValueError("Derived WAV frame count does not match source boundaries")
-        if audio.getcomptype() != "NONE" or original_audio.getcomptype() != "NONE":
-            raise ValueError("Only uncompressed PCM WAV can be promoted")
-        if audio.getframerate() != original_audio.getframerate():
-            raise ValueError("Derived WAV sample rate differs from original source")
+    original_info = audio_source_info(source)
+    derived_info = audio_source_info(derived)
+    if end > original_info.frames:
+        raise ValueError("Source sample boundaries exceed the original audio")
+    if derived_info.frames != end - start:
+        raise ValueError("Derived WAV frame count does not match source boundaries")
+    if derived_info.source_format.upper() != "WAV" or derived_info.source_subtype not in {"PCM_16", "PCM_24", "PCM_32", "PCM_U8", "PCM"}:
+        raise ValueError("Derived asset must be uncompressed PCM WAV")
+    if derived_info.framerate != original_info.framerate:
+        raise ValueError("Derived WAV sample rate differs from original source")
 
     metadata = record.setdefault("musical_metadata", {})
     if not isinstance(metadata, dict):
