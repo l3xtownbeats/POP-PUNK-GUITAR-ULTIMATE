@@ -157,16 +157,21 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
             velocity = _velocity_record(asset, metadata) if approved_evidence else {
                 "status": "UNKNOWN", "min": None, "max": None, "layer": "UNKNOWN"
             }
+            review_ok = (
+                asset.get("review_status") == "REVIEWED"
+                and asset.get("license_status") == "LICENSE_APPROVED"
+            )
+            integrity_ok = asset.get("integrity_status") == "VERIFIED" and bool(asset.get("asset_file"))
+            mode_mapping_ok = mode in (asset.get("playable_modes") or [])
             playable = bool(
                 asset.get("playable") and asset.get("playable_in_mode")
-                and asset.get("review_status") == "REVIEWED"
-                and asset.get("license_status") == "LICENSE_APPROVED"
-                and asset.get("integrity_status") == "VERIFIED"
-                and asset.get("asset_file")
+                and review_ok and integrity_ok and mode_mapping_ok
             )
-            status = "RUNTIME_READY" if playable else (
-                "REVIEW_REQUIRED" if asset.get("review_status") != "REVIEWED"
-                or asset.get("license_status") != "LICENSE_APPROVED" else "MODE_MAPPING_BLOCKED"
+            status = (
+                "RUNTIME_READY" if playable else
+                "REVIEW_REQUIRED" if not review_ok else
+                "INTEGRITY_BLOCKED" if not integrity_ok else
+                "MODE_MAPPING_BLOCKED"
             )
             row = {
                 "asset_id": asset_id,
@@ -214,6 +219,7 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
             "runtime_ready_count": sum(1 for item in rows if item["runtime_ready"]),
             "review_required_count": sum(1 for item in rows if item["status"] == "REVIEW_REQUIRED"),
             "mode_mapping_blocked_count": sum(1 for item in rows if item["status"] == "MODE_MAPPING_BLOCKED"),
+            "integrity_blocked_count": sum(1 for item in rows if item["status"] == "INTEGRITY_BLOCKED"),
             "assets": rows,
         })
 
