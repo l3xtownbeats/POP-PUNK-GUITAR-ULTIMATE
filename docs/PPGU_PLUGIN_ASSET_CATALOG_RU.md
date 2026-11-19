@@ -67,3 +67,10 @@ STRUMMING, ARPEGGIO, ARTICULATIONS and ENDING are not inferred from generic onse
 
 - `CANDIDATES_ONLY_NO_APPROVED_RUNTIME_ASSETS`: catalog valid, but there are no assets that passed all musical/license/integrity gates.
 - `READY_FOR_PLUGIN_IMPORT`: at least one asset passed every gate; this still does not mean the plugin has loaded or played it.
+
+
+## Performance Manifest
+
+The same full cycle writes `performance_manifest.json` beside the asset catalog. Its schema is `ppgu.performance_manifest/1.0.0`. It carries all ten mode execution-model identifiers, mode-to-asset bindings, deduplicated source/derived provenance, and an event contract for future DAW-PPQ-tick events.
+
+The initial event list is deliberately empty. Manager does not invent event positions, durations, stroke directions, articulation, microtiming, velocity layers, string/fret positions or chord voicings. These fields remain unknown until verified. The future VST3 must load asset bindings off the audio thread and schedule only reviewed performance events.
