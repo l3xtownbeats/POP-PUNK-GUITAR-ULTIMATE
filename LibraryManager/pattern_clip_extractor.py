@@ -16,7 +16,7 @@ from typing import Any
 
 from audio_segmenter import STAGING_BASE, sha256_file, _safe_staging_root
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def extract_pattern_occurrences(
