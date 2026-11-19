@@ -509,3 +509,23 @@ SAMPLE MODE, STRUMMING, ARPEGGIO, PATTERN MODE, RIFF MODE, MELODY MODE, PHRASE M
 **Приёмка:** отдельные тесты для всех режимов. Для Pattern — цикл, сетка, ритмические события, гармонические изменения и артикуляции; для Melody — высоты/порядок нот, длительности, тайминг, фразировка и артикуляции. Отдельно подтверждаются manifests, CI, Windows/Portable build, VST3 runtime и воспроизведение в FL Studio 20.
 
 **Статус реализации не подразумевается:** решение утверждает обязательную базу и требования, но не заявляет, что анализатор, полная сортировка или VST3 уже готовы.
+
+
+## PPGU-MANAGER-30-018 — переход Library Manager на интегрированную архитектуру 3.0
+
+- **Статус:** DEVELOPMENT BASE IMPLEMENTED / RELEASE NOT ACCEPTED
+- **Дата:** 2026-11-19
+- **Версия разработки:** `3.0.0-dev1`
+- **Подробная запись:** `TJ-2026-11-19-MANAGER-30-INDEX-018` в `TASK_JOURNAL_RU.md`.
+
+### Решение
+
+Manager 3.0 разделяет два слоя данных:
+1. **Analysis hypotheses** — автоматические кандидаты, которые требуют музыкального прослушивания/проверки.
+2. **Reviewed mode assignments** — явные назначения из прошедших human review manifest.
+
+Новый `mode_assignment_index.py` индексирует staged assets в десяти утверждённых режимах без копирования WAV, проверяет SHA-256 и формирует mode-specific runtime blockers. Unified Manager пишет `reviewed_mode_assignment_index.json` рядом с анализом кандидатов. Версии GUI и unified runner — `3.0.0-dev1`.
+
+### Обязательное правило выпуска
+
+Название 3.0.0 не означает готовность. Финальный релиз запрещён до успешных Windows regression tests, portable package smoke test, проверки на реальной Samples library, проверки review/distribution/rollback и подтверждения всех release gates. Неизвестные музыкальные факты и лицензии не превращаются в подтверждённые данные.
