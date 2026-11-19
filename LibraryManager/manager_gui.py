@@ -149,6 +149,9 @@ class LibraryManagerApp:
 
         self._job_running = True
         self._cancel_event.clear()
+        self._active_task_id = self._task_journal.start(
+            title, details={"samples_root": self.samples_root.get(), "manager_version": APP_VERSION}
+        )
         self._cancel_button.configure(state="normal")
         self.status.set(title + " — запуск…")
         for button in self._action_buttons:
@@ -158,8 +161,10 @@ class LibraryManagerApp:
         def runner():
             try:
                 result = work()
+                self._task_journal.finish(self._active_task_id, title, result=result)
                 self._worker_events.put(("finish", title, result))
             except Exception as exc:
+                self._task_journal.fail(self._active_task_id, title, f"{type(exc).__name__}: {exc}")
                 self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
 
         worker = threading.Thread(target=runner, name="LibraryManagerWorker", daemon=True)
