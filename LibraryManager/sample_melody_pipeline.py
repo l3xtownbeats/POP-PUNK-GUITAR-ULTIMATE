@@ -119,10 +119,16 @@ def prepare_sample_and_melody(
             groups.append([event])
 
     results: dict[str, list[dict[str, Any]]] = {"sample_mode": [], "melody_mode": []}
+    eligible_groups = [group for group in groups if len(group) >= melody_min_notes]
+    melody_quota = (
+        min(len(eligible_groups), max(1, max_assets // 4))
+        if eligible_groups and max_assets > 1 else 0
+    )
+    sample_quota = max_assets - melody_quota
     created: list[Path] = []
     try:
         for event in events:
-            if len(results["sample_mode"]) + len(results["melody_mode"]) >= max_assets:
+            if len(results["sample_mode"]) >= sample_quota:
                 break
             start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
             if start < 0 or end <= start or end > total_frames:
@@ -146,11 +152,9 @@ def prepare_sample_and_melody(
             created.append(manifest)
             results["sample_mode"].append(record)
 
-        for group in groups:
-            if len(results["sample_mode"]) + len(results["melody_mode"]) >= max_assets:
+        for group in eligible_groups:
+            if len(results["melody_mode"]) >= melody_quota:
                 break
-            if len(group) < melody_min_notes:
-                continue
             start = min(int(x["source_start_sample"]) for x in group)
             end = max(int(x["source_end_sample"]) for x in group)
             if start < 0 or end <= start or end > total_frames:
