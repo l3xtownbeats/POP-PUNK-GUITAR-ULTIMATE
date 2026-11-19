@@ -68,8 +68,10 @@ class VirtualSampleExtractorTests(unittest.TestCase):
             record = json.loads(files[0].read_text(encoding="utf-8"))
             self.assertEqual(record["asset_kind"], "VIRTUAL_AUDIO_RANGE")
             self.assertEqual(record["source_sha256"], report["source_sha256"])
-            with self.assertRaises(FileExistsError):
-                write_virtual_index(report, import_root)
+            # Re-running the same scan reuses only sidecars with matching
+            # source hash, exact offsets and acoustic fingerprint.
+            reused = write_virtual_index(report, import_root)
+            self.assertEqual(reused, files)
 
 
     def test_extracts_long_recording_regions_to_staging_wav_with_exact_provenance(self):
