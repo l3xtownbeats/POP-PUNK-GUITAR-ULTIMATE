@@ -38,6 +38,18 @@ def audit_all_import_sources(samples_root: Path, staging_root: Path,
     source_records: dict[str, dict[str, Any]] = {}
     errors: list[dict[str, str]] = []
     manifests_scanned = 0
+    verified_distributed_assets: set[tuple[str, str]] = set()
+    for distributed_root in roots[1:]:
+        if not distributed_root.is_dir():
+            continue
+        for sidecar in distributed_root.rglob("*.json"):
+            try:
+                item = json.loads(sidecar.read_text(encoding="utf-8"))
+                if item.get("distribution_status") in {"VERIFIED_COPIED", "VERIFIED_COPIED_TO_OTHER"}:
+                    if item.get("source_path") and item.get("asset_id"):
+                        verified_distributed_assets.add((str(Path(item["source_path"]).resolve()), str(item["asset_id"])))
+            except Exception:
+                continue
 
     for source in sorted(p for p in incoming.rglob("*") if p.is_file()):
         try:
@@ -86,12 +98,14 @@ def audit_all_import_sources(samples_root: Path, staging_root: Path,
                 }
                 if str(source_hash).upper() != tracked["source_sha256"]:
                     dependent["blockers"].append("SOURCE_HASH_MISMATCH")
-                destination_text = (record.get("distributed_path") or
-                                    record.get("destination_path"))
+                destination_text = (record.get("distributed_path") or record.get("destination_path"))
+                if base == roots[0] and not destination_text:
+                    asset_key = (str(source), str(record.get("asset_id", "")))
+                    if asset_key in verified_distributed_assets:
+                        continue
                 destination_hash = (record.get("distributed_sha256") or
                                     record.get("destination_sha256") or
-                                    record.get("derived_sha256") if not destination_text else
-                                    record.get("distributed_sha256") or record.get("destination_sha256"))
+                                    record.get("derived_sha256"))
                 if destination_text:
                     destination = Path(destination_text).expanduser().resolve()
                     dependent["destination_path"] = str(destination)
