@@ -1,0 +1,27 @@
+name: Library Manager Windows Package
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "LibraryManager/**"
+      - ".github/workflows/library-manager-windows-package.yml"
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install packaging dependency
+        run: python -m pip install -r LibraryManager/requirements-build.txt
+      - name: Build portable folder
+        run: python -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths LibraryManager --distpath dist LibraryManager/manager_gui.py
+      - name: Archive package
+        shell: pwsh
+        run: Compress-Archive -Path dist/POP_PUNK_GUITAR_LIBRARY_MANAGER -DestinationPath dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
+          path: dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
+          if-no-files-found: error
