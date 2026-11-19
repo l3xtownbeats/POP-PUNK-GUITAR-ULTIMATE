@@ -55,6 +55,18 @@ class FinalizationTests(unittest.TestCase):
                         "tone_family": "CRUNCH",
                     },
                 }
+                if review == "REVIEWED":
+                    record["review_validation"] = {
+                        "source_sha256_verified": True,
+                        "derived_sha256_verified": True,
+                        "sample_boundaries_verified": True,
+                        "explicit_musical_approval": True,
+                        "explicit_license_approval": True,
+                    }
+                    record["musical_metadata"].update({
+                        "musical_review_notes": "Reviewed by listening.",
+                        "license_evidence": "License permits redistribution.",
+                    })
                 (manifests / f"{name}.json").write_text(json.dumps(record), encoding="utf-8")
             before_source = sha(source)
             result = finalize_staging(staging, reports_root=root / "reports")
