@@ -26,7 +26,7 @@ MODE_ORDER = (
 MODE_DESCRIPTIONS = {
     "SAMPLE MODE": "Pitch-specific note attacks, reviewed chord samples and Power Chords.",
     "STRUMMING": "Reviewed Downstroke, Upstroke and chord-strumming performances.",
-    "ARPEGGIO": "Reviewed string-by-string chord voicings and arpeggio events.",
+    "ARPEGGIO": "Chord voicing hypotheses plus reviewed string-by-string arpeggio events.",
     "PATTERN MODE": "Repeated rhythmic patterns plus pitch-specific note zones.",
     "RIFF MODE": "Musically reviewed guitar riffs and characteristic fragments.",
     "MELODY MODE": "Pitch-specific notes and reviewed melodic sequences.",
