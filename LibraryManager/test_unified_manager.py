@@ -61,6 +61,31 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
                          self.original_hash)
 
+    def test_quick_scan_reports_empty_import_folder_as_completed(self) -> None:
+        self.wav.unlink()
+        messages = []
+        summary = quick_scan(
+            self.samples, reports_root=self.reports, progress=messages.append,
+        )
+        self.assertEqual(summary["files_found"], 0)
+        self.assertEqual(summary["directory_errors"], 0)
+        self.assertEqual(summary["directories_scanned"], 1)
+        self.assertTrue(any("БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО" in item for item in messages))
+
+    def test_quick_scan_fails_clearly_when_import_root_is_unreadable(self) -> None:
+        import os
+
+        real_scandir = os.scandir
+
+        def guarded_scandir(path):
+            if Path(path).resolve() == self.incoming.resolve():
+                raise PermissionError("access denied by regression test")
+            return real_scandir(path)
+
+        with patch("unified_manager.os.scandir", side_effect=guarded_scandir):
+            with self.assertRaisesRegex(OSError, "Не удаётся прочитать входную папку"):
+                quick_scan(self.samples, reports_root=self.reports)
+
     def test_inventory_sfz_and_exact_duplicates(self) -> None:
         duplicate = self.incoming / "copy.wav"
         shutil.copyfile(self.wav, duplicate)
