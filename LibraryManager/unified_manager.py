@@ -357,10 +357,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         acoustic_json TEXT NOT NULL, classification_json TEXT NOT NULL,
         updated_utc TEXT NOT NULL)""")
     con.commit()
-    cached_rows = {
-        row[0]: (row[1], row[2], row[3])
-        for row in con.execute("SELECT path,size,mtime_ns,sha256 FROM file_hash_cache")
-    }
+    # Hash-cache rows are queried by path on demand; avoid loading an
+    # unbounded path->digest dictionary for very large sample libraries.
     # Do not preload the complete analysis cache into RAM. Query SQLite per
     # audio file so memory use remains bounded as the library grows.
 
@@ -387,7 +385,16 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         # guitar classification and needlessly stalls the scan.
         hash_required = ext in AUDIO_EXT or ext == ".sfz"
         key = str(path.resolve()) if hash_required else ""
-        cached = cached_rows.get(key) if key else None
+        cached = None
+        if key:
+            cache_reader = sqlite3.connect(str(cache_db), timeout=30)
+            try:
+                cached = cache_reader.execute(
+                    "SELECT size,mtime_ns,sha256 FROM file_hash_cache WHERE path=?",
+                    (key,),
+                ).fetchone()
+            finally:
+                cache_reader.close()
         if not hash_required:
             digest, hash_source = "", "SKIPPED_NON_AUDIO"
         elif cached and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
