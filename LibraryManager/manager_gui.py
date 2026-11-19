@@ -26,7 +26,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -82,7 +82,7 @@ class LibraryManagerApp:
             ("Остановить звук", self.stop_preview),
             ("Аудит папки OTHER", self.audit_other),
             ("Распределить одобренное в OTHER", self.distribute_other),
-            ("2. Извлечь найденные ритм-паттерны в WAV", self.extract_patterns),
+            ("Отдельное извлечение Pattern WAV", self.extract_patterns),
             ("3. Проверить WAV-кандидат", self.review_candidate),
             ("4. Финализировать staging", self.finalize_library),
             ("5. Распределить проверенные материалы", self.distribute),
@@ -91,12 +91,15 @@ class LibraryManagerApp:
             ("Открыть отчёты", self.open_reports),
             ("Открыть staging", self.open_staging),
         ]
-        for label, command in buttons:
+        for column in range(3):
+            actions.columnconfigure(column, weight=1)
+        for index, (label, command) in enumerate(buttons):
             button = ttk.Button(actions, text=label, command=command)
-            button.pack(side="left", padx=4, pady=3)
+            button.grid(row=index // 3, column=index % 3, sticky="ew", padx=4, pady=3)
             self._action_buttons.append(button)
+        cancel_row = (len(buttons) + 2) // 3
         self._cancel_button = ttk.Button(actions, text="ОСТАНОВИТЬ задачу", command=self.cancel_job, state="disabled")
-        self._cancel_button.pack(side="left", padx=8, pady=3)
+        self._cancel_button.grid(row=cancel_row, column=0, columnspan=3, sticky="ew", padx=4, pady=5)
 
         ttk.Label(outer, text="Журнал работы:").pack(anchor="w", pady=(8, 2))
         self.log = tk.Text(outer, wrap="word", height=22, font=("Consolas", 9))
