@@ -633,6 +633,11 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         other_audit_summary = {"errors": 1, "error": f"{type(exc).__name__}: {exc}"}
         errors.append({"path": str(samples_root / "OTHER"), "stage": "OTHER_AUDIT",
                        "error": f"{type(exc).__name__}: {exc}"})
+    pattern_manifest = build_pattern_engine_manifest()
+    manifest_errors = validate_pattern_engine_manifest(pattern_manifest)
+    if manifest_errors:
+        raise RuntimeError("Invalid Pattern Mode manifest template: " + "; ".join(manifest_errors))
+
     summary = {
         "manager_version": VERSION, "run_id": run_id,
         "report_directory": str(reports), "samples_root": str(samples_root),
@@ -680,10 +685,6 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_json(reports / "unified_exact_duplicates.json", duplicates)
     _write_json(reports / "unified_audio_analysis.json", audio_reports)
     _write_json(reports / "unified_asset_classification.json", classification_reports)
-    pattern_manifest = build_pattern_engine_manifest()
-    manifest_errors = validate_pattern_engine_manifest(pattern_manifest)
-    if manifest_errors:
-        raise RuntimeError("Invalid Pattern Mode manifest template: " + "; ".join(manifest_errors))
     _write_json(reports / "pattern_engine_manifest.json", pattern_manifest)
     _write_json(reports / "unified_errors.json", errors)
     _write_json(reports / "unified_summary.json", summary)
