@@ -456,3 +456,14 @@ Melody использует самостоятельную логику испо
 - Runtime readiness повторно ограничена REVIEWED + LICENSE_APPROVED + VERIFIED + asset path. Неизвестные данные не повышаются до подтверждённых.
 - Тесты добавлены, но CI и фактическая проверка на библиотеке пользователя ещё не подтверждены.
 - Исходные WAV не перемещаются, не копируются и не изменяются этим структурным этапом.
+
+
+## TJ-2026-11-19-MANAGER-30-REVIEW-METADATA-020 — полноценные поля музыкальной проверки
+
+- Версия разработки: `3.0.0-dev3`; статус: DEVELOPMENT / NOT FINAL.
+- `manifest_review.py` расширен полями `confirmed_techniques`, `confirmed_velocity_layer`, `advanced_metadata`.
+- GUI ручной проверки теперь принимает подтверждённые Downstroke, Upstroke, Palm Mute, Open, Muted, Slide, Legato, Hammer-on, Pull-off, Harmonics, Tremolo, Choke, Let Ring и Dead Note; velocity LOW/MEDIUM/HIGH; структурированные Pattern/Melody данные.
+- Pattern validation проверяет loop offsets внутри staged WAV, BPM, time signature, attack events, ordered beat grid, technique/harmonic events, cycle integrity и musical review confirmation.
+- Melody validation проверяет MIDI pitch, упорядоченное время старта, длительность, velocity, phrase boundaries и mapping verification.
+- Повторный review удаляет прежние подтверждения, если они не введены повторно.
+- Добавлен тест записи расширенных полей. Полный CI не подтвердил запуск job steps: GitHub Actions возвращает completed/failure при `runner_id=0`, `steps=null`, без логов; поэтому тестовый pass не заявляется.
