@@ -38,7 +38,7 @@ class LibraryManagerApp:
         self.samples_root = tk.StringVar(value=str(DEFAULT_SAMPLES))
         self.analyze_audio = tk.BooleanVar(value=True)
         self.guitar_confirmed = tk.BooleanVar(value=False)
-        self.status = tk.StringVar(value="Готов. Выберите папку Samples и запустите анализ.")
+        self.status = tk.StringVar(value="Готов. Выберите Samples или непосредственно Import Sample Guitar.")
         self._build()
 
     def _build(self) -> None:
@@ -50,7 +50,7 @@ class LibraryManagerApp:
 
         path_row = ttk.Frame(outer)
         path_row.pack(fill="x", pady=4)
-        ttk.Label(path_row, text="Папка Samples:").pack(side="left")
+        ttk.Label(path_row, text="Папка Samples / Import Sample Guitar:").pack(side="left")
         ttk.Entry(path_row, textvariable=self.samples_root).pack(side="left", fill="x", expand=True, padx=8)
         ttk.Button(path_row, text="Обзор…", command=self.choose_samples).pack(side="right")
 
@@ -96,15 +96,36 @@ class LibraryManagerApp:
         self.log.configure(state="disabled")
 
     def _samples(self) -> Path:
-        path = Path(self.samples_root.get()).expanduser()
-        if not path.is_dir():
-            raise FileNotFoundError(f"Папка Samples не найдена: {path}")
-        if not (path / "Import Sample Guitar").is_dir():
-            raise FileNotFoundError("В выбранной папке нет Import Sample Guitar.")
-        return path.resolve()
+        """Accept either the Samples root or Import Sample Guitar itself.
+
+        Internally operations receive the Samples root and resolve its
+        Import Sample Guitar child directory.
+        """
+        selected = Path(self.samples_root.get()).expanduser()
+        if not selected.is_dir():
+            raise FileNotFoundError(f"Выбранная папка не найдена: {selected}")
+
+        selected = selected.resolve()
+        samples_root = selected.parent if selected.name.casefold() == "import sample guitar" else selected
+        incoming = samples_root / "Import Sample Guitar"
+        if not incoming.is_dir():
+            match = next(
+                (child for child in samples_root.iterdir()
+                 if child.is_dir() and child.name.casefold() == "import sample guitar"),
+                None,
+            )
+            if match is None:
+                raise FileNotFoundError(
+                    "Не найдена папка 'Import Sample Guitar'. Выберите либо "
+                    "корневую папку Samples, внутри которой она находится, "
+                    "либо саму папку Import Sample Guitar."
+                )
+        return samples_root
 
     def choose_samples(self) -> None:
-        selected = filedialog.askdirectory(title="Выберите корневую папку Samples")
+        selected = filedialog.askdirectory(
+            title="Выберите Samples ИЛИ непосредственно Import Sample Guitar"
+        )
         if selected:
             self.samples_root.set(selected)
 
