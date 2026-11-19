@@ -24,7 +24,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
