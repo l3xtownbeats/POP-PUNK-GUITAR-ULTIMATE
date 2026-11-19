@@ -17,7 +17,7 @@ import sys
 from datetime import datetime, timezone
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from audio_analysis import analyse_wav
 from asset_classifier import classify_wav
@@ -106,7 +106,8 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 guitar_source_confirmed: bool = False,
                 write_virtual: bool = False,
-                reports_root: Path | None = None) -> dict[str, Any]:
+                reports_root: Path | None = None,
+                progress: Callable[[str], None] | None = None) -> dict[str, Any]:
     samples_root = resolve_samples_root(samples_root)
     incoming = next(p for p in samples_root.iterdir()
                     if p.is_dir() and p.name.strip().casefold() == "import sample guitar")
@@ -119,6 +120,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     reports = report_base / f"run_{run_id}"
     reports.mkdir(parents=True, exist_ok=False)
 
+    if progress:
+        progress(f"Папка импорта найдена: {incoming}. Подсчитываю файлы…")
     all_files = sorted(path for path in incoming.rglob("*") if path.is_file())
     excluded = [path for path in all_files if _is_excluded(path.relative_to(incoming))]
     included = [path for path in all_files if not _is_excluded(path.relative_to(incoming))]
@@ -128,8 +131,13 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     sfz_rows: list[dict[str, Any]] = []
     duplicate_groups: dict[str, list[str]] = defaultdict(list)
     errors: list[dict[str, str]] = []
+    total_files = len(included)
+    if progress:
+        progress(f"Найдено файлов: {len(all_files)}; к обработке: {total_files}; исключено по меткам: {len(excluded)}. Начинаю инвентаризацию и SHA-256…")
 
-    for path in included:
+    for file_index, path in enumerate(included, 1):
+        if progress and (file_index == 1 or file_index % 10 == 0 or file_index == total_files):
+            progress(f"Инвентаризация: {file_index}/{total_files} — {path.name}")
         ext = path.suffix.lower()
         relative = str(path.relative_to(incoming))
         try:
@@ -207,6 +215,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             errors.append({"path": relative, "stage": "INVENTORY",
                            "error": f"{type(exc).__name__}: {exc}"})
 
+    if progress:
+        progress(f"Инвентаризация завершена. SFZ-файлов: {sum(p.suffix.lower() == '.sfz' for p in included)}. Проверяю ссылки…")
     for sfz in (p for p in included if p.suffix.lower() == ".sfz"):
         try:
             sfz_rows.extend(parse_sfz_file(sfz, incoming))
@@ -218,7 +228,14 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         {"sha256": digest, "count": len(paths), "paths": paths}
         for digest, paths in sorted(duplicate_groups.items()) if len(paths) > 1
     ]
-    other_audit_summary = audit_other_library(samples_root, reports / "other_audit")
+    if progress:
+        progress("SFZ-проверка завершена. Выполняю аудит OTHER…")
+    try:
+        other_audit_summary = audit_other_library(samples_root, reports / "other_audit")
+    except Exception as exc:
+        other_audit_summary = {"errors": 1, "error": f"{type(exc).__name__}: {exc}"}
+        errors.append({"path": str(samples_root / "OTHER"), "stage": "OTHER_AUDIT",
+                       "error": f"{type(exc).__name__}: {exc}"})
     summary = {
         "manager_version": VERSION,
         "run_id": run_id,
@@ -262,6 +279,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_json(reports / "unified_asset_classification.json", classification_reports)
     _write_json(reports / "unified_errors.json", errors)
     _write_json(reports / "unified_summary.json", summary)
+    if progress:
+        progress(f"Готово. Отчёт сохранён: {reports}")
     return summary
 
 
