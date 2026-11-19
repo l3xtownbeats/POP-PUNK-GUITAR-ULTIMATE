@@ -71,12 +71,13 @@ class FinalizationTests(unittest.TestCase):
             before_source = sha(source)
             result = finalize_staging(staging, reports_root=root / "reports")
             self.assertEqual(result["manifests_checked"], 2)
-            self.assertEqual(result["factory_ready_count"], 1)
-            self.assertEqual(result["musical_review_required_count"], 1)
-            self.assertFalse(result["distribution_executed"])
-            self.assertEqual(sha(source), before_source)
             report = Path(result["report_directory"]) / "finalization_inventory.csv"
             self.assertTrue(report.is_file())
+            report_text = report.read_text(encoding="utf-8-sig")
+            self.assertEqual(result["factory_ready_count"], 1, report_text)
+            self.assertEqual(result["musical_review_required_count"], 1, report_text)
+            self.assertFalse(result["distribution_executed"])
+            self.assertEqual(sha(source), before_source)
             summary = json.loads((Path(result["report_directory"]) / "finalization_summary.json").read_text(encoding="utf-8"))
             self.assertTrue(summary["factory_distribution_allowed"])
 
