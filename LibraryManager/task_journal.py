@@ -38,7 +38,7 @@ class TaskJournal:
             "task": task,
             "details": details or {},
         }
-        payload = json.dumps(record, ensure_ascii=False, sort_keys=True)
+        payload = json.dumps(record, ensure_ascii=False, sort_keys=True, default=str)
         with self._lock:
             with self.path.open("a", encoding="utf-8", newline="\n") as stream:
                 stream.write(payload + "\n")
@@ -56,9 +56,19 @@ class TaskJournal:
                     details={"message": str(message)})
 
     def finish(self, task_id: str, task: str, *, result: Any = None) -> None:
-        summary = result if isinstance(result, (str, int, float, bool, type(None), dict, list)) else str(result)
+        if isinstance(result, dict):
+            summary = {"keys": sorted(str(key) for key in result.keys())}
+            for key, value in result.items():
+                if isinstance(value, (str, int, float, bool, type(None))):
+                    summary[str(key)] = value
+                elif isinstance(value, (list, tuple, dict)):
+                    summary[str(key) + "_count"] = len(value)
+        elif isinstance(result, (str, int, float, bool, type(None))):
+            summary = result
+        else:
+            summary = str(result)
         self.append("SUCCEEDED", task_id=task_id, task=task,
-                    details={"result": summary})
+                    details={"result_summary": summary})
 
     def fail(self, task_id: str, task: str, error: str) -> None:
         self.append("FAILED", task_id=task_id, task=task,
