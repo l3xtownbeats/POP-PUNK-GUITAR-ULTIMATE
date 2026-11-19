@@ -143,13 +143,23 @@ class LibraryManagerApp:
         analyze_audio = self.analyze_audio.get()
         guitar_confirmed = self.guitar_confirmed.get()
         def work():
+            def report_progress(message: str) -> None:
+                self.root.after(0, lambda text=message: self._progress(text))
             return run_manager(
                 samples,
                 analyze_audio=analyze_audio,
                 guitar_source_confirmed=guitar_confirmed,
                 write_virtual=False,
+                progress=report_progress,
             )
+        self._write("=== ЗАПУСК АНАЛИЗА БИБЛИОТЕКИ ===")
+        self._write(f"Акустический анализ: {'ВКЛЮЧЁН' if analyze_audio else 'ВЫКЛЮЧЕН'}")
+        self._write(f"Гитарный источник подтверждён: {'ДА' if guitar_confirmed else 'НЕТ'}")
         self._background("Анализ библиотеки", work)
+
+    def _progress(self, message: str) -> None:
+        self._write("[ВЫПОЛНЯЕТСЯ] " + message)
+        self.status.set(message)
 
     def preview_audio(self) -> None:
         selected = filedialog.askopenfilename(
