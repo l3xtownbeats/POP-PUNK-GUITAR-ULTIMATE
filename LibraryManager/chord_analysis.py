@@ -140,7 +140,7 @@ def _best_chord(chroma: list[float], *, min_confidence: float,
     }
 
 
-def analyze_chords(path: Path, *, frame_ms: int = 180, hop_ms: int = 60,
+def analyze_chords(path: Path, *, source_sha256: str | None = None, frame_ms: int = 180, hop_ms: int = 60,
                    min_confidence: float = 0.78,
                    min_margin: float = 0.035,
                    min_region_seconds: float = 0.24) -> dict[str, Any]:
@@ -207,7 +207,7 @@ def analyze_chords(path: Path, *, frame_ms: int = 180, hop_ms: int = 60,
     return {
         "chord_analyzer_version": VERSION,
         "source_path": str(path),
-        "source_sha256": sha256_file(path),
+        "source_sha256": str(source_sha256 or sha256_file(path)).upper(),
         "duration_seconds": round(total_frames / original_rate, 6),
         "sample_rate": original_rate,
         "channels": channels,
