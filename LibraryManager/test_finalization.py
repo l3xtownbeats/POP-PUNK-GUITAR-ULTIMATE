@@ -59,7 +59,7 @@ class FinalizationTests(unittest.TestCase):
                 },
             }
             wav_path.with_suffix(".wav.json").write_text(json.dumps(record), encoding="utf-8")
-            result = audit_factory_library(root, reports_root=root / "reports")
+            result = audit_factory_library(root / "Samples", reports_root=root / "reports")
             self.assertEqual(result["factory_wav_checked"], 1)
             self.assertEqual(result["factory_valid_count"], 1)
             self.assertTrue(result["factory_finalized"])
