@@ -23,7 +23,7 @@ from library_operations import (
     distribution_plan,
 )
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 MANAGER_DIR = Path(__file__).resolve().parent
 DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
 STAGING_ROOT = MANAGER_DIR / "staging"
@@ -96,8 +96,16 @@ class LibraryManagerApp:
         self.log.configure(state="disabled")
 
     def _samples(self) -> Path:
-        """Accept Samples root or the Import Sample Guitar directory itself."""
-        return resolve_samples_root(Path(self.samples_root.get()))
+        """Resolve and log the exact Samples/Import Sample Guitar paths."""
+        selected = Path(self.samples_root.get()).expanduser()
+        resolved = resolve_samples_root(selected)
+        incoming = next(
+            p for p in resolved.iterdir()
+            if p.is_dir() and p.name.strip().casefold() == "import sample guitar"
+        )
+        self._write(f"Путь Samples: {resolved}")
+        self._write(f"Путь входной библиотеки: {incoming.resolve()}")
+        return resolved
 
     def choose_samples(self) -> None:
         selected = filedialog.askdirectory(
