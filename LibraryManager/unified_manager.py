@@ -350,10 +350,21 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     con.execute("""CREATE TABLE IF NOT EXISTS file_hash_cache (
         path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL,
         sha256 TEXT NOT NULL, updated_utc TEXT NOT NULL)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS audio_analysis_cache (
+        cache_key TEXT PRIMARY KEY, path TEXT NOT NULL, size INTEGER NOT NULL,
+        mtime_ns INTEGER NOT NULL, source_sha256 TEXT NOT NULL,
+        acoustic_json TEXT NOT NULL, classification_json TEXT NOT NULL,
+        updated_utc TEXT NOT NULL)""")
     con.commit()
     cached_rows = {
         row[0]: (row[1], row[2], row[3])
         for row in con.execute("SELECT path,size,mtime_ns,sha256 FROM file_hash_cache")
+    }
+    cached_analysis = {
+        row[0]: (row[1], row[2])
+        for row in con.execute(
+            "SELECT cache_key,acoustic_json,classification_json FROM audio_analysis_cache"
+        )
     }
 
     def hash_with_cancel(path: Path) -> str:
@@ -422,9 +433,35 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                     # cycle also runs the monophonic tracker on eligible clips so the
                     # Sample/Melody extraction stage receives actual note candidates.
                     # YIN is internally skipped for sources longer than 45 seconds.
-                    acoustic = analyse_wav(path, max_samples=90_000)
+                    analysis_key = hashlib.sha256(
+                        ("|".join((str(path.resolve()).casefold(), str(stat.st_size),
+                                   str(stat.st_mtime_ns), digest, "acoustic-0.4.0",
+                                   "classifier-0.3.0", "pitch-events-current",
+                                   "max_samples=90000"))).encode("utf-8")
+                    ).hexdigest()
+                    cached_pair = cached_analysis.get(analysis_key)
+                    cache_status = "MISS"
+                    if cached_pair:
+                        try:
+                            acoustic = json.loads(cached_pair[0])
+                            classification = json.loads(cached_pair[1])
+                            cache_status = "HIT"
+                        except (TypeError, ValueError, json.JSONDecodeError):
+                            acoustic = analyse_wav(path, max_samples=90_000)
+                            classification = classify_wav(path, analyze_pitch=True, max_samples=90_000)
+                            cache_status = "REBUILT_CORRUPT_ENTRY"
+                    else:
+                        acoustic = analyse_wav(path, max_samples=90_000)
+                        classification = classify_wav(path, analyze_pitch=True, max_samples=90_000)
                     acoustic["source_sha256"] = digest
-                    classification = classify_wav(path, analyze_pitch=True, max_samples=90_000)
+                    acoustic["analysis_cache_status"] = cache_status
+                    classification["source_sha256"] = digest
+                    classification["analysis_cache_status"] = cache_status
+                    analysis_cache_record = (
+                        analysis_key, str(path.resolve()), stat.st_size, stat.st_mtime_ns,
+                        digest, json.dumps(acoustic, ensure_ascii=False, separators=(",", ":")),
+                        json.dumps(classification, ensure_ascii=False, separators=(",", ":"))
+                    )
                     classification["source_sha256"] = digest
                     classification["classification_status"] = "CANDIDATE_REQUIRES_REVIEW"
                     classification["automatic_factory_promotion"] = False
@@ -440,6 +477,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                             "articulation_candidates": row.get("articulation_candidates", ""),
                         },
                         "virtual_extraction": None,
+                        "analysis_cache_status": cache_status,
                     }
                     if guitar_source_confirmed and ext in {".wav", ".wave"}:
                         # Pattern Mode uses repeated rhythmic motifs only; broad RMS
@@ -498,6 +536,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
             "row": row, "audio_record": audio_record, "classification": classification,
             "errors": local_errors,
             "cache": (key, stat.st_size, stat.st_mtime_ns, digest) if hash_required and digest else None,
+            "analysis_cache": analysis_cache_record if ext in AUDIO_EXT and analyze_audio else None,
         }
 
     def safe_process_one(path: Path) -> dict[str, Any]:
@@ -525,7 +564,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 "audio_record": None, "classification": None,
                 "errors": [{"path": relative, "stage": "INVENTORY",
                             "error": f"{type(exc).__name__}: {exc}"}],
-                "cache": None,
+                "cache": None, "analysis_cache": None,
             }
 
     inventory: list[dict[str, Any]] = []
@@ -595,6 +634,12 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         con.execute(
                             "INSERT OR REPLACE INTO file_hash_cache VALUES(?,?,?,?,?)",
                             (*result["cache"], datetime.now(timezone.utc).isoformat())
+                        )
+                    if result.get("analysis_cache") is not None:
+                        cache_item = result["analysis_cache"]
+                        con.execute(
+                            "INSERT OR REPLACE INTO audio_analysis_cache VALUES(?,?,?,?,?,?,?,?)",
+                            (*cache_item, datetime.now(timezone.utc).isoformat())
                         )
                     completed += 1
                     # Keep the Tk event queue bounded: report progress in
@@ -694,6 +739,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "source_files_modified": False, "source_files_moved_or_deleted": False,
         "automatic_factory_promotion": False,
         "hash_cache": str(cache_db),
+        "audio_analysis_cache": str(cache_db),
+        "audio_analysis_cache_entries": len(cached_analysis),
         "workers": worker_count,
         "note": "All source files are read-only. Candidates require musical review and independent license approval.",
     }
