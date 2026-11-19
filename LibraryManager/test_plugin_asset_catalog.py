@@ -62,6 +62,18 @@ class PluginAssetCatalogTests(unittest.TestCase):
                 "license_status": "UNREVIEWED",
             }
             (manifests / "asset.json").write_text(json.dumps(manifest), encoding="utf-8")
+            strum_wav = clips / "strum.wav"
+            write_wav(strum_wav)
+            strum_manifest = dict(manifest)
+            strum_manifest.update({
+                "asset_id": "ASSET-STRUM",
+                "kind": "audio_region_candidate",
+                "derived_path": str(strum_wav),
+                "derived_sha256": digest(strum_wav),
+                "engine_targets": [],
+                "mode_assignments": ["STRUMMING"],
+            })
+            (manifests / "strum.json").write_text(json.dumps(strum_manifest), encoding="utf-8")
             mode_report = base / "mode_sorting_report.json"
             mode_report.write_text(json.dumps({"modes": [
                 {"mode": "RIFF MODE", "candidates": [{"candidate_type": "RIFF_OR_PHRASE_REVIEW"}]}
@@ -76,6 +88,9 @@ class PluginAssetCatalogTests(unittest.TestCase):
             self.assertEqual(sample_mode["asset_count"], 1)
             self.assertFalse(sample_mode["assets"][0]["playable"])
             self.assertEqual(sample_mode["assets"][0]["review_status"], "NEEDS_MUSICAL_REVIEW")
+            strumming_mode = next(item for item in catalog["modes"] if item["mode"] == "STRUMMING")
+            self.assertEqual(strumming_mode["asset_count"], 1)
+            self.assertEqual(strumming_mode["assets"][0]["mode_assignments"], ["STRUMMING"])
             riff_mode = next(item for item in catalog["modes"] if item["mode"] == "RIFF MODE")
             self.assertEqual(riff_mode["candidate_count"], 1)
             self.assertEqual(result["playable_asset_count"], 0)
