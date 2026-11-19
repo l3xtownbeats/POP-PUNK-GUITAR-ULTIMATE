@@ -72,6 +72,12 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertEqual(summary["audio_files_analyzed"], 1)
         self.assertGreaterEqual(summary["repeated_rhythm_pattern_candidates"], 0)
         self.assertEqual(summary["virtual_active_region_candidates"], 0)
+        self.assertEqual(summary["asset_classifications_created"], 1)
+        self.assertEqual(summary["classification_policy"], "CANDIDATE_ONLY_REQUIRES_HUMAN_REVIEW")
+        classifications = json.loads((Path(summary["report_directory"]) / "unified_asset_classification.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(classifications), 1)
+        self.assertEqual(classifications[0]["classification_status"], "CANDIDATE_REQUIRES_REVIEW")
+        self.assertFalse(classifications[0]["automatic_factory_promotion"])
         self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
                          self.original_hash)
         self.assertFalse(summary["source_files_moved_or_deleted"])
