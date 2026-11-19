@@ -27,7 +27,7 @@ from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_long_wav, write_virtual_index
 from other_audit import audit_other_library
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 
 
