@@ -86,5 +86,5 @@ The 393-path count and 387-unique-content count are both intentional and must no
 
 - The VST3 source/build system is still not present in the inspected repository baseline.
 - The plugin must implement catalog loading, sample-zone lookup, realtime voice scheduling, chord/voicing generation, strumming/arpeggio/riff/phrase/melody engines, MIDI Key Switch and DAW sync.
-- Strumming, Arpeggio, Articulations and Ending remain manual-evidence categories in Manager until validated source data or explicit human tagging is available.
+- Strumming, Arpeggio, Articulations and Ending remain manual-evidence categories in Manager until validated source data or explicit human tagging is available. The staged review dialog now stores explicit mode assignments in manifests; this does not invent missing event timing or articulation details.
 - Do not claim successful VST3 build or FL Studio 20 playback until the plugin binary exists and is tested after the approved library/preset integration gate.
