@@ -8,7 +8,8 @@ import unittest
 import wave
 from pathlib import Path
 
-from virtual_sample_extractor import analyze_long_wav, write_virtual_index, extract_virtual_ranges, STAGING_BASE
+from virtual_sample_extractor import (analyze_long_wav, analyze_pattern_ranges,
+                                      write_virtual_index, extract_virtual_ranges, STAGING_BASE)
 
 
 def write_test_wav(path: Path, rate: int = 11025) -> None:
@@ -53,6 +54,61 @@ class VirtualSampleExtractorTests(unittest.TestCase):
                 self.assertLess(item["source_start_sample"], item["source_end_sample"])
                 self.assertEqual(len(item["acoustic_fingerprint"]), 64)
                 self.assertEqual(item["review_status"], "NEEDS_MUSICAL_REVIEW")
+
+    def test_pattern_mode_keeps_only_repeated_rhythm_occurrences(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "take.wav"
+            write_test_wav(source)
+            report = {
+                "pattern_analysis": {
+                    "onset_count": 8,
+                    "rhythmic_regularity_candidate": 0.91,
+                    "patterns": [{
+                        "candidate_type": "REPEATED_RHYTHM_MOTIF",
+                        "pattern_candidate_id": "PATTERN-TEST",
+                        "pattern_signature_units": [8, 8, 8],
+                        "occurrence_count": 2,
+                        "occurrences": [
+                            {"start_seconds": 0.50, "end_seconds": 1.20,
+                             "start_onset_index": 0, "end_onset_index_exclusive": 4},
+                            {"start_seconds": 1.50, "end_seconds": 2.20,
+                             "start_onset_index": 4, "end_onset_index_exclusive": 8},
+                        ],
+                    }],
+                },
+            }
+            result = analyze_pattern_ranges(
+                source, report, guitar_source_confirmed=True,
+                source_sha256=hashlib.sha256(source.read_bytes()).hexdigest().upper(),
+            )
+            self.assertEqual(result["candidate_count"], 2)
+            self.assertEqual(result["extraction_policy"],
+                             "REPEATED_RHYTHM_ONLY_NO_BROAD_RMS_ACTIVE_REGIONS")
+            for candidate in result["candidates"]:
+                self.assertEqual(candidate["candidate_type"],
+                                 "REPEATED_GUITAR_RHYTHM_PATTERN")
+                self.assertEqual(candidate["review_status"], "NEEDS_MUSICAL_REVIEW")
+                self.assertGreaterEqual(candidate["onset_count_candidate"], 4)
+                self.assertLess(candidate["duration_seconds"], 1.0)
+
+    def test_pattern_mode_rejects_irregular_or_unrepeated_material(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "take.wav"
+            write_test_wav(source)
+            report = {"pattern_analysis": {
+                "onset_count": 8, "rhythmic_regularity_candidate": 0.40,
+                "patterns": [{
+                    "candidate_type": "REPEATED_RHYTHM_MOTIF",
+                    "occurrence_count": 2,
+                    "occurrences": [{"start_seconds": 0.2, "end_seconds": 1.2,
+                                     "start_onset_index": 0,
+                                     "end_onset_index_exclusive": 5}],
+                }],
+            }}
+            result = analyze_pattern_ranges(source, report,
+                                             guitar_source_confirmed=True,
+                                             source_sha256="A" * 64)
+            self.assertEqual(result["candidate_count"], 0)
 
     def test_writes_sidecars_only_to_import_folder(self):
         with tempfile.TemporaryDirectory() as tmp:
