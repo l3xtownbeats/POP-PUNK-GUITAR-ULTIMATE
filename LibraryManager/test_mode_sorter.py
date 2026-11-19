@@ -71,10 +71,10 @@ class ModeSorterTests(unittest.TestCase):
         source = record(chord_analysis={
             "chord_candidates": [
                 {"start_seconds": 0.2, "end_seconds": 0.6,
-                 "chord_name_candidate": "C", "quality": "MAJOR",
+                 "chord_name_candidate": "C", "root_pitch_class": "C", "quality": "MAJOR",
                  "pitch_classes_candidate": ["C", "E", "G"], "confidence": 0.9},
                 {"start_seconds": 0.8, "end_seconds": 1.2,
-                 "chord_name_candidate": "G5", "quality": "POWER5",
+                 "chord_name_candidate": "G5", "root_pitch_class": "G", "quality": "POWER5",
                  "pitch_classes_candidate": ["G", "D"], "confidence": 0.88},
             ]
         })
