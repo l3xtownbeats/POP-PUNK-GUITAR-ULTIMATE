@@ -145,6 +145,29 @@ class SampleMelodyPipelineTests(unittest.TestCase):
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
 
+    def test_total_sample_and_melody_outputs_respect_asset_cap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.wav"
+            _write_test_wav(source)
+            candidates = [
+                {"start_seconds": start, "end_seconds": start + 0.12,
+                 "midi_note_candidate": 60 + index,
+                 "note_name_candidate": "CANDIDATE", "confidence": 0.8}
+                for index, start in enumerate((0.10, 0.35, 0.60, 0.85, 1.10, 1.35), 1)
+            ]
+            stage = pipeline.STAGING_BASE / ("test-asset-cap-" + next(tempfile._get_candidate_names()))
+            try:
+                result = pipeline.prepare_sample_and_melody(
+                    source, stage, pre_roll_ms=0, post_roll_ms=0,
+                    pitch_candidates=candidates, expected_source_sha256=_hash(source),
+                    max_note_events=20, max_assets=4,
+                )
+                total = result["sample_mode_count"] + result["melody_mode_count"]
+                self.assertEqual(total, 4)
+                self.assertEqual(result["max_assets"], 4)
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
     def test_rejects_non_staging_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.wav"
