@@ -179,6 +179,6 @@ def finalize_staging(
         "staged_files_modified": False,
     }
     (report_dir / "finalization_summary.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8"
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return summary
