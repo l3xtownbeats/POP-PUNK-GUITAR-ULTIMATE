@@ -319,6 +319,8 @@ class LibraryManagerApp:
                         result = prepare_sample_and_melody(
                             source, STAGING_ROOT,
                             max_note_events=min(100, remaining),
+                            pitch_candidates=record.get("pitch_candidates"),
+                            expected_source_sha256=record.get("source_sha256"),
                         )
                         extracted_sample += result["sample_mode_count"]
                         extracted_melody += result["melody_mode_count"]
