@@ -81,11 +81,19 @@ def find_repeating_patterns(
             signature = tuple(units[start:start + length])
             grouped[signature].append((start, start + length))
 
-    repeated = [
-        (signature, occurrences)
-        for signature, occurrences in grouped.items()
-        if len(occurrences) >= min_occurrences
-    ]
+    # Sliding windows overlap heavily. Treating every matching window as an
+    # occurrence would inflate counts and report one long passage as many
+    # repetitions. Keep only temporally non-overlapping instances per signature.
+    repeated = []
+    for signature, occurrences in grouped.items():
+        accepted = []
+        last_end = -1
+        for start, end in sorted(occurrences):
+            if start >= last_end:
+                accepted.append((start, end))
+                last_end = end
+        if len(accepted) >= min_occurrences:
+            repeated.append((signature, accepted))
     # Prefer longer motifs and collapse candidates whose every occurrence is
     # already covered by a longer repeated motif with the same occurrence starts.
     repeated.sort(key=lambda item: (-len(item[0]), -len(item[1]), item[0]))
