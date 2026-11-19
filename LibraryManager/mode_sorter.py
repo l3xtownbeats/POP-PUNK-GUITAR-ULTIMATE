@@ -8,6 +8,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from voicing_generator import generate_voicing_candidates
+
 SORTER_VERSION = "1.0.0"
 
 MODE_ORDER = (
@@ -146,6 +148,29 @@ def build_mode_sorting_report(audio_reports: list[dict[str, Any]]) -> dict[str, 
                     "string_fret_positions": None,
                 },
             ))
+            # Build review-only fretboard shapes from the chord pitch-class
+            # hypothesis. Standard EADGBE is an assumption, never confirmed tuning.
+            voicing_report = generate_voicing_candidates(chord, max_candidates=12)
+            if voicing_report.get("voicing_candidates"):
+                queues["ARPEGGIO"].append(_candidate(
+                    record, "ARPEGGIO", "ARPEGGIO_VOICING_HYPOTHESIS", start, end,
+                    status="GENERATED_VOICING_REQUIRES_GUITAR_REVIEW",
+                    evidence=[
+                        "Voicing candidates generated from an experimental chord pitch-class hypothesis.",
+                        "Standard EADGBE tuning is assumed and must be confirmed; fingerings are not solved.",
+                    ],
+                    extra={
+                        "chord_name_candidate": chord.get("chord_name_candidate"),
+                        "root_pitch_class_candidate": chord.get("root_pitch_class"),
+                        "quality_candidate": quality,
+                        "pitch_classes_candidate": chord.get("pitch_classes_candidate", []),
+                        "voicing_candidates": voicing_report["voicing_candidates"],
+                        "voicing_candidate_count": voicing_report["candidate_count"],
+                        "tuning_name_candidate": voicing_report.get("tuning_name_candidate"),
+                        "tuning_status": voicing_report.get("tuning_status"),
+                        "physical_fingering_review_required": True,
+                    },
+                ))
 
         # Only the repeated-motif extractor can populate Pattern Mode.
         virtual = record.get("virtual_extraction") or {}
