@@ -792,3 +792,18 @@ PPGU использует собственный визуальный язык �
 Критерии: отдельные слоты/ID и типы; независимая логика STRUMMED/ARPEGGIO/RIFF; валидный chord/voicing; проверка host sync, Start on a key, Latch, Offset и tempo multipliers; корректная динамика/артикуляции только при подтверждённых данных; сохранение SAME PERFORMANCE, DIFFERENT NOTE; оригинальный UI PPGU.
 
 Эта запись фиксирует требования, но не подтверждает наличие готового Pattern engine/UI, chord adaptation или успешных тестов. Проект остаётся DEVELOPMENT / NOT FINAL.
+
+
+## TJ-2026-11-19-AUTOCHORDS-12-NOTE-PATTERN-SCOPE-035
+**Статус: USER APPROVED / SCOPE FIXED / IMPLEMENTATION NOT VERIFIED.**
+
+Пользователь утвердил предыдущую спецификацию Pattern с обязательным ограничением: её аккордовое управление и применение в PPGU должны работать только через наш режим **AUTOCHORDS — 12 NOTES**. Это наша собственная схема управления, а не копирование MIDI-раскладки Session Guitarist.
+
+- AUTOCHORDS 12 NOTES — единственный утверждённый способ подачи/выбора аккордового контекста для данного Pattern workflow.
+- Все семейства STRUMMED, ARPEGGIO и RIFF должны получать chord context через AUTOCHORDS 12 NOTES и затем применять только совместимую музыкальную/voicing-адаптацию.
+- Сохранить инвариант PATTERN = SAME PERFORMANCE, DIFFERENT NOTE, а также независимость MELODY = SINGLE GUITAR NOTES.
+- Не назначать клавиши E1–G1 или C1–D#1 по аналогии с NI. Конкретное соответствие 12 нот, chord/root/quality mapping и поведение одновременных нажатий должны следовать отдельной утверждённой спецификации AUTOCHORDS; неизвестное не угадывать.
+- Не добавлять альтернативный chord-input workflow в обход AUTOCHORDS без отдельного решения пользователя.
+- Визуальный интерфейс и выбор слотов остаются собственными PPGU.
+
+Запись фиксирует область действия и пользовательское решение. Она не доказывает, что AUTOCHORDS 12 NOTES или Pattern engine уже реализованы и протестированы. DEVELOPMENT / NOT FINAL.
