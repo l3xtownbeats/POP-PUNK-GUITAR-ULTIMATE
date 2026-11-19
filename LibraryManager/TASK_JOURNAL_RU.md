@@ -533,3 +533,16 @@ Melody использует самостоятельную логику испо
 - Stability acceptance requires no known release-blocking defects, source corruption, uncontrolled memory growth or incomplete transaction recovery; failure/cancellation/restart/hash and integrity tests are mandatory.
 - No absolute zero-bug guarantee is claimed. No feature, CI pass, Portable build or Windows launch is marked complete until execution evidence exists.
 - Previous long-WAV streaming optimization commit: fd828d444b78a57ae8b78987fec5b4e419aff1b5; this journal entry records approval of the scope, not a test pass.
+
+
+## TJ-2026-11-19-MANAGER-30-APPROVAL-027 — утверждена обязательная база разработки Manager 3.0
+
+- Дата: 2026-11-19.
+- Тип: прямое утверждение пользователя («БАЗА ФИКСИРУЮ УТВЕРЖДАЮ»).
+- Статус: APPROVED SCOPE / IMPLEMENTATION AND VALIDATION REQUIRED.
+
+Зафиксирована как обязательная база: MELODY с извлечением нот/последовательностей/фраз и MIDI-кандидатами; PATTERN с обнаружением повторяющихся ритмов и выборочным извлечением; классификация десяти режимов, техник и velocity; автоматический анализ и ручная очередь проверки; физическая библиотека, SFZ и mapping; SHA-256, журнал, транзакции, отмена и rollback; CI, все тесты, Windows Portable и фактическая проверка запуска.
+
+Критерии стабильности: не маскировать заглушки и незавершённые функции под готовые; проверками и негативными тестами блокировать повреждение оригиналов, нарушение целостности и некорректное восстановление; не заявлять абсолютное отсутствие будущих багов без испытаний. Неоднозначные музыкальные данные остаются кандидатами для review. Обычный Manager определяет музыкальную функцию материала при распределении; AUTO SOUND HUNTER использует то же полноценное ядро.
+
+Статус Manager 3.0 остаётся DEVELOPMENT / NOT FINAL до реализации и фактического прохождения каждого обязательного приёмочного gate. Эта запись не является свидетельством прохождения тестов, CI, Portable build или Windows launch.
