@@ -368,13 +368,13 @@ class LibraryManagerApp:
             def report_progress(message: str) -> None:
                 self._worker_events.put(("progress", message))
 
-            report_progress("ЭТАП 1/6: быстрое сканирование структуры — только файловая метаинформация.")
+            report_progress("ЭТАП 1/8: быстрое сканирование структуры — только файловая метаинформация.")
             quick_result = quick_scan(
                 samples, progress=report_progress, cancel_event=self._cancel_event,
             )
             if self._cancel_event.is_set():
                 raise RuntimeError("Полный цикл остановлен после быстрого сканирования.")
-            report_progress("ЭТАП 2/6: глубокая инвентаризация, SHA-256 cache, форматы, дубликаты и SFZ.")
+            report_progress("ЭТАП 2/8: глубокая инвентаризация, SHA-256 cache, форматы, дубликаты и SFZ.")
             analysis_result = run_manager(
                 samples,
                 analyze_audio=analyze_audio,
@@ -395,6 +395,7 @@ class LibraryManagerApp:
 
             extracted_region = 0
             extracted_pattern = 0
+            extracted_chord = 0
             extracted_sample = 0
             extracted_melody = 0
             max_total_assets = 500
@@ -406,7 +407,7 @@ class LibraryManagerApp:
                 from sample_melody_pipeline import prepare_sample_and_melody
                 from virtual_sample_extractor import extract_virtual_ranges
 
-                report_progress("ЭТАП 3/6: извлечение реальных WAV-отрывков из длинных гитарных записей.")
+                report_progress("ЭТАП 3/8: извлечение реальных WAV-отрывков из длинных гитарных записей.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; уже созданные staging-кандидаты сохранены.")
@@ -431,7 +432,7 @@ class LibraryManagerApp:
                             "error": f"{type(exc).__name__}: {exc}",
                         })
 
-                report_progress("ЭТАП 4/6: извлечение WAV повторяющихся ритм-паттернов.")
+                report_progress("ЭТАП 4/8: извлечение WAV повторяющихся ритм-паттернов.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
@@ -457,18 +458,41 @@ class LibraryManagerApp:
                     if extracted_region + extracted_pattern >= max_total_assets:
                         break
 
-                report_progress("ЭТАП 5/6: извлечение отдельных нот SAMPLE MODE и фраз MELODY MODE.")
+                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV для SAMPLE MODE / Chord / Auto Chords.")
+                from chord_clip_extractor import extract_chord_samples
+                for record in records:
+                    if self._cancel_event.is_set():
+                        raise RuntimeError("Извлечение аккордов остановлено; созданные staging-кандидаты сохранены.")
+                    chord_data = record.get("chord_analysis") or {}
+                    if not chord_data.get("chord_candidates"):
+                        continue
+                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord
+                    if remaining <= 0:
+                        break
+                    try:
+                        clips = extract_chord_samples(
+                            chord_data, STAGING_ROOT, max_clips=min(100, remaining),
+                        )
+                        extracted_chord += len(clips)
+                    except Exception as exc:
+                        extraction_failures.append({
+                            "source_path": record.get("source_path"),
+                            "stage": "CHORD_SAMPLE_EXTRACTION",
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
+
+                report_progress("ЭТАП 6/8: извлечение отдельных нот SAMPLE MODE и фраз MELODY MODE.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
-                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_sample - extracted_melody
+                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord - extracted_sample - extracted_melody
                     if remaining <= 0:
                         break
                     source = Path(record.get("source_path", ""))
                     if source.suffix.lower() not in AUDIO_EXT:
                         continue
                     try:
-                        remaining = max_total_assets - extracted_region - extracted_pattern - extracted_sample - extracted_melody
+                        remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord - extracted_sample - extracted_melody
                         result = prepare_sample_and_melody(
                             source, STAGING_ROOT,
                             max_note_events=min(100, remaining),
@@ -497,13 +521,13 @@ class LibraryManagerApp:
                     "error": "Физическое извлечение пропущено: оператор не подтвердил гитарный источник.",
                 })
 
-            report_progress("ЭТАП 6/6: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
+            report_progress("ЭТАП 7/8: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
             finalization_result = finalize_library_audit(
                 samples, STAGING_ROOT,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
-            report_progress("ЭТАП 7/7: проверка и сборка plugin_asset_catalog для всех 10 режимов VST3.")
+            report_progress("ЭТАП 8/8: проверка и сборка plugin_asset_catalog для всех 10 режимов VST3.")
             catalog_path = Path(analysis_result["report_directory"]) / "plugin_asset_catalog.json"
             catalog_result = build_plugin_asset_catalog(
                 STAGING_ROOT,
@@ -525,9 +549,10 @@ class LibraryManagerApp:
                 "physical_extraction": {
                     "long_recording_region_wav_count": extracted_region,
                     "pattern_mode_wav_count": extracted_pattern,
+                    "chord_and_power_chord_wav_count": extracted_chord,
                     "sample_mode_wav_count": extracted_sample,
                     "melody_mode_wav_count": extracted_melody,
-                    "total_new_wav_candidates": extracted_region + extracted_pattern + extracted_sample + extracted_melody,
+                    "total_new_wav_candidates": extracted_region + extracted_pattern + extracted_chord + extracted_sample + extracted_melody,
                     "global_asset_limit": max_total_assets,
                     "manifest_count_in_staging": finalization_result["staging"]["manifests_checked"],
                     "failures": extraction_failures,
