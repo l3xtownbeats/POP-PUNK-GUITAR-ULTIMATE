@@ -13,7 +13,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 
-from unified_manager import run_manager
+from unified_manager import run_manager, resolve_samples_root
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
@@ -96,31 +96,8 @@ class LibraryManagerApp:
         self.log.configure(state="disabled")
 
     def _samples(self) -> Path:
-        """Accept either the Samples root or Import Sample Guitar itself.
-
-        Internally operations receive the Samples root and resolve its
-        Import Sample Guitar child directory.
-        """
-        selected = Path(self.samples_root.get()).expanduser()
-        if not selected.is_dir():
-            raise FileNotFoundError(f"Выбранная папка не найдена: {selected}")
-
-        selected = selected.resolve()
-        samples_root = selected.parent if selected.name.casefold() == "import sample guitar" else selected
-        incoming = samples_root / "Import Sample Guitar"
-        if not incoming.is_dir():
-            match = next(
-                (child for child in samples_root.iterdir()
-                 if child.is_dir() and child.name.casefold() == "import sample guitar"),
-                None,
-            )
-            if match is None:
-                raise FileNotFoundError(
-                    "Не найдена папка 'Import Sample Guitar'. Выберите либо "
-                    "корневую папку Samples, внутри которой она находится, "
-                    "либо саму папку Import Sample Guitar."
-                )
-        return samples_root
+        """Accept Samples root or the Import Sample Guitar directory itself."""
+        return resolve_samples_root(Path(self.samples_root.get()))
 
     def choose_samples(self) -> None:
         selected = filedialog.askdirectory(
