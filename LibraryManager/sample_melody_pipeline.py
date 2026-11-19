@@ -79,56 +79,56 @@ def prepare_sample_and_melody(
     created: list[Path] = []
     try:
         for event in events:
-                start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
-                if start < 0 or end <= start or end > total_frames:
-                    continue
-                asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
-                clip = clips_dir / f"SAMPLE-{asset_id}.wav"
-                manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
-                clip_info = _write_clip(source, start, end, clip, rate)
-                created.append(clip)
-                record = _record(
-                    asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
-                    "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
-                    {"midi_note_candidate": event.get("midi_note_candidate"),
-                     "note_name_candidate": event.get("note_name_candidate"),
-                     "detected_note_start_seconds": event.get("detected_note_start_seconds"),
-                     "detected_note_end_seconds": event.get("detected_note_end_seconds"),
-                     "confidence": event.get("confidence")},
-                )
-                _write_manifest(manifest, record)
-                created.append(manifest)
-                results["sample_mode"].append(record)
+            start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
+            if start < 0 or end <= start or end > total_frames:
+                continue
+            asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
+            clip = clips_dir / f"SAMPLE-{asset_id}.wav"
+            manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
+            clip_info = _write_clip(source, start, end, clip, rate)
+            created.append(clip)
+            record = _record(
+                asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
+                "sample_note_candidate", ["SAMPLE_MODE", "KEYBOARD_PLAYBACK"],
+                {"midi_note_candidate": event.get("midi_note_candidate"),
+                 "note_name_candidate": event.get("note_name_candidate"),
+                 "detected_note_start_seconds": event.get("detected_note_start_seconds"),
+                 "detected_note_end_seconds": event.get("detected_note_end_seconds"),
+                 "confidence": event.get("confidence")},
+            )
+            _write_manifest(manifest, record)
+            created.append(manifest)
+            results["sample_mode"].append(record)
 
-            for group in groups:
-                if len(group) < melody_min_notes:
-                    continue
-                start = min(int(x["source_start_sample"]) for x in group)
-                end = max(int(x["source_end_sample"]) for x in group)
-                if start < 0 or end <= start or end > total_frames:
-                    continue
-                asset_id = _identity(source_hash, "MELODY_PHRASE", start, end)
-                clip = clips_dir / f"MELODY-{asset_id}.wav"
-                manifest = manifests_dir / f"MELODY-{asset_id}.json"
-                clip_info = _write_clip(source, start, end, clip, rate)
-                created.append(clip)
-                record = _record(
-                    asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
-                    "melody_phrase_candidate", ["MELODY_MODE", "MELODY_INSTRUMENT"],
-                    {"note_event_count": len(group),
-                     "note_candidates": [
-                         {"midi": x.get("midi_note_candidate"),
-                          "name": x.get("note_name_candidate"),
-                          "start_seconds": x.get("detected_note_start_seconds"),
-                          "end_seconds": x.get("detected_note_end_seconds")}
-                         for x in group
-                     ],
-                     "boundary_basis": "grouped_pitch_event_candidates",
-                     "grouping_gap_seconds": melody_gap_seconds},
-                )
-                _write_manifest(manifest, record)
-                created.append(manifest)
-                results["melody_mode"].append(record)
+        for group in groups:
+            if len(group) < melody_min_notes:
+                continue
+            start = min(int(x["source_start_sample"]) for x in group)
+            end = max(int(x["source_end_sample"]) for x in group)
+            if start < 0 or end <= start or end > total_frames:
+                continue
+            asset_id = _identity(source_hash, "MELODY_PHRASE", start, end)
+            clip = clips_dir / f"MELODY-{asset_id}.wav"
+            manifest = manifests_dir / f"MELODY-{asset_id}.json"
+            clip_info = _write_clip(source, start, end, clip, rate)
+            created.append(clip)
+            record = _record(
+                asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
+                "melody_phrase_candidate", ["MELODY_MODE", "MELODY_INSTRUMENT"],
+                {"note_event_count": len(group),
+                 "note_candidates": [
+                     {"midi": x.get("midi_note_candidate"),
+                      "name": x.get("note_name_candidate"),
+                      "start_seconds": x.get("detected_note_start_seconds"),
+                      "end_seconds": x.get("detected_note_end_seconds")}
+                     for x in group
+                 ],
+                 "boundary_basis": "grouped_pitch_event_candidates",
+                 "grouping_gap_seconds": melody_gap_seconds},
+            )
+            _write_manifest(manifest, record)
+            created.append(manifest)
+            results["melody_mode"].append(record)
 
         if _sha256(source) != source_hash:
             raise RuntimeError("Source changed during Sample/Melody extraction")
