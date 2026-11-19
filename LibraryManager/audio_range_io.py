@@ -73,16 +73,29 @@ def write_pcm_wav_range(
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite {destination}")
     try:
+        # Stream in bounded chunks: a long riff/phrase must not allocate the
+        # entire decoded range in RAM on the target 8 GB / dual-core PC.
+        remaining = end_frame - start_frame
         with sf.SoundFile(str(source), mode="r") as reader:
             reader.seek(start_frame)
-            data = reader.read(end_frame - start_frame, dtype="float32", always_2d=True)
-        if len(data) != end_frame - start_frame:
-            raise IOError("Decoder returned an incomplete frame range")
-        with destination.open("xb") as output:
-            sf.write(output, data, info.framerate, format="WAV", subtype="PCM_24")
+            with sf.SoundFile(
+                str(destination), mode="x",
+                samplerate=info.framerate, channels=info.nchannels,
+                format="WAV", subtype="PCM_24",
+            ) as writer:
+                while remaining:
+                    count = min(65536, remaining)
+                    data = reader.read(count, dtype="float32", always_2d=True)
+                    if len(data) != count:
+                        raise IOError("Decoder returned an incomplete frame range")
+                    writer.write(data)
+                    remaining -= count
         with sf.SoundFile(str(destination), mode="r") as verify:
-            if len(verify) != end_frame - start_frame or verify.samplerate != info.framerate:
-                raise IOError("Derived WAV failed frame/rate verification")
+            if (len(verify) != end_frame - start_frame
+                    or verify.samplerate != info.framerate
+                    or verify.channels != info.nchannels
+                    or verify.subtype != "PCM_24"):
+                raise IOError("Derived WAV failed frame/rate/channel/PCM verification")
     except Exception:
         destination.unlink(missing_ok=True)
         raise
