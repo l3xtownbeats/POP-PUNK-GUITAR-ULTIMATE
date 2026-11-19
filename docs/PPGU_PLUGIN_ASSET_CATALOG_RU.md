@@ -48,7 +48,7 @@ An asset is `playable: true` only if all conditions hold:
 5. `license_status == LICENSE_APPROVED`.
 6. License evidence and all explicit `review_validation` flags are present.
 
-Unreviewed assets may be browsed and previewed by Manager but must never enter the plugin's playable factory set. Never infer chord labels, MIDI notes, string/fret positions, tuning, velocity layers, articulation or license status from a missing field.
+Unreviewed or unmapped assets may be browsed and previewed by Manager but must never enter the plugin's playable factory set. The review dialog accepts explicit mappings such as `MIDI:60`, `CHORD:C` or `NOTES:60,62,64`; blank input leaves the mapping unknown. Never infer chord labels, MIDI notes, string/fret positions, tuning, velocity layers, articulation or license status from a missing field.
 
 ## Musical engine boundary
 
