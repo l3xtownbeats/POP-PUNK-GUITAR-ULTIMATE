@@ -90,7 +90,8 @@ def chromatic_note_table(*, key_name: str | None = None, spelling: str = "key") 
             "canonical_name": names[pc],
             "enharmonic_aliases": list(ENHARMONIC_NAMES[pc]),
             "midi_notes": list(range(pc, 128, 12)),
-            "playable": True,
+            "required_for_playback": True,
+            "runtime_status": "REQUIRES_APPROVED_SAMPLE_OR_VERIFIED_FALLBACK",
         }
         for pc in range(12)
     ]
