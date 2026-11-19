@@ -125,10 +125,20 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                     pre_roll_ms=0, post_roll_ms=0,
                     pitch_candidates=candidates,
                     expected_source_sha256=_hash(source),
+                    source_metadata={
+                        "note_candidate": "C4",
+                        "velocity_candidate": "80",
+                        "string_candidate": "2",
+                        "articulation_candidates": "palm;mute",
+                    },
                 )
                 self.assertEqual(result["sample_mode_count"], 3)
                 self.assertEqual(result["melody_mode_count"], 1)
                 self.assertEqual(result["sample_mode"][0]["source_format"], "AIFF")
+                self.assertEqual(
+                    result["sample_mode"][0]["musical_metadata"]["source_filename_metadata"]["velocity_candidate"],
+                    "80",
+                )
                 with wave.open(result["sample_mode"][0]["derived_path"], "rb") as clip:
                     self.assertEqual(clip.getframerate(), 8000)
                     self.assertEqual(clip.getnframes(), 1600)
