@@ -55,11 +55,13 @@ def build_performance_manifest(
         raise ValueError("Unsupported or invalid plugin asset catalog")
 
     mode_bindings = {mode: [] for mode in MODE_ORDER}
+    mode_candidate_bindings = {mode: [] for mode in MODE_ORDER}
     bindings_by_id: dict[str, dict[str, Any]] = {}
     for section in catalog.get("modes", []):
         mode = section.get("mode")
         if mode not in mode_bindings:
             continue
+        mode_candidate_bindings[mode] = section.get("candidates", [])
         for asset in section.get("assets", []):
             asset_id = str(asset.get("asset_id") or "")
             if not asset_id:
@@ -112,6 +114,7 @@ def build_performance_manifest(
             for mode in MODE_ORDER
         ],
         "mode_asset_bindings": mode_bindings,
+        "mode_candidate_bindings": mode_candidate_bindings,
         "asset_bindings": bindings,
         "events": [],
         "event_count": 0,
@@ -195,6 +198,9 @@ def validate_performance_manifest(manifest: dict[str, Any]) -> list[str]:
     mode_bindings = manifest.get("mode_asset_bindings")
     if not isinstance(mode_bindings, dict) or list(mode_bindings) != list(MODE_ORDER):
         errors.append("mode_asset_bindings must contain all ten modes in approved order")
+    candidate_bindings = manifest.get("mode_candidate_bindings")
+    if not isinstance(candidate_bindings, dict) or list(candidate_bindings) != list(MODE_ORDER):
+        errors.append("mode_candidate_bindings must contain all ten modes in approved order")
     events = manifest.get("events")
     if not isinstance(events, list) or manifest.get("event_count") != len(events):
         errors.append("events/event_count are inconsistent")
