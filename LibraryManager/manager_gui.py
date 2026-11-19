@@ -387,7 +387,29 @@ class LibraryManagerApp:
 
     def _progress(self, message: str) -> None:
         self._write("[ВЫПОЛНЯЕТСЯ] " + message)
+        if self._active_task_id:
+            try:
+                self._task_journal.progress(self._active_task_id, "Background task", message)
+            except OSError as exc:
+                self._write(f"[ПРЕДУПРЕЖДЕНИЕ] Не удалось записать историю: {exc}")
         self.status.set(message)
+
+    def show_task_history(self) -> None:
+        """Display last known task states from the durable journal."""
+        try:
+            states = self._task_journal.latest_states()
+            if not states:
+                self._write("История задач пока пуста.")
+                return
+            self._write("=== ИСТОРИЯ ЗАДАЧ ===")
+            for task_id, state in list(states.items())[-100:]:
+                self._write(
+                    f"{state.get('last_timestamp_utc')} | {state.get('task')} | "
+                    f"{state.get('last_event')} | id={task_id}"
+                )
+            self._write(f"Полный журнал: {self._task_journal.path}")
+        except OSError as exc:
+            messagebox.showerror("История задач", str(exc))
 
     def preview_audio(self) -> None:
         selected = filedialog.askopenfilename(
