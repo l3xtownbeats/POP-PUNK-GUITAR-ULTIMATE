@@ -57,6 +57,9 @@ class PerformanceManifestTests(unittest.TestCase):
             self.assertEqual(manifest["events"], [])
             self.assertTrue(manifest["event_contract"]["unknown_timing_must_remain_unknown"])
             self.assertEqual(manifest["asset_bindings"][0]["asset_id"], "SAMPLE-1")
+            self.assertEqual([item["pitch_class"] for item in manifest["chromatic_pitch_map"]["pitch_classes"]], list(range(12)))
+            self.assertTrue(manifest["chromatic_pitch_map"]["enharmonic_aliases_are_merged"])
+            self.assertTrue(manifest["midi_contract"]["autochords_uses_same_canonical_pitch_classes"])
             self.assertEqual(manifest["mode_candidate_bindings"]["ARPEGGIO"][0]["candidate_type"], "ARPEGGIO_VOICING_HYPOTHESIS")
             self.assertEqual(validate_performance_manifest(manifest), [])
 
