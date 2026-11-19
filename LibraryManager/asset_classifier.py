@@ -57,9 +57,10 @@ def _pitch_evidence(path):
                 "pitch_tracker":"UNAVAILABLE","error":str(exc)}
 
 def classify_wav(path: Path, short_max_seconds: float=1.25,
-                 long_min_seconds: float=1.5, analyze_pitch: bool=True) -> dict:
+                 long_min_seconds: float=1.5, analyze_pitch: bool=True,
+                 max_samples: int=90_000) -> dict:
     path=Path(path)
-    samples,rate,frames,channels,width,decimation=read_mono_pcm(path)
+    samples,rate,frames,channels,width,decimation=read_mono_pcm(path, max_samples=max_samples)
     if rate<=0 or frames<=0 or not samples: raise ValueError("Empty or invalid WAV")
     duration=frames/rate
     env,dt=_envelope(samples,rate,decimation)
