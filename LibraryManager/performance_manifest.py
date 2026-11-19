@@ -72,6 +72,7 @@ def build_performance_manifest(
                     "kind": asset.get("kind", "UNKNOWN"),
                     "asset_file": asset.get("asset_file"),
                     "target_modes": [],
+                    "mode_assignments": asset.get("mode_assignments", []),
                     "source_path": asset.get("source_path"),
                     "source_sha256": asset.get("source_sha256"),
                     "source_start_sample": asset.get("source_start_sample"),
