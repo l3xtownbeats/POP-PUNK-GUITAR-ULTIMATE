@@ -120,3 +120,8 @@
 Каталог теперь сохраняет полный `musical_metadata`, чтобы структура не теряла проверенные события. Физические WAV не дублируются; связи между режимами строятся по asset ID. Только явно подтверждённые техники попадают в coverage. Неизвестные данные остаются GAP/INCOMPLETE. Runtime-ready требует REVIEWED + LICENSE_APPROVED + VERIFIED + валидный asset path.
 
 Статус: базовая структурная сборка реализована; требуется прохождение полного CI, реальная Samples validation и закрытие всех музыкальных/режимных пробелов. Это не означает, что все режимы VST3 уже готовы к воспроизведению.
+
+
+### Дополнение 3.0-dev3 — расширенное музыкальное ревью
+
+В `manifest_review.py` и GUI добавлен ввод подтверждённых техник, velocity layer и расширенных JSON-данных Pattern/Melody. Проверяются границы loop относительно длительности staged WAV, BPM, размер, attack events, beat grid, technique/harmonic events, cycle integrity, MIDI pitch, ordered beat timing, note duration, velocity и phrase boundaries. При повторном ревью старые подтверждённые теги и event mappings сбрасываются, если пользователь их заново не подтвердил. Это предотвращает перенос устаревшей разметки на изменённое решение.
