@@ -270,7 +270,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 reports_root: Path | None = None,
                 progress: Callable[[str], None] | None = None,
                 cancel_event: Any = None,
-                workers: int | None = 1) -> dict[str, Any]:
+                workers: int | None = None) -> dict[str, Any]:
     """Run a resumable, low-memory read-only inventory and analysis pass.
 
     Defaults to one worker for older dual-core/8GB systems to keep the PC responsive.
@@ -281,6 +281,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     """
     import hashlib
     import sqlite3
+    import threading
     from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 
     samples_root = resolve_samples_root(samples_root)
@@ -358,10 +359,28 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         acoustic_json TEXT NOT NULL, classification_json TEXT NOT NULL,
         updated_utc TEXT NOT NULL)""")
     con.commit()
-    # Hash-cache rows are queried by path on demand; avoid loading an
-    # unbounded path->digest dictionary for very large sample libraries.
-    # Do not preload the complete analysis cache into RAM. Query SQLite per
-    # audio file so memory use remains bounded as the library grows.
+
+    # Reuse one read-only SQLite connection per worker. Opening/closing a
+    # database connection twice for every file adds avoidable overhead on
+    # Windows, especially when scanning thousands of short samples.
+    # Worker connections are never shared between worker threads.
+    cache_thread_state = threading.local()
+    cache_reader_connections: list[sqlite3.Connection] = []
+    cache_reader_guard = threading.Lock()
+
+    def get_cache_reader() -> sqlite3.Connection:
+        reader = getattr(cache_thread_state, "connection", None)
+        if reader is None:
+            reader = sqlite3.connect(str(cache_db), timeout=15, check_same_thread=False)
+            reader.execute("PRAGMA query_only=ON")
+            reader.execute("PRAGMA busy_timeout=15000")
+            cache_thread_state.connection = reader
+            with cache_reader_guard:
+                cache_reader_connections.append(reader)
+        return reader
+
+    # The inventory itself is processed with a bounded number of futures;
+    # no full path->digest or audio-analysis cache is loaded into RAM.
 
     def hash_with_cancel(path: Path) -> str:
         h = hashlib.sha256()
@@ -388,14 +407,10 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         key = str(path.resolve()) if hash_required else ""
         cached = None
         if key:
-            cache_reader = sqlite3.connect(str(cache_db), timeout=30)
-            try:
-                cached = cache_reader.execute(
-                    "SELECT size,mtime_ns,sha256 FROM file_hash_cache WHERE path=?",
-                    (key,),
-                ).fetchone()
-            finally:
-                cache_reader.close()
+            cached = get_cache_reader().execute(
+                "SELECT size,mtime_ns,sha256 FROM file_hash_cache WHERE path=?",
+                (key,),
+            ).fetchone()
         if not hash_required:
             digest, hash_source = "", "SKIPPED_NON_AUDIO"
         elif cached and cached[0] == stat.st_size and cached[1] == stat.st_mtime_ns:
@@ -445,15 +460,10 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                                    "classifier-0.3.0", "pitch-events-current", "chord-analysis-0.1.0",
                                    "max_samples=90000"))).encode("utf-8")
                     ).hexdigest()
-                    cache_reader = sqlite3.connect(str(cache_db), timeout=30)
-                    try:
-                        cached_row = cache_reader.execute(
-                            "SELECT acoustic_json,classification_json FROM audio_analysis_cache WHERE cache_key=?",
-                            (analysis_key,),
-                        ).fetchone()
-                    finally:
-                        cache_reader.close()
-                    cached_pair = cached_row
+                    cached_pair = get_cache_reader().execute(
+                        "SELECT acoustic_json,classification_json FROM audio_analysis_cache WHERE cache_key=?",
+                        (analysis_key,),
+                    ).fetchone()
                     cache_status = "MISS"
                     if cached_pair:
                         try:
@@ -634,7 +644,11 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         ),
     )  # SFZ, mapped WAV, other audio, then non-audio metadata.
 
-    worker_count = max(1, min(int(workers if workers is not None else 1), 2))
+    # Two I/O workers speed up hashing/inventory on most drives. During
+    # acoustic analysis, default to one worker on older dual-core PCs to keep
+    # the UI responsive; users can explicitly select two after benchmarking.
+    default_workers = 1 if analyze_audio else 2
+    worker_count = max(1, min(int(workers if workers is not None else default_workers), 2))
     completed = 0
     pending = set()
     iterator = iter(supported_files)
@@ -698,6 +712,13 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         con.commit()
         raise
     finally:
+        # Executor shutdown has completed before this block, so each cached
+        # reader is idle and can be closed safely from the coordinating thread.
+        for cache_reader in cache_reader_connections:
+            try:
+                cache_reader.close()
+            except sqlite3.Error:
+                pass
         con.close()
 
     # Unsupported files remain visible in the inventory; they are never silently dropped.
@@ -830,6 +851,8 @@ def main() -> int:
                         help="Operator confirms that input has already excluded Piano, Bell and Drum.")
     parser.add_argument("--write-virtual-index", action="store_true",
                         help="Write non-audio JSON range sidecars under Import Sample Guitar (never slices WAV).")
+    parser.add_argument("--workers", type=int, choices=(1, 2), default=None,
+                        help="Parallel workers: default 2 for inventory-only, 1 during heavy audio analysis.")
     args = parser.parse_args()
     try:
         summary = run_manager(
@@ -837,6 +860,7 @@ def main() -> int:
             analyze_audio=args.analyze_audio,
             guitar_source_confirmed=args.guitar_source_confirmed,
             write_virtual=args.write_virtual_index,
+            workers=args.workers,
         )
     except Exception as exc:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
