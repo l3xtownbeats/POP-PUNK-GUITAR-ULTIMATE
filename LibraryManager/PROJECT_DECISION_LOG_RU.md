@@ -557,3 +557,13 @@ Manager 3.0 разделяет два слоя данных:
 - Pattern note-zone classification требует подтверждённой ноты и ссылки на физический derived WAV; оно не заменяет chord-driven rhythm Pattern.
 - Melody event note sequence должна совпадать с подтверждённой последовательностью; события без MIDI pitch, ordered start, duration, velocity или phrase boundaries остаются INCOMPLETE.
 - Ни одна структурная запись не может обойти mode-specific playable_modes, license, review и integrity gates.
+
+
+## PPGU-MANAGER-30-APPROVAL-023 — утверждённая база Manager 3.0 и приоритет производительности
+
+- Статус: USER APPROVED / IMPLEMENTED IN DEVELOPMENT, VALIDATION PENDING
+- Неизменная функциональная база: десять утверждённых режимов; 12 pitch classes; LOW/MEDIUM/HIGH velocity; 15 управляемых техник/артикуляций; строгие Pattern/Melody metadata gates; ручная проверка; раздельные review/license/integrity статусы.
+- Приоритет производительности: быстрый проход — только filesystem metadata, без SHA-256 и аудиодекодирования; inventory/hash-only — до двух ограниченных потоков; тяжёлый audio analysis — один поток по умолчанию на старых dual-core CPU.
+- SQLite read-only connections переиспользуются в worker threads. Кэш остаётся на диске, не загружается целиком в RAM.
+- FACTORY batch distribution выполняет полный preflight до записи, не перезаписывает назначения, сверяет SHA-256 и журналирует операцию. При ошибке или отмене откатывает только назначения, созданные этой транзакцией. Оригиналы остаются нетронутыми.
+- Не считать релиз финальным: требуются успешные тесты, проверка на Windows, Portable smoke test, сравнение скорости на реальном диске и музыкальная валидация извлечения. Данная запись фиксирует требования и development-изменения, но не утверждает прохождение проверок.
