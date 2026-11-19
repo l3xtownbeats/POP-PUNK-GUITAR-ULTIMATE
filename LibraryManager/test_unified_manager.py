@@ -126,6 +126,38 @@ class UnifiedManagerTests(unittest.TestCase):
                          self.original_hash)
         self.assertFalse(summary["source_files_moved_or_deleted"])
 
+    def test_confirmed_guitar_analysis_adds_chord_candidates_to_sample_mode(self) -> None:
+        chord_report = {
+            "source_path": str(self.wav.resolve()),
+            "source_sha256": self.original_hash,
+            "chord_candidate_count": 1,
+            "chord_candidates": [{
+                "start_seconds": 0.2,
+                "end_seconds": 0.7,
+                "chord_name_candidate": "A5",
+                "root_pitch_class": "A",
+                "quality": "POWER5",
+                "pitch_classes_candidate": ["A", "E"],
+                "confidence": 0.91,
+            }],
+        }
+        with patch("chord_analysis.analyze_chords", return_value=chord_report):
+            summary = run_manager(
+                self.samples, analyze_audio=True, guitar_source_confirmed=True,
+                reports_root=self.reports,
+            )
+        report_dir = Path(summary["report_directory"])
+        audio = json.loads((report_dir / "unified_audio_analysis.json").read_text(encoding="utf-8"))
+        self.assertEqual(audio[0]["chord_analysis"]["chord_candidate_count"], 1)
+        self.assertEqual(summary["chord_sample_candidates"], 1)
+        modes = json.loads((report_dir / "mode_sorting_report.json").read_text(encoding="utf-8"))
+        sample_mode = next(item for item in modes["modes"] if item["mode"] == "SAMPLE MODE")
+        self.assertTrue(any(item["candidate_type"] == "POWER_CHORD_SAMPLE"
+                            for item in sample_mode["candidates"]))
+        self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
+                         self.original_hash)
+        self.assertFalse(summary["source_files_modified"])
+
     def test_aiff_flac_ogg_are_inventoried_when_bundled_decoder_supports_them(self) -> None:
         try:
             import numpy as np
