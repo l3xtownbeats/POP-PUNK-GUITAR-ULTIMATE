@@ -76,7 +76,7 @@ class LibraryStructureTests(unittest.TestCase):
                "license_status": "UNREVIEWED", "integrity_status": "BLOCKED"}
         result = build_library_structure(_catalog({"SAMPLE MODE": [bad]}))
         self.assertEqual(result["modes"][0]["assets"][0]["runtime_ready"], False)
-        self.assertTrue(validate_library_structure(result))
+        self.assertEqual(validate_library_structure(result), [])
 
 
 if __name__ == "__main__":
