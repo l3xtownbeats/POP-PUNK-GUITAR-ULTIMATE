@@ -407,4 +407,4 @@ The full preparation cycle now produces a versioned `plugin_asset_catalog.json` 
 
 The catalog's WAV paths are relative to the catalog file and resolve into `LibraryManager/staging`. It is a bridge contract for the future VST3 loader, not a compiled plugin or a packaged factory sound bank. A staged asset becomes runtime-playable only after its derived/source hashes and sample boundaries validate and its manifest contains explicit `REVIEWED` + `LICENSE_APPROVED` evidence. No automatic FACTORY promotion occurs.
 
-The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog automatically. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
+The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
