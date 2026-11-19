@@ -10,7 +10,8 @@ from typing import Any
 
 from voicing_generator import generate_voicing_candidates
 
-SORTER_VERSION = "1.0.0"
+SORTER_VERSION = "1.1.0"
+MAX_CHORD_HYPOTHESES_PER_FILE = 100
 
 MODE_ORDER = (
     "SAMPLE MODE", "STRUMMING", "ARPEGGIO", "PATTERN MODE", "RIFF MODE",
@@ -122,7 +123,7 @@ def build_mode_sorting_report(audio_reports: list[dict[str, Any]]) -> dict[str, 
         # Experimental chord regions are SAMPLE MODE chord/power-chord
         # candidates. They are not verified voicings or string/fret positions.
         chord_report = record.get("chord_analysis") or {}
-        for chord in chord_report.get("chord_candidates", []) or []:
+        for chord in (chord_report.get("chord_candidates", []) or [])[:MAX_CHORD_HYPOTHESES_PER_FILE]:
             start_s, end_s = chord.get("start_seconds"), chord.get("end_seconds")
             if not acoustic_rate or not isinstance(start_s, (int, float)) or not isinstance(end_s, (int, float)) or end_s <= start_s:
                 continue
