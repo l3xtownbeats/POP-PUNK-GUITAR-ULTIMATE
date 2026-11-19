@@ -321,6 +321,7 @@ class LibraryManagerApp:
                             max_note_events=min(100, remaining),
                             pitch_candidates=record.get("pitch_candidates"),
                             expected_source_sha256=record.get("source_sha256"),
+                            source_metadata=record.get("filename_metadata"),
                         )
                         extracted_sample += result["sample_mode_count"]
                         extracted_melody += result["melody_mode_count"]
