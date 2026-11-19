@@ -449,3 +449,14 @@ The structure builder does not copy WAV files. One physical staged asset may be 
 ### 3.0-dev3 — review metadata for real library structure
 
 The manual review dialog now records explicit technique tags (Downstroke, Upstroke, Palm Mute, Open, Slide, Legato, Hammer-on, Pull-off, harmonics, tremolo, choke, let-ring and dead-note), a confirmed velocity layer, and optional structured Pattern/Melody event data. Pattern metadata is validated for loop boundaries inside the staged WAV, BPM, meter, attack/beat-grid/technique/harmonic events and cycle/review confirmations. Melody metadata is validated for MIDI pitch, ordered beat positions, durations, velocity and phrase boundaries. Blank/unknown fields are not guessed; they remain coverage gaps. A new review revokes old confirmed tags unless the reviewer confirms them again.
+
+
+## Manager 3.0-dev6 — ускорение инвентаризации и транзакционное распределение
+
+- Быстрый filesystem scan не вычисляет SHA-256 и не декодирует аудио; строки inventory записываются потоково в CSV, поэтому память не растёт пропорционально числу файлов.
+- Для глубокого прохода без DSP используется до двух ограниченных рабочих потоков. При включённом тяжёлом акустическом анализе значение по умолчанию — один поток, чтобы не перегружать старые двухъядерные компьютеры. CLI позволяет явно выбрать --workers 1 или --workers 2.
+- SQLite cache readers переиспользуются внутри каждого рабочего потока вместо открытия нового соединения на каждый файл. Кэш хэшей и аудиоанализа остаётся на диске; исходники только читаются.
+- Распределение FACTORY в GUI и CLI выполняется через единый транзакционный пакет: сначала пересобирается и проверяется весь план, затем проверяются коллизии путей/хэшей, затем копируются файлы. При ошибке или отмене удаляются только назначения, созданные данной транзакцией; rollback фиксируется в operations.jsonl. Исходники и staging не перемещаются и не удаляются.
+- Добавлен regression test для отката частично скопированного пакета и защиты уже существующего файла.
+
+Это development build. Скорость зависит от диска, числа файлов и размера библиотеки; числовые гарантии производительности без измерения на конкретном компьютере не заявляются. Windows Portable smoke test и полный прогон тестов должны быть подтверждены отдельным успешным CI/локальным запуском.
