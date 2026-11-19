@@ -11,7 +11,7 @@ from typing import Any
 from voicing_generator import generate_voicing_candidates
 
 SORTER_VERSION = "1.1.0"
-MAX_CHORD_HYPOTHESES_PER_FILE = 100
+MAX_CHORD_HYPOTHESES_PER_FILE = 25
 
 MODE_ORDER = (
     "SAMPLE MODE", "STRUMMING", "ARPEGGIO", "PATTERN MODE", "RIFF MODE",
@@ -151,7 +151,7 @@ def build_mode_sorting_report(audio_reports: list[dict[str, Any]]) -> dict[str, 
             ))
             # Build review-only fretboard shapes from the chord pitch-class
             # hypothesis. Standard EADGBE is an assumption, never confirmed tuning.
-            voicing_report = generate_voicing_candidates(chord, max_candidates=12)
+            voicing_report = generate_voicing_candidates(chord, max_candidates=8)
             if voicing_report.get("voicing_candidates"):
                 queues["ARPEGGIO"].append(_candidate(
                     record, "ARPEGGIO", "ARPEGGIO_VOICING_HYPOTHESIS", start, end,
