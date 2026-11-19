@@ -20,7 +20,7 @@ from audio_range_io import audio_source_info, write_pcm_wav_range
 
 STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 DEFAULT_WINDOW_MS = 20
 DEFAULT_HOP_MS = 10
 
@@ -45,37 +45,57 @@ def _frame_levels(source: Path, window_ms: int, hop_ms: int) -> tuple[list[dict[
         hop = max(1, round(rate * hop_ms / 1000))
         if total < window:
             raise ValueError("WAV is shorter than one analysis window")
-        # Read each analysis window independently so long files do not need
-        # to be decoded into RAM. Only the compact envelope is retained.
+        # Sequential bounded-memory reader: read the first window once, then
+        # advance by hop frames while retaining only the overlap. This avoids
+        # one seek and one overlapping disk read for every 10 ms window.
         frame_bytes = channels * width
         levels = []
-        for start in range(0, total - window + 1, hop):
-            reader.setpos(start)
-            raw = reader.readframes(window)
-            if len(raw) != window * frame_bytes:
-                raise IOError("Incomplete PCM analysis window")
-            chunk: list[float] = []
+        raw = bytearray(reader.readframes(window))
+        if len(raw) != window * frame_bytes:
+            raise IOError("Incomplete PCM analysis window")
+        start = 0
+        scale = float(1 << (8 * width - 1))
+        while len(raw) == window * frame_bytes:
+            square_sum = 0.0
+            crossings = 0
+            previous = None
+            frame_count = 0
             for offset in range(0, len(raw), frame_bytes):
-                values = []
+                mono = 0.0
                 for channel in range(channels):
                     sample_start = offset + channel * width
-                    sample = raw[sample_start:sample_start + width]
                     if width == 1:
-                        value = (sample[0] - 128) / 128.0
+                        value = (raw[sample_start] - 128) / 128.0
+                    elif width == 3:
+                        b0, b1, b2 = raw[sample_start:sample_start + 3]
+                        integer = b0 | (b1 << 8) | (b2 << 16)
+                        if integer & 0x800000:
+                            integer -= 0x1000000
+                        value = integer / scale
                     else:
-                        if width == 3:
-                            sample += b"\\xff" if sample[2] & 0x80 else b"\\x00"
-                        value = int.from_bytes(sample, "little", signed=True) / float(1 << (8 * width - 1))
-                    values.append(value)
-                chunk.append(sum(values) / channels)
-            rms = math.sqrt(sum(value * value for value in chunk) / len(chunk))
-            crossings = sum((a < 0) != (b < 0) for a, b in zip(chunk, chunk[1:]))
+                        sample = raw[sample_start:sample_start + width]
+                        value = int.from_bytes(sample, "little", signed=True) / scale
+                    mono += value
+                mono /= channels
+                square_sum += mono * mono
+                if previous is not None and ((previous < 0) != (mono < 0)):
+                    crossings += 1
+                previous = mono
+                frame_count += 1
             levels.append({
                 "start_sample": start,
                 "end_sample": start + window,
-                "rms": rms,
-                "zcr": crossings / max(1, len(chunk) - 1),
+                "rms": math.sqrt(square_sum / max(1, frame_count)),
+                "zcr": crossings / max(1, frame_count - 1),
             })
+            if start + hop + window > total:
+                break
+            advance = hop * frame_bytes
+            del raw[:advance]
+            raw.extend(reader.readframes(hop))
+            if len(raw) < window * frame_bytes:
+                break
+            start += hop
     return levels, {"sample_rate": rate, "channels": channels,
                     "sample_width_bytes": width, "total_frames": total}
 
