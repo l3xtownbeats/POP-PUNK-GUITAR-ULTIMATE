@@ -25,7 +25,7 @@ from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
 from performance_manifest import build_performance_manifest
 from pattern_song_manager import open_pattern_song_manager
 from chromatic_pitch_map import build_chromatic_pitch_map, chromatic_note_table
-from library_structure import write_library_structure
+from library_structure import write_library_structure, TECHNIQUES
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -1170,6 +1170,48 @@ class LibraryManagerApp:
                 parent=self.root,
             )
             return
+        technique_text = simpledialog.askstring(
+            "Подтверждённые техники",
+            "Введите только прослушанные и подтверждённые техники через запятую.\n"
+            + ", ".join(TECHNIQUES) + "\nОставьте пустым, если техника не подтверждена.",
+            parent=self.root,
+        )
+        if technique_text is None:
+            return
+        confirmed_techniques = [
+            item.strip().upper().replace(" ", "_").replace("-", "_")
+            for item in technique_text.split(",") if item.strip()
+        ]
+        velocity_layer = simpledialog.askstring(
+            "Velocity layer",
+            "Подтверждённый слой: LOW, MEDIUM, HIGH или UNKNOWN.",
+            initialvalue="UNKNOWN", parent=self.root,
+        )
+        if velocity_layer is None:
+            return
+        velocity_layer = velocity_layer.strip().upper()
+        advanced_text = simpledialog.askstring(
+            "Структура Pattern / Melody",
+            "Необязательно: вставьте JSON с подтверждёнными событиями Pattern/Melody. "
+            "Если данных нет — оставьте {}.\n"
+            "Pattern: pattern_performance_review {loop_start_sample, loop_end_sample, tempo_bpm, "
+            "time_signature, attack_events, beat_grid, technique_events, harmonic_events, "
+            "cycle_integrity_verified:true, musical_review_verified:true}.\n"
+            "Melody: confirmed_melody_events [{midi_note,start_beats,duration_beats,velocity}, ...], "
+            "melody_phrase_boundaries [0,4], melody_mapping_verified:true.\n"
+            "Также допустимы velocity_min и velocity_max.",
+            initialvalue="{}", parent=self.root,
+        )
+        if advanced_text is None:
+            return
+        try:
+            advanced_metadata = json.loads(advanced_text or "{}")
+            if not isinstance(advanced_metadata, dict):
+                raise ValueError("Нужен JSON-объект.")
+        except (json.JSONDecodeError, ValueError) as exc:
+            messagebox.showerror("Структура Pattern / Melody", f"Некорректный JSON: {exc}", parent=self.root)
+            return
+
         if not messagebox.askyesno(
             "Подтверждение LICENSE_APPROVED",
             "Подтверждаете, что указанное лицензионное основание действительно разрешает распространение этого материала?",
@@ -1192,6 +1234,9 @@ class LibraryManagerApp:
                 confirmed_midi_note=confirmed_midi_note,
                 confirmed_chord_name=confirmed_chord_name,
                 confirmed_note_sequence=confirmed_note_sequence,
+                confirmed_techniques=confirmed_techniques,
+                confirmed_velocity_layer=velocity_layer,
+                advanced_metadata=advanced_metadata,
             )
         self._background("Музыкальная и лицензионная проверка WAV", work)
 
