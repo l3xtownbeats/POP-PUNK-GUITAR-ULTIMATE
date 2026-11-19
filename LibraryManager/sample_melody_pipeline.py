@@ -99,12 +99,9 @@ def prepare_sample_and_melody(
         folder.resolve().relative_to(root)
         folder.resolve().relative_to(STAGING_BASE)
 
-    source_info = audio_source_info(source)
-    if source_info.framerate != int(report["sample_rate"]):
-        raise RuntimeError("Source sample rate changed since Sample/Melody analysis")
-    rate = source_info.framerate
-    total_frames = source_info.frames
-    events = report["segments"]
+    # Keep the already selected event source (deep-analysis report or the
+    # GUI-provided pitch candidates). Re-reading report here broke the
+    # candidate path and raised UnboundLocalError for normal GUI operation.
     # Group sequential pitch events into phrase candidates. A fixed gap is only
     # a segmentation heuristic; it does not assert a bar, riff or song section.
     groups: list[list[dict[str, Any]]] = []
