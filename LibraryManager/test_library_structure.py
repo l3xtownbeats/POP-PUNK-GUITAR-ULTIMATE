@@ -72,7 +72,7 @@ class LibraryStructureTests(unittest.TestCase):
 
     def test_pattern_note_zone_is_not_mistaken_for_a_rhythm_loop(self):
         note_zone = {
-            "asset_id": "PN1", "kind": "note_event",
+            "asset_id": "PN1", "kind": "note_event", "asset_file": "staging/clips/note.wav",
             "review_status": "REVIEWED", "license_status": "LICENSE_APPROVED",
             "integrity_status": "VERIFIED", "confirmed_midi_note": 60,
             "playable": False, "playable_in_mode": False,
