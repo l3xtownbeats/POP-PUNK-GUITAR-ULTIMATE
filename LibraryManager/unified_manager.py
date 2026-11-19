@@ -26,6 +26,7 @@ from pattern_pipeline import build_pattern_report
 from sfz_parser import parse_sfz_file
 from virtual_sample_extractor import analyze_pattern_ranges, write_virtual_index
 from other_audit import audit_other_library
+from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
 
 VERSION = "2.2.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
@@ -648,6 +649,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         "audio_files_analyzed": len(audio_reports),
         "asset_classifications_created": len(classification_reports),
         "classification_policy": "CANDIDATE_ONLY_REQUIRES_HUMAN_REVIEW",
+"pattern_engine_manifest": "pattern_engine_manifest.json",
+        "pattern_engine_manifest_status": pattern_manifest["status"],
         "repeated_rhythm_pattern_candidates": sum(
             item["pattern_analysis"]["pattern_analysis"]["candidate_count"] for item in audio_reports
         ),
@@ -677,6 +680,11 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     _write_json(reports / "unified_exact_duplicates.json", duplicates)
     _write_json(reports / "unified_audio_analysis.json", audio_reports)
     _write_json(reports / "unified_asset_classification.json", classification_reports)
+    pattern_manifest = build_pattern_engine_manifest()
+    manifest_errors = validate_pattern_engine_manifest(pattern_manifest)
+    if manifest_errors:
+        raise RuntimeError("Invalid Pattern Mode manifest template: " + "; ".join(manifest_errors))
+    _write_json(reports / "pattern_engine_manifest.json", pattern_manifest)
     _write_json(reports / "unified_errors.json", errors)
     _write_json(reports / "unified_summary.json", summary)
     emit(f"ВСЕ 4 ЭТАПА ЗАВЕРШЕНЫ. Обработано: {len(inventory)}; ошибок: {len(errors)}. Отчёт: {reports}")
