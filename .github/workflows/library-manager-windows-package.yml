@@ -7,7 +7,7 @@ on:
       - ".github/workflows/library-manager-windows-package.yml"
 jobs:
   package:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,6 +24,9 @@ jobs:
         run: |
           $exe = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
           if (!(Test-Path $exe)) { throw "Portable GUI executable was not produced: $exe" }
+          # Require the embedded CPython runtime inside the distributable folder.
+          $pythonRuntime = Get-ChildItem "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -Recurse -Filter "python311.dll" | Select-Object -First 1
+          if (!$pythonRuntime) { throw "Bundled python311.dll is missing; package is not self-contained." }
           # Smoke-test with PATH restricted to Windows system folders. PyInstaller
           # must provide its own Python runtime and bundled dependencies.
           $oldPath = $env:PATH
@@ -40,6 +43,7 @@ jobs:
           if (!(Test-Path $zip) -or (Get-Item $zip).Length -lt 1024) { throw "Portable ZIP is missing or unexpectedly small." }
           $entries = tar -tf $zip
           if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
+          if (!($entries -match "python311.dll")) { throw "Portable ZIP does not contain its bundled Python runtime." }
       - uses: actions/upload-artifact@v4
         with:
           name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
