@@ -235,8 +235,14 @@ def validate_performance_manifest(manifest: dict[str, Any]) -> list[str]:
             or binding.get("license_status") != "LICENSE_APPROVED"
             or binding.get("integrity_status") != "VERIFIED"
             or not binding.get("asset_file")
+            or not binding.get("playable_modes")
+            or not (
+                type(binding.get("confirmed_midi_note")) is int
+                or bool(binding.get("confirmed_chord_name"))
+                or len(binding.get("confirmed_note_sequence") or []) >= 2
+            )
         ):
-            errors.append("Playable asset binding does not satisfy approval/integrity gates")
+            errors.append("Playable asset binding does not satisfy mode/mapping/approval/integrity gates")
     if manifest.get("safety", {}).get("events_invented") is not False:
         errors.append("Performance event invention must remain disabled")
     return errors
