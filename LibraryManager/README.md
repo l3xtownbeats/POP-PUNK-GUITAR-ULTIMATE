@@ -1,6 +1,6 @@
 # POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
 
-## Safe inventory engine 0.2.0
+## Library Manager 2.4.0 — inventory, extraction and VST3 preparation
 
 This is a read-only inventory and SFZ audit stage. It never moves, renames, deletes, rewrites, or overwrites source audio or SFZ files.
 
@@ -78,7 +78,7 @@ The planned extraction/mapping stage must:
 
 The Manager's output is consumed by the plugin's per-key playback engine: MIDI key → pitch-specific approved note clip → independent voice playback. The plugin handles real-time note-on/note-off, polyphony and release; the Manager handles source analysis, extraction, metadata, review and mapping preparation.
 
-**Safety:** this is a target capability, not part of the current 0.2.0 scanner. The current scanner remains read-only inventory/SFZ audit until the extraction stage is implemented and tested. Derived audio must stay in staging pending approval; never modify or move source files automatically.
+**Current implementation (2.4.0):** the optional full cycle now runs the physical extraction paths for pitch-specific Sample/Melody assets, repeated Pattern occurrences, and review-only chord/Power Chord sample candidates. Derived PCM WAVs and manifests are written only under LibraryManager/staging, then audited and indexed into the VST3 plugin asset catalog. Riff/Phrase remain review candidates unless the source evidence and musical review establish their identity; Strumming, Arpeggio, Articulations and Ending are not guessed from generic onset/RMS data. Original source files remain read-only and are never moved or deleted by this workflow.
 
 
 ## Extract meaningful guitar patterns; keep full recordings optional
