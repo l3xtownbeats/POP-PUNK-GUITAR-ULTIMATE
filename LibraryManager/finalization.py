@@ -265,8 +265,14 @@ def audit_factory_library(
                                 raise ValueError(f"Missing/invalid reviewed tag: {field}")
                             row[field] = value
                         expected_category = wav_path.parent.relative_to(factory).as_posix()
-                        if record.get("distribution_category") != expected_category:
-                            raise ValueError("Factory folder path does not match reviewed category")
+                        tag_category = "/".join([
+                            row["style_family"], "WAV", row["instrument_family"],
+                            row["asset_role"], row["tone_family"],
+                        ])
+                        if expected_category != tag_category or record.get("distribution_category") != expected_category:
+                            raise ValueError("Factory folder path does not match reviewed category tags")
+                        if str(record.get("derived_sha256", "")).upper() != expected:
+                            raise ValueError("Distributed WAV hash differs from reviewed source derivative")
                         if not str(tags.get("license_evidence", "")).strip() or not str(tags.get("musical_review_notes", "")).strip():
                             raise ValueError("Missing review or license evidence")
                         validation = record.get("review_validation") or {}
