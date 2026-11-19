@@ -31,6 +31,51 @@ VERSION = "1.8.0"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 
 
+def resolve_samples_root(selected_path: Path) -> Path:
+    """Resolve either Samples or Import Sample Guitar to the Samples root.
+
+    Matching is case-insensitive and tolerates trailing whitespace in the
+    directory name. The returned path always contains the incoming directory.
+    """
+    selected = Path(selected_path).expanduser()
+    if not selected.exists():
+        raise FileNotFoundError(f"Выбранный путь не существует: {selected}")
+    if not selected.is_dir():
+        raise NotADirectoryError(f"Выбранный путь не является папкой: {selected}")
+    selected = selected.resolve()
+
+    def is_incoming(path: Path) -> bool:
+        return path.name.strip().casefold() == "import sample guitar"
+
+    if is_incoming(selected):
+        samples_root = selected.parent
+        incoming = selected
+    else:
+        samples_root = selected
+        try:
+            children = [p for p in samples_root.iterdir()
+                        if p.is_dir() and is_incoming(p)]
+        except OSError as exc:
+            raise OSError(f"Не удалось прочитать выбранную папку: {samples_root}: {exc}") from exc
+        if not children:
+            # Also tolerate a case-insensitive spelling on filesystems where
+            # directory lookup itself is case-sensitive.
+            raise FileNotFoundError(
+                "В выбранной папке не найдена подпапка 'Import Sample Guitar'. "
+                f"Выбранный путь: {samples_root}. Выберите Samples либо саму Import Sample Guitar."
+            )
+        if len(children) > 1:
+            raise RuntimeError(
+                "Найдено несколько папок Import Sample Guitar. "
+                "Выберите непосредственно нужную папку, чтобы избежать анализа не той библиотеки."
+            )
+        incoming = children[0]
+
+    if not incoming.is_dir():
+        raise FileNotFoundError(f"Папка импорта не найдена или недоступна: {incoming}")
+    return samples_root
+
+
 def _is_excluded(path: Path) -> bool:
     return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
 
@@ -62,10 +107,9 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 guitar_source_confirmed: bool = False,
                 write_virtual: bool = False,
                 reports_root: Path | None = None) -> dict[str, Any]:
-    samples_root = samples_root.expanduser().resolve()
-    incoming = samples_root / "Import Sample Guitar"
-    if not incoming.is_dir():
-        raise FileNotFoundError(f"Expected incoming folder not found: {incoming}")
+    samples_root = resolve_samples_root(samples_root)
+    incoming = next(p for p in samples_root.iterdir()
+                    if p.is_dir() and p.name.strip().casefold() == "import sample guitar")
     if write_virtual and not (analyze_audio and guitar_source_confirmed):
         raise ValueError("--write-virtual-index requires --analyze-audio and --guitar-source-confirmed")
 
