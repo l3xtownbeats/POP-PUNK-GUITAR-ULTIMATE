@@ -162,11 +162,24 @@ def prepare_sample_and_melody(
             asset_id = _identity(source_hash, "SAMPLE_NOTE", start, end)
             clip = clips_dir / f"SAMPLE-{asset_id}.wav"
             manifest = manifests_dir / f"SAMPLE-{asset_id}.json"
-            # The range writer opens the destination exclusively itself.
-            # Pre-creating an empty placeholder made every valid extraction fail
-            # with FileExistsError; record the path only after a successful write.
+            # Reuse only a complete, hash-verified derivative from a previous
+            # run. A half-pair or altered manifest is a hard stop; never overwrite.
             if clip.exists() or manifest.exists():
-                raise FileExistsError(f"Refusing to overwrite staged Sample asset {asset_id}")
+                if not (clip.is_file() and manifest.is_file()):
+                    raise FileExistsError(f"Incomplete existing staged Sample asset {asset_id}")
+                existing = json.loads(manifest.read_text(encoding="utf-8"))
+                matches = (
+                    existing.get("source_sha256") == source_hash
+                    and int(existing.get("source_start_sample", -1)) == start
+                    and int(existing.get("source_end_sample", -1)) == end
+                    and Path(str(existing.get("derived_path", ""))).resolve() == clip.resolve()
+                    and str(existing.get("derived_sha256", "")).upper() == _sha256(clip)
+                )
+                if not matches:
+                    raise RuntimeError(f"Existing staged Sample asset failed provenance/hash validation: {asset_id}")
+                existing["reused_existing"] = True
+                results["sample_mode"].append(existing)
+                continue
             # The range writer creates the WAV exclusively ("x").
             clip_info = _write_clip(source, start, end, clip, rate)
             created.append(clip)
@@ -183,6 +196,7 @@ def prepare_sample_and_melody(
             )
             _write_manifest(manifest, record)
             created.append(manifest)
+            record["reused_existing"] = False
             results["sample_mode"].append(record)
 
         for group in eligible_groups:
@@ -196,7 +210,21 @@ def prepare_sample_and_melody(
             clip = clips_dir / f"MELODY-{asset_id}.wav"
             manifest = manifests_dir / f"MELODY-{asset_id}.json"
             if clip.exists() or manifest.exists():
-                raise FileExistsError(f"Refusing to overwrite staged Melody asset {asset_id}")
+                if not (clip.is_file() and manifest.is_file()):
+                    raise FileExistsError(f"Incomplete existing staged Melody asset {asset_id}")
+                existing = json.loads(manifest.read_text(encoding="utf-8"))
+                matches = (
+                    existing.get("source_sha256") == source_hash
+                    and int(existing.get("source_start_sample", -1)) == start
+                    and int(existing.get("source_end_sample", -1)) == end
+                    and Path(str(existing.get("derived_path", ""))).resolve() == clip.resolve()
+                    and str(existing.get("derived_sha256", "")).upper() == _sha256(clip)
+                )
+                if not matches:
+                    raise RuntimeError(f"Existing staged Melody asset failed provenance/hash validation: {asset_id}")
+                existing["reused_existing"] = True
+                results["melody_mode"].append(existing)
+                continue
             clip_info = _write_clip(source, start, end, clip, rate)
             created.append(clip)
             record = _record(
@@ -216,6 +244,7 @@ def prepare_sample_and_melody(
             )
             _write_manifest(manifest, record)
             created.append(manifest)
+            record["reused_existing"] = False
             results["melody_mode"].append(record)
 
         if _sha256(source) != source_hash:
