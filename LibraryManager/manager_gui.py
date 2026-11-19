@@ -16,6 +16,7 @@ from pathlib import Path
 from unified_manager import run_manager
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
+from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
 from library_operations import (
     cleanup_original_sources,
     distribute_assets,
@@ -68,7 +69,8 @@ class LibraryManagerApp:
             ("Распределить одобренное в OTHER", self.distribute_other),
             ("2. Извлечь найденные ритм-паттерны в WAV", self.extract_patterns),
             ("3. Распределить проверенные материалы", self.distribute),
-            ("4. Удалить оригиналы после проверки", self.cleanup),
+            ("Полный аудит очистки Import", self.audit_cleanup),
+            ("Удалить оригиналы после полного аудита", self.cleanup),
             ("Открыть отчёты", self.open_reports),
             ("Открыть staging", self.open_staging),
         ]
@@ -278,40 +280,58 @@ class LibraryManagerApp:
             journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
         ))
 
+    def audit_cleanup(self) -> None:
+        try:
+            samples = self._samples()
+        except Exception as exc:
+            messagebox.showerror("Папка Samples", str(exc))
+            return
+        report_path = MANAGER_DIR / "reports" / ("cleanup_audit_" + __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S") + ".json")
+        self._background("Полный аудит Import", lambda: audit_all_import_sources(
+            samples, STAGING_ROOT, report_path))
+
     def cleanup(self) -> None:
         try:
             samples = self._samples()
         except Exception as exc:
             messagebox.showerror("Папка Samples", str(exc))
             return
-        selected = filedialog.askopenfilenames(
-            title="Выберите распределённые sidecar-манифесты из FACTORY",
-            initialdir=str(samples / "FACTORY"),
-            filetypes=[("Distributed asset manifests", "*.wav.json"), ("JSON", "*.json")],
+        audit_path = filedialog.askopenfilename(
+            title="Выберите полный cleanup_audit_*.json",
+            initialdir=str(MANAGER_DIR / "reports"),
+            filetypes=[("Cleanup audit", "cleanup_audit_*.json"), ("JSON", "*.json")],
         )
-        if not selected:
+        if not audit_path:
+            return
+        try:
+            audit = json.loads(Path(audit_path).read_text(encoding="utf-8"))
+            summary = audit["summary"]
+            if summary.get("blocked_sources") or summary.get("errors") or summary.get("eligible_for_cleanup") != summary.get("source_files_scanned"):
+                messagebox.showwarning(
+                    "Очистка заблокирована",
+                    "Не все исходники имеют полностью проверенные производные копии. "
+                    "Сначала устраните блокировки в отчёте. Ни один файл не удалён."
+                )
+                return
+        except Exception as exc:
+            messagebox.showerror("Отчёт очистки", str(exc))
             return
         if not messagebox.askyesno(
             "Удаление оригиналов — подтверждение 1/2",
-            "Удалить исходные записи, от которых получены выбранные материалы?\n"
-            "Перед удалением будут повторно проверены SHA-256 всех оригиналов и копий."
+            f"Аудит охватил все {summary['source_files_scanned']} исходных файлов. "
+            "Все зависимости имеют проверенные копии. Удалить оригиналы из Import?"
         ):
             return
         if not messagebox.askyesno(
             "Удаление оригиналов — подтверждение 2/2",
-            "Подтверждаете, что выбраны ВСЕ зависимые фрагменты для каждого исходника "
-            "и других нужных производных материалов не осталось?"
+            "Подтверждаете окончательное удаление всех исходников? "
+            "Перед удалением аудит и SHA-256 будут проверены повторно."
         ):
             return
-        def work():
-            return cleanup_original_sources(
-                [Path(item) for item in selected],
-                samples_root=samples,
-                confirm_delete=True,
-                confirm_all_dependents_accounted_for=True,
-                journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
-            )
-        self._background("Очистка исходников", work)
+        self._background("Очистка исходников", lambda: cleanup_sources_from_audit(
+            samples, STAGING_ROOT, Path(audit_path), approve=True,
+            confirm_all_dependents_accounted_for=True,
+            journal_path=samples / "LibraryManagerReports" / "cleanup.jsonl"))
 
     def open_reports(self) -> None:
         path = MANAGER_DIR / "reports"
