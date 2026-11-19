@@ -60,6 +60,41 @@ class PatternClipExtractorTests(unittest.TestCase):
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
 
+    def test_extracts_aiff_to_pcm_wav_when_decoder_supports_format(self):
+        try:
+            import numpy as np
+            import soundfile as sf
+        except ImportError:
+            self.skipTest("python-soundfile is unavailable")
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.aiff"
+            samples = (0.2 * np.sin(2 * np.pi * 220 * np.arange(24000) / 8000)).astype("float32")
+            try:
+                sf.write(str(source), samples, 8000, format="AIFF", subtype="PCM_16")
+            except Exception:
+                self.skipTest("libsndfile AIFF decoding/encoding unavailable")
+            report = {
+                "source": str(source),
+                "source_sha256": sha256_file(source),
+                "pattern_analysis": {"patterns": [{
+                    "pattern_candidate_id": "AIFF-001",
+                    "occurrences": [{"start_seconds": 0.4, "end_seconds": 0.9}],
+                }]},
+            }
+            stage = STAGING_BASE / ("pattern-aiff-" + next(tempfile._get_candidate_names()))
+            try:
+                records = extract_pattern_occurrences(
+                    report, stage, pre_roll_ms=0, post_roll_ms=0,
+                )
+                self.assertEqual(len(records), 1)
+                self.assertEqual(records[0]["source_format"], "AIFF")
+                self.assertEqual(records[0]["derived_subtype"], "PCM_24")
+                with wave.open(records[0]["derived_path"], "rb") as clip:
+                    self.assertEqual(clip.getframerate(), 8000)
+                    self.assertEqual(clip.getnframes(), 4000)
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
     def test_rolls_back_all_created_clips_when_batch_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.wav"
