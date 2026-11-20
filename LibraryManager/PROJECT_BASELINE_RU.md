@@ -45,7 +45,7 @@ Manager подготавливает библиотеку. Он не являе�
 
 #### IMPORT GUITAR — import handoff
 
-IMPORT GUITAR must make selected external sources available to subsequent Manager stages. The approved non-destructive implementation is to create SHA-256-verified copies under the active `Samples/Import Sample Guitar` folder, preserve the original source files and their hierarchy/dependency paths, and register original-to-copy provenance. Failed imports roll back the incomplete batch. SCAN LIBRARY and START HUNTING process the verified copies. Archives remain opaque and are not automatically extracted.
+IMPORT GUITAR must make selected external sources available to subsequent Manager stages. The approved non-destructive implementation is to create SHA-256-verified copies under the active `Samples/Import Sample Guitar` folder, preserve the original source files and their hierarchy/dependency paths, and register original-to-copy provenance. Failed imports roll back the incomplete batch. Re-import of an unchanged folder reuses its verified copy; if any file changes or is added, the complete folder is copied into a new batch so SFZ relative dependencies stay within one version. Previous batches remain for comparison/recovery, and altered previously verified copies are rejected. SCAN LIBRARY and START HUNTING process the verified copies. Archives remain opaque and are not automatically extracted.
 
 ## 3.2. POP PUNK GUITAR ULTIMATE VST3
 
