@@ -17,7 +17,7 @@ from pathlib import Path
 from app_paths import resolve_runtime_paths, resource_file
 
 from unified_manager import AUDIO_EXT, run_manager, quick_scan, resolve_samples_root
-from source_import import register_sources
+from source_import import import_sources_to_library
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
@@ -696,8 +696,55 @@ class LibraryManagerApp:
             self.status.set("Остановка запрошена — завершаю текущий безопасный блок…")
             self._write("[ОТМЕНА] Запрошена остановка. Исходные файлы не затрагиваются.")
 
+    def _prepare_import_target(self) -> Path | None:
+        """Create/resolve the active Samples folder and its incoming destination."""
+        chosen = self.samples_root.get().strip()
+        if not chosen:
+            chosen = filedialog.askdirectory(
+                title="Выберите или создайте папку Samples для библиотеки Manager",
+            )
+            if not chosen:
+                return None
+
+        selected = Path(chosen).expanduser().resolve()
+        if not selected.is_dir():
+            raise NotADirectoryError(f"Выбранный каталог Samples не существует: {selected}")
+
+        if selected.name.strip().casefold() == "import sample guitar":
+            samples = selected.parent
+            incoming = selected
+        else:
+            samples = selected
+            children = [
+                item for item in samples.iterdir()
+                if item.is_dir() and item.name.strip().casefold() == "import sample guitar"
+            ]
+            if len(children) > 1:
+                raise RuntimeError(
+                    "В выбранной папке найдено несколько Import Sample Guitar. "
+                    "Выберите нужную входную папку напрямую."
+                )
+            incoming = children[0] if children else samples / "Import Sample Guitar"
+
+        incoming.mkdir(parents=True, exist_ok=True)
+        (samples / "FACTORY").mkdir(parents=True, exist_ok=True)
+        (samples / "OTHER").mkdir(parents=True, exist_ok=True)
+        self.samples_root.set(str(samples))
+        self._save_settings()
+        self._write(f"Целевая папка импорта: {incoming}")
+        return incoming
+
     def import_guitar(self) -> None:
-        """Register user-selected files and folders without copying or altering them."""
+        """Copy selected source libraries into Import Sample Guitar, preserving originals."""
+        try:
+            incoming = self._prepare_import_target()
+        except Exception as exc:
+            messagebox.showerror("IMPORT GUITAR — папка библиотеки", str(exc), parent=self.root)
+            return
+        if incoming is None:
+            self.status.set("IMPORT GUITAR: папка Samples не выбрана.")
+            return
+
         selected = list(filedialog.askopenfilenames(
             title="IMPORT GUITAR — выберите аудио, SFZ или архивы",
             filetypes=[
@@ -708,8 +755,9 @@ class LibraryManagerApp:
         while messagebox.askyesno(
             "IMPORT GUITAR",
             "Добавить целую папку библиотеки? Можно добавить несколько папок подряд.",
+            parent=self.root,
         ):
-            folder = filedialog.askdirectory(title="Выберите папку гитарной библиотеки")
+            folder = filedialog.askdirectory(title="Выберите папку исходной гитарной библиотеки")
             if not folder:
                 break
             selected.append(folder)
@@ -717,14 +765,31 @@ class LibraryManagerApp:
             self.status.set("IMPORT GUITAR: источники не выбраны.")
             return
 
+        if not messagebox.askyesno(
+            "Подтверждение импорта",
+            f"Менеджер создаст проверенные копии выбранных файлов в:\n{incoming}\n\n"
+            "Оригиналы останутся на прежнем месте и не будут изменены, перемещены или удалены. "
+            "Для копирования требуется дополнительное место на диске. "
+            "После импорта копии будут доступны этапам SCAN LIBRARY и START HUNTING. Продолжить?",
+            parent=self.root,
+        ):
+            self.status.set("IMPORT GUITAR: копирование отменено.")
+            return
+
         registry = MANAGER_DIR / "reports" / "import_registry.json"
 
         def work():
-            return register_sources(selected, registry)
+            return import_sources_to_library(
+                selected,
+                incoming,
+                registry,
+                progress=self._queue_progress,
+                cancel_event=self._cancel_event,
+            )
 
         self._write("=== IMPORT GUITAR ===")
-        self._write(f"Выбрано источников: {len(selected)}. Регистрация без копирования, перемещения и изменения оригиналов.")
-        self._background("IMPORT GUITAR — регистрация источников", work)
+        self._write(f"Выбрано источников: {len(selected)}. Будут созданы SHA-256-проверенные копии; оригиналы останутся нетронутыми.")
+        self._background("IMPORT GUITAR — копирование и регистрация источников", work)
 
     def quick_scan_only(self) -> None:
         """Run only the fast filesystem inventory; never start deep analysis."""
