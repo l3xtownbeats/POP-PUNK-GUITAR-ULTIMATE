@@ -141,5 +141,30 @@ class PatternClipExtractorTests(unittest.TestCase):
                 shutil.rmtree(stage, ignore_errors=True)
 
 
+    def test_pre_cancelled_batch_writes_no_assets(self):
+        import threading
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.wav"
+            write_wav(source)
+            report = {
+                "source": str(source), "source_sha256": sha256_file(source),
+                "pattern_analysis": {"patterns": [{
+                    "pattern_candidate_id": "CANCEL",
+                    "occurrences": [{"start_seconds": 0.4, "end_seconds": 0.9}],
+                }]},
+            }
+            stage = STAGING_BASE / ("pattern-cancel-" + next(tempfile._get_candidate_names()))
+            event = threading.Event()
+            event.set()
+            try:
+                with self.assertRaisesRegex(RuntimeError, "cancelled"):
+                    extract_pattern_occurrences(report, stage, cancel_event=event)
+                self.assertFalse(list((stage / "clips").glob("*.wav")) if (stage / "clips").exists() else [])
+                self.assertFalse(list((stage / "manifests").glob("*.json")) if (stage / "manifests").exists() else [])
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
+
+
 if __name__ == "__main__":
     unittest.main()

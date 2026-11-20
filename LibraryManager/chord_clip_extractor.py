@@ -25,6 +25,7 @@ def extract_chord_samples(
     pre_roll_ms: int = 35,
     post_roll_ms: int = 220,
     max_clips: int = 300,
+    cancel_event: Any = None,
 ) -> list[dict[str, Any]]:
     if pre_roll_ms < 0 or post_roll_ms < 0 or not 1 <= max_clips <= 5000:
         raise ValueError("Invalid chord extraction limits")
@@ -54,6 +55,8 @@ def extract_chord_samples(
     seen_ranges: set[tuple[int, int]] = set()
     try:
         for candidate in candidates:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Chord extraction cancelled; this batch is rolled back safely")
             if len(results) >= max_clips:
                 break
             start_seconds = candidate.get("start_seconds")
@@ -94,6 +97,8 @@ def extract_chord_samples(
 
             clip_info = write_pcm_wav_range(source, start, end, clip, expected_rate=rate)
             created.append(clip)
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Chord extraction cancelled; this batch is rolled back safely")
             record = {
                 "schema_version": 1,
                 "asset_id": identity,

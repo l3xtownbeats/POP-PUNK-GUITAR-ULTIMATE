@@ -761,7 +761,8 @@ class LibraryManagerApp:
                             "source": record["source_path"],
                             "source_sha256": record["source_sha256"],
                             "pattern_analysis": pattern_data,
-                        }, STAGING_ROOT, max_clips=min(100, remaining))
+                        }, STAGING_ROOT, max_clips=min(100, remaining),
+                            cancel_event=self._cancel_event)
                         extracted_pattern += len(clips)
                     except Exception as exc:
                         extraction_failures.append({
@@ -786,6 +787,7 @@ class LibraryManagerApp:
                     try:
                         clips = extract_chord_samples(
                             chord_data, STAGING_ROOT, max_clips=min(100, remaining),
+                            cancel_event=self._cancel_event,
                         )
                         extracted_chord += len(clips)
                     except Exception as exc:
@@ -814,6 +816,7 @@ class LibraryManagerApp:
                             pitch_candidates=record.get("pitch_candidates"),
                             expected_source_sha256=record.get("source_sha256"),
                             source_metadata=record.get("filename_metadata"),
+                            cancel_event=self._cancel_event,
                         )
                         extracted_sample += result["sample_mode_count"]
                         extracted_melody_notes += result.get("melody_note_mode_count", 0)

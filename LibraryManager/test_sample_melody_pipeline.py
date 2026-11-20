@@ -225,5 +225,30 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                 pipeline.prepare_sample_and_melody(source, Path(tmp) / "outside")
 
 
+    def test_pre_cancelled_batch_writes_no_assets(self):
+        import threading
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.wav"
+            _write_test_wav(source)
+            event = threading.Event()
+            event.set()
+            stage = pipeline.STAGING_BASE / ("sample-cancel-" + next(tempfile._get_candidate_names()))
+            candidates = [{
+                "start_seconds": 0.1, "end_seconds": 0.3,
+                "midi_note_candidate": 60, "confidence": 0.9,
+            }]
+            try:
+                with self.assertRaisesRegex(RuntimeError, "cancelled"):
+                    pipeline.prepare_sample_and_melody(
+                        source, stage, pitch_candidates=candidates,
+                        expected_source_sha256=_hash(source), cancel_event=event,
+                    )
+                self.assertFalse(list((stage / "clips").glob("*.wav")) if (stage / "clips").exists() else [])
+                self.assertFalse(list((stage / "manifests").glob("*.json")) if (stage / "manifests").exists() else [])
+            finally:
+                shutil.rmtree(stage, ignore_errors=True)
+
+
+
 if __name__ == "__main__":
     unittest.main()

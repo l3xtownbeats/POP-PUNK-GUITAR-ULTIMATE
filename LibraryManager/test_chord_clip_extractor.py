@@ -78,5 +78,28 @@ class ChordClipExtractorTests(unittest.TestCase):
                     extractor.extract_chord_samples(report, staging)
 
 
+    def test_pre_cancelled_batch_writes_no_assets(self):
+        import threading
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            staging = base / "staging"
+            source = base / "guitar.wav"
+            write_wav(source)
+            report = {
+                "source_path": str(source),
+                "source_sha256": digest(source),
+                "chord_candidates": [{"start_seconds": 0.2, "end_seconds": 0.5}],
+            }
+            event = threading.Event()
+            event.set()
+            with patch.object(extractor, "STAGING_BASE", staging.resolve()), \
+                 patch.object(audio_segmenter, "STAGING_BASE", staging.resolve()):
+                with self.assertRaisesRegex(RuntimeError, "cancelled"):
+                    extractor.extract_chord_samples(report, staging, cancel_event=event)
+            self.assertFalse(list((staging / "clips").glob("*.wav")) if (staging / "clips").exists() else [])
+            self.assertFalse(list((staging / "manifests").glob("*.json")) if (staging / "manifests").exists() else [])
+
+
+
 if __name__ == "__main__":
     unittest.main()

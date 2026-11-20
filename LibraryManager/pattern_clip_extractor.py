@@ -27,6 +27,7 @@ def extract_pattern_occurrences(
     post_roll_ms: int = 250,
     min_duration_ms: int = 100,
     max_clips: int = 500,
+    cancel_event: Any = None,
 ) -> list[dict[str, Any]]:
     if pre_roll_ms < 0 or post_roll_ms < 0 or min_duration_ms < 1:
         raise ValueError("Invalid padding or minimum duration")
@@ -67,6 +68,8 @@ def extract_pattern_occurrences(
             pattern_id = str(pattern.get("pattern_candidate_id") or "UNKNOWN")
             occurrences = pattern.get("occurrences") or []
             for occurrence_index, occurrence in enumerate(occurrences, 1):
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RuntimeError("Pattern extraction cancelled; this batch is rolled back safely")
                 if len(results) >= max_clips:
                     break
                 start_sec = float(occurrence["start_seconds"])
@@ -106,6 +109,8 @@ def extract_pattern_occurrences(
                 clip_info = write_pcm_wav_range(
                     source, start, end, clip_path, expected_rate=rate,
                 )
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RuntimeError("Pattern extraction cancelled; this batch is rolled back safely")
                 record = {
                     "schema_version": 1,
                     "asset_id": identity,

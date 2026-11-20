@@ -45,6 +45,7 @@ def prepare_sample_and_melody(
     pitch_candidates: list[dict[str, Any]] | None = None,
     expected_source_sha256: str | None = None,
     source_metadata: dict[str, Any] | None = None,
+    cancel_event: Any = None,
 ) -> dict[str, Any]:
     """Extract note-event WAVs and grouped melody-phrase WAV candidates."""
     if (melody_gap_seconds < 0 or melody_min_notes < 2
@@ -155,6 +156,8 @@ def prepare_sample_and_melody(
     created: list[Path] = []
     try:
         for event in events:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Sample/Melody extraction cancelled; this batch is rolled back safely")
             if len(results["sample_mode"]) >= sample_quota:
                 break
             start, end = int(event["source_start_sample"]), int(event["source_end_sample"])
@@ -185,6 +188,8 @@ def prepare_sample_and_melody(
             # The range writer creates the WAV exclusively ("x").
             clip_info = _write_clip(source, start, end, clip, rate)
             created.append(clip)
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Sample/Melody extraction cancelled; this batch is rolled back safely")
             record = _record(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                 "melody_single_note_candidate", ["SAMPLE_MODE", "MELODY_MODE", "KEYBOARD_PLAYBACK"],
@@ -206,6 +211,8 @@ def prepare_sample_and_melody(
             results["melody_note_mode"].append(record)
 
         for group in eligible_groups:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Sample/Melody extraction cancelled; this batch is rolled back safely")
             if len(results["melody_mode"]) >= melody_quota:
                 break
             start = min(int(x["source_start_sample"]) for x in group)
@@ -233,6 +240,8 @@ def prepare_sample_and_melody(
                 continue
             clip_info = _write_clip(source, start, end, clip, rate)
             created.append(clip)
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("Sample/Melody extraction cancelled; this batch is rolled back safely")
             record = _record(
                 asset_id, source, source_hash, clip, manifest, source_info, clip_info, start, end,
                 "melody_phrase_candidate", ["MELODY_MODE", "MELODY_INSTRUMENT"],
