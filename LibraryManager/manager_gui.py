@@ -24,7 +24,7 @@ from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
 from finalization import finalize_library as finalize_library_audit
 from manifest_review import review_manifest
 from task_journal import TaskJournal
-from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
+from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog, browser_assets_for_mode
 from performance_manifest import build_performance_manifest
 from pattern_song_manager import open_pattern_song_manager
 from chromatic_pitch_map import build_chromatic_pitch_map, chromatic_note_table
@@ -1245,6 +1245,10 @@ class LibraryManagerApp:
             tree.heading(column, text=label)
             tree.column(column, width=width, anchor="w")
         tree.pack(fill="both", expand=True, pady=(8, 6))
+        tree.tag_configure("candidate", foreground=NEON_STAGE_THEME["palette"]["warning"])
+        tree.tag_configure("staged", foreground=NEON_STAGE_THEME["palette"]["accent"])
+        tree.tag_configure("playable", foreground=NEON_STAGE_THEME["palette"]["success"])
+        tree.tag_configure("pattern_instrument", foreground=NEON_STAGE_THEME["palette"]["accent_purple"])
 
         details = tk.Text(
             frame, height=7, wrap="word", font=("Consolas", 9),
@@ -1275,16 +1279,21 @@ class LibraryManagerApp:
                 )
                 row_id = tree.insert("", "end", values=values, tags=("candidate",))
                 item_records[row_id] = candidate
-            for asset in selected_mode.get("assets", []):
+            for asset in browser_assets_for_mode(catalog, mode_var.get()):
+                is_pattern_instrument = asset.get("playable_in_pattern_instrument") is not None
+                asset_kind = "PATTERN INSTRUMENT" if is_pattern_instrument else asset.get("kind", "STAGED_WAV")
                 values = (
-                    asset.get("kind", "STAGED_WAV"),
+                    asset_kind,
                     asset.get("review_status", "NEEDS_MUSICAL_REVIEW"),
                     asset.get("license_status", "UNREVIEWED"),
                     asset.get("duration_seconds", ""),
                     asset.get("asset_id", ""),
                 )
-                row_id = tree.insert("", "end", values=values,
-                                     tags=("playable" if asset.get("playable") else "staged",))
+                if is_pattern_instrument:
+                    row_tag = "pattern_instrument"
+                else:
+                    row_tag = "playable" if asset.get("playable") else "staged"
+                row_id = tree.insert("", "end", values=values, tags=(row_tag,))
                 item_records[row_id] = asset
             details.delete("1.0", "end")
             details.insert("end", json.dumps({
@@ -1293,6 +1302,10 @@ class LibraryManagerApp:
                 "assets": selected_mode.get("asset_count", 0),
                 "playable_assets": selected_mode.get("playable_asset_count", 0),
                 "analysis_candidates": selected_mode.get("candidate_count", 0),
+                "pattern_instrument_assets": (
+                    len(catalog.get("pattern_instrument_assets", []))
+                    if mode_var.get() == "PATTERN MODE" else 0
+                ),
                 "description": selected_mode.get("description", ""),
             }, ensure_ascii=False, indent=2))
 
