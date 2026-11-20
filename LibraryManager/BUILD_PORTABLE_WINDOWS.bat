@@ -38,7 +38,7 @@ if errorlevel 1 exit /b 1
 if exist "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData" rmdir /s /q "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData"
 
 echo [5/5] Create Portable ZIP and optional Installer EXE...
-powershell -NoProfile -Command "Compress-Archive -Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER' -DestinationPath 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip' -Force"
+powershell -NoProfile -Command "$zip='dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip'; Compress-Archive -Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER' -DestinationPath $zip -Force; if(!(Test-Path $zip) -or (Get-Item $zip).Length -lt 1MB){throw 'Portable ZIP missing or unexpectedly small'}; $entries=tar -tf $zip; if($LASTEXITCODE -ne 0){throw 'Cannot inspect Portable ZIP'}; foreach($required in @('POP_PUNK_GUITAR_LIBRARY_MANAGER.exe','python311.dll','portable.mode','PORTABLE_USER_GUIDE_RU.md','ppgu_skin/theme.json','ppgu_skin/assets/hero.png')){if(!($entries -match [regex]::Escape($required))){throw ('Portable ZIP missing required entry: '+$required)}}; if($entries -match 'UserData/'){throw 'Portable ZIP contains smoke-test user data'}"
 if errorlevel 1 exit /b 1
 if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
   "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%~dp0POP_PUNK_GUITAR_LIBRARY_MANAGER.iss"
