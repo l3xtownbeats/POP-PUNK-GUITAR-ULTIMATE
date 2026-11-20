@@ -84,6 +84,24 @@ def _candidate_mode_assignments(record: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(modes))
 
 
+def browser_assets_for_mode(catalog: dict[str, Any], mode: str) -> list[dict[str, Any]]:
+    """Return assets visible inside a single browser mode.
+
+    The PATTERN tab contains both pitch-specific note clips and the chord-driven
+    Pattern Instrument's whole-performance assets. The latter remain a separate
+    asset path in the catalog but are displayed within PATTERN, never as a third
+    top-level mode.
+    """
+    selected = next(
+        (item for item in catalog.get("modes", []) if item.get("mode") == mode),
+        {},
+    )
+    assets = list(selected.get("assets", []))
+    if mode == "PATTERN MODE":
+        assets.extend(catalog.get("pattern_instrument_assets", []))
+    return assets
+
+
 def _read_mode_candidates(mode_report_path: Path | None) -> dict[str, list[dict[str, Any]]]:
     result = {mode: [] for mode in MODE_ORDER}
     if mode_report_path is None:
