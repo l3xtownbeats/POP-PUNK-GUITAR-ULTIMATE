@@ -9,7 +9,7 @@ py -3.11 -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_
 if errorlevel 1 exit /b 1
 echo.
 echo Build completed: %~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER
-> "%~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\portable.mode" echo portable
+powershell -NoProfile -Command "[guid]::NewGuid().ToString('N') | Set-Content -NoNewline 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\portable.mode'"
 powershell -NoProfile -Command "if (Test-Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip') { Remove-Item 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip' -Force }; Compress-Archive -Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER' -DestinationPath 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip'"
 if errorlevel 1 exit /b 1
 if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
