@@ -32,7 +32,17 @@ Keep this as the single approved Samples root. Put new incoming WAV, SFZ and arc
 
 Windows 10 x64 is the target platform. For source development, use Python 3.11 and install `requirements.txt`; the Windows packaging workflow also installs `requirements-build.txt`. The packaged application is intended to include its runtime and must not require a separate Python installation.
 
-### Reports
+### Build the Windows x64 Portable package
+
+On a Windows 10/11 x64 build machine with Python 3.11 installed, open this folder and run `BUILD_PORTABLE_WINDOWS.bat`. The script installs the pinned project/runtime build requirements, compiles the modules, runs the Manager regression suite, builds the self-contained PyInstaller onedir application, performs a Portable-mode startup smoke test, and creates:
+
+`dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip`
+
+The ZIP is the Portable deliverable. Extract the complete folder before launching `POP_PUNK_GUITAR_LIBRARY_MANAGER.exe`; do not run the EXE from inside the ZIP. The first launch creates `UserData` next to the application when writable, or uses the documented LocalAppData fallback when the application directory is read-only. Keep the whole extracted folder together when moving it to another drive or PC.
+
+The script also builds the Inno Setup installer when Inno Setup 6 is installed. A package is considered verified only after the script exits successfully and the resulting ZIP is tested on Windows 10 x64. Source checkout or a successful documentation commit is not a Portable build.
+
+## Reports
 
 Reports are written beside the tool in `reports/`:
 - `inventory.csv` — file inventory, SHA-256, WAV header metadata and conservative filename hints.
