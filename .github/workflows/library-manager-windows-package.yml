@@ -120,7 +120,7 @@ jobs:
         working-directory: LibraryManager
         shell: pwsh
         run: |
-          $iscc = "$env:ProgramFiles(x86)/Inno Setup 6/ISCC.exe"
+          $iscc = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
           if (!(Test-Path $iscc)) { throw "Inno Setup compiler was not installed: $iscc" }
 
           & $iscc "POP_PUNK_GUITAR_LIBRARY_MANAGER.iss"
