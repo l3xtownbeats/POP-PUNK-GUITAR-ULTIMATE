@@ -72,6 +72,10 @@ Reports are written beside the tool in `reports/`:
 
 The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compiles the Manager Python modules and runs the full `unittest` regression suite on Ubuntu with Python 3.11. The separate Windows workflow builds and smoke-tests Portable ZIP and Installer EXE. A workflow definition is not proof of a successful run; check the latest CI result before calling a build verified.
 
+### IMPORT GUITAR — verified, non-destructive ingest
+
+IMPORT GUITAR copies selected files/folders into a unique `IMPORT_BATCH_...` directory under the active `Samples/Import Sample Guitar` root. Each copied file is checked against its source with SHA-256 and original metadata/provenance are registered. Original files are never modified, moved, renamed or deleted. A failed batch is rolled back; re-importing unchanged registered sources reuses their existing verified copies. Archives remain opaque files and are not automatically extracted. The resulting copies are the inputs consumed by SCAN LIBRARY and START HUNTING.
+
 ### Safety and controlled distribution
 
 - Import, registration, scanning, analysis, extraction, audition and FACTORY distribution do not modify, rename, move or delete original source files.
