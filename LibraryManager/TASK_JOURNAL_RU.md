@@ -890,3 +890,16 @@ PPGU использует собственный визуальный язык �
 - В workflow добавлена сборка Portable ZIP и Inno Setup installer EXE из одного и того же onedir build; marker `portable.mode` исключается из installer.
 - Статус: изменения внесены в рабочую ветку; CI и реальные Windows smoke-тесты ещё не подтверждены. Наличие двух сборочных сценариев не означает, что два готовых дистрибутива уже созданы.
 
+
+
+## Запись TJ-2026-11-20-MANAGER-RELEASE-017 — runtime paths, Portable и Installer
+
+- Дата: 2026-11-20
+- Тип: **ФАКТИЧЕСКОЕ УТОЧНЕНИЕ И УСИЛЕНИЕ СБОРКИ**
+- Версия ветки: `3.0.0-dev8`.
+- Исправлена проблема: приложение в frozen-сборке не должно записывать отчёты, staging, task history и реестр в PyInstaller bundle/_MEIPASS или Program Files.
+- Portable: marker `portable.mode`; пользовательские данные находятся в `UserData` рядом с EXE.
+- Installer: изменяемые данные находятся в `%LOCALAPPDATA%\POP PUNK GUITAR Library Manager`; установка настраивается в пользовательскую область `%LOCALAPPDATA%\Programs`, без требования прав администратора.
+- Portable workflow проверяет startup уже с portable marker, проверяет marker в ZIP и собирает отдельный Inno Setup installer из той же onedir-сборки. Installer исключает portable marker и UserData.
+- Локальный BAT builder тоже создаёт portable marker.
+- Важно: этот commit меняет build definition и пути, но не доказывает, что CI собрал или запустил обе версии. До успешного Windows workflow и практического smoke/functional test ссылки на готовые бинарники не публикуются.
