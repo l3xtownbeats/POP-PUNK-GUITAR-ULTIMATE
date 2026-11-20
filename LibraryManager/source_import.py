@@ -414,7 +414,7 @@ def import_sources_to_library(
                 if selected not in selected_directories:
                     # A nested directory is already included by a selected parent.
                     continue
-                files = list(_walk(selected, errors))
+                files = _walk(selected, errors)
                 source_root = selected
                 destination_base = temporary_root / "Sources" / (
                     f"{selection_index:03d}_{_safe_folder_name(selected.name)}"
@@ -426,13 +426,6 @@ def import_sources_to_library(
                     continue
                 files = [selected]
                 source_root, destination_base = file_plan[_identity(selected)]
-
-            if errors:
-                first = errors[0]
-                raise OSError(
-                    "Не удалось полностью прочитать выбранную папку; импорт отменён без частичной копии: "
-                    f"{first.get('path')}: {first.get('error')}"
-                )
 
             for source in files:
                 source = source.resolve()
@@ -468,6 +461,13 @@ def import_sources_to_library(
                 imported_paths[str(source)] = final_root / destination.relative_to(temporary_root)
                 if progress:
                     progress(f"Проверена копия: {source.name} — SHA-256 {digest}")
+
+            if errors:
+                first = errors[0]
+                raise OSError(
+                    "Не удалось полностью прочитать выбранную папку; импорт отменён без частичной копии: "
+                    f"{first.get('path')}: {first.get('error')}"
+                )
 
         if cancel_event is not None and cancel_event.is_set():
             raise InterruptedError("IMPORT GUITAR остановлен пользователем.")
