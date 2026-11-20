@@ -31,7 +31,7 @@ from pattern_engine_schema import build_pattern_engine_manifest, validate_patter
 from mode_sorter import build_mode_sorting_report
 from mode_assignment_index import build_mode_assignment_index
 
-VERSION = "3.0.0-dev8"
+VERSION = "3.0.0-dev9"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 # Non-audio production assets are excluded immediately from all scan/analyze queues.
 # Source files are never deleted or moved; this is an analysis-only filter.
