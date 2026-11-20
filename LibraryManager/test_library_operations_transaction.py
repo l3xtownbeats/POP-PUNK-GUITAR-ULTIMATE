@@ -100,6 +100,36 @@ class TransactionalDistributionTests(unittest.TestCase):
             sum(item["event"] == "BATCH_ROLLBACK" for item in journal_events), 2
         )
 
+    def test_auto_distribution_skips_bad_manifest_and_continues(self) -> None:
+        from library_operations import auto_distribute_approved
+
+        manifests_dir = self.staging / "manifests"
+        manifests_dir.mkdir(parents=True)
+        bad = manifests_dir / "00_bad.json"
+        good = manifests_dir / "01_good.json"
+        bad.write_text("not-json", encoding="utf-8")
+        good.write_text("{}", encoding="utf-8")
+        single_plan = {
+            **self.plan,
+            "entries": [self.entries[0]],
+        }
+        with patch("library_operations.distribution_plan",
+                   side_effect=[ValueError("broken manifest"), single_plan]), \\
+             patch("library_operations.distribute_assets_transactional",
+                   return_value={"results": [{"status": "VERIFIED_COPIED"}]}) as distribute:
+            result = auto_distribute_approved(
+                self.samples, self.staging, approve=True, journal_path=self.journal,
+            )
+
+        self.assertEqual(result["status"], "DISTRIBUTION_COMPLETE_WITH_ERRORS")
+        self.assertEqual(result["manifests_seen"], 2)
+        self.assertEqual(result["ready_count"], 1)
+        self.assertEqual(result["copied_count"], 1)
+        self.assertEqual(len(result["rejected"]), 1)
+        self.assertEqual(Path(result["rejected"][0]["manifest_path"]), bad)
+        distribute.assert_called_once()
+        self.assertTrue(result["source_originals_deleted"] is False)
+
     def test_existing_destination_blocks_the_entire_batch_before_copy(self) -> None:
         first_destination = Path(self.entries[0]["destination_path"])
         first_destination.parent.mkdir(parents=True)
