@@ -1100,3 +1100,10 @@ PPGU использует собственный визуальный язык �
 - Функция подключена к основному окну до создания панелей; оба дополнительных окна получают тёмный navy фон, а поле JSON/деталей в Sample Browser — lowlight/cyan палитру.
 - Добавлен unit test с FakeStyle, проверяющий применение темы к общим ttk-классам без создания GUI/зависимости от display server.
 - Графика/расположение дополнительных окон не перепроектировались; изменена только единая цветовая и контрольная стилизация.
+
+
+## Дополнение к TJ-2026-11-20-MANAGER-PATTERN-031 — Pattern Instrument в Sample Browser
+
+- Sample Browser теперь объединяет обычные note-clip assets режима PATTERN MODE и отдельный массив `pattern_instrument_assets` при отображении выбранной вкладки PATTERN.
+- Цельные chord-driven pattern performances показываются с типом `PATTERN INSTRUMENT` и отдельной фиолетовой меткой, но не становятся третьим режимом и не попадают в список MELODY.
+- Добавлена чистая функция `browser_assets_for_mode()` и регрессионный тест, подтверждающий, что Pattern Instrument assets видны внутри PATTERN tab, а главные режимы остаются двумя: MELODY и PATTERN.
