@@ -78,6 +78,10 @@ class TaskJournal:
         self.append("FAILED", task_id=task_id, task=task,
                     details={"error": str(error)})
 
+    def cancel(self, task_id: str, task: str, reason: str = "Операция остановлена пользователем.") -> None:
+        self.append("CANCELLED", task_id=task_id, task=task,
+                    details={"reason": str(reason)})
+
     def history(self, *, limit: int | None = None) -> list[dict[str, Any]]:
         if not self.path.exists():
             return []
