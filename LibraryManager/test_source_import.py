@@ -240,6 +240,38 @@ class SourceImportTests(unittest.TestCase):
         self.assertEqual(self.wav.read_bytes(), b"original-wav-bytes")
         self.assertTrue(self.sfz.exists())
 
+    def test_symlink_inside_source_folder_aborts_batch_without_copying(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        link = self.library / "linked.wav"
+        try:
+            link.symlink_to(self.wav)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"Symlinks are unavailable in this environment: {exc}")
+
+        with self.assertRaisesRegex(OSError, "Символические ссылки"):
+            import_sources_to_library([self.library], incoming, self.registry)
+
+        self.assertEqual(list(incoming.iterdir()), [])
+        self.assertFalse(self.registry.exists())
+        self.assertEqual(self.wav.read_bytes(), b"original-wav-bytes")
+
+    def test_direct_symlink_source_is_rejected_before_resolving_target(self):
+        linked = self.root / "linked.wav"
+        try:
+            linked.symlink_to(self.wav)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"Symlinks are unavailable in this environment: {exc}")
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+
+        with self.assertRaisesRegex(ValueError, "Символические ссылки"):
+            import_sources_to_library([linked], incoming, self.registry)
+
+        self.assertEqual(list(incoming.iterdir()), [])
+        self.assertFalse(self.registry.exists())
+        self.assertEqual(self.wav.read_bytes(), b"original-wav-bytes")
+
     def test_import_rejects_samples_parent_to_prevent_recursive_self_copy(self):
         incoming = self.root / "Samples" / "Import Sample Guitar"
         incoming.mkdir(parents=True)
