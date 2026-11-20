@@ -383,6 +383,11 @@ def import_sources_to_library(
     if not incoming.is_dir():
         raise NotADirectoryError(f"Папка Import Sample Guitar не найдена: {incoming}")
     for item in selections:
+        if item == incoming:
+            raise ValueError(
+                "Выбрана сама целевая папка Import Sample Guitar. "
+                "Для её содержимого используйте SCAN LIBRARY; выберите внешнюю исходную папку или отдельные файлы."
+            )
         if not item.exists() or not (item.is_file() or item.is_dir()):
             raise FileNotFoundError(f"Источник не найден или не поддерживается: {item}")
         if item.is_dir():
