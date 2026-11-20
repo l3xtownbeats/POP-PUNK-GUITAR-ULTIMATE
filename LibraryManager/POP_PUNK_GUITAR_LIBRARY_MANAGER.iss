@@ -4,11 +4,11 @@
 #define MyAppExeName "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
 
 [Setup]
-AppId={{A16A7E54-7A3B-4F7D-9E2A-PPGU30000001}
+AppId={{A16A7E54-7A3B-4F7D-9E2A-300000000001}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
