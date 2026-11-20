@@ -137,12 +137,25 @@ def register_sources(
     # the selected library root; unresolved references remain explicit.
     sfz_audit = []
     if sfz_roots:
+        # Resolve each SFZ registry record in O(1), rather than rescanning the
+        # full registry for every SFZ file (quadratic behavior on large banks).
+        records_by_identity = {
+            item["identity"]: item for item in records if item.get("identity")
+        }
         try:
             from sfz_parser import parse_sfz_file
         except ImportError:
             from .sfz_parser import parse_sfz_file
         for sfz_identity, library_root in sfz_roots.items():
-            sfz_record = next(item for item in records if item.get("identity") == sfz_identity)
+            sfz_record = records_by_identity.get(sfz_identity)
+            if sfz_record is None:
+                sfz_audit.append({
+                    "sfz_identity": sfz_identity,
+                    "library_root": str(library_root),
+                    "status": "SFZ_REGISTRY_RECORD_MISSING",
+                    "error": "Registered SFZ identity is missing from source registry.",
+                })
+                continue
             try:
                 rows = parse_sfz_file(Path(sfz_record["source_path"]), library_root)
                 for row in rows:
