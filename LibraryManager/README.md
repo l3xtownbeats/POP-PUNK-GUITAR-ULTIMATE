@@ -97,7 +97,7 @@ This does not make a full pattern or whole WAV the payload for ordinary MELODY M
 
 
 
-**Important playback separation:** whole rhythm/pattern recordings are indexed separately for the chord-driven PATTERN INSTRUMENT. They are not assigned to the keyboard note-playable PATTERN MODE, whose ordinary MIDI keys must trigger only pitch-specific individual note clips.
+**PATTERN is one main UI mode, not two tabs:** the PATTERN tab contains the chord-driven Pattern Instrument performance path, its pattern assets, and the AutoChords auxiliary window. The Manager also retains pitch-specific note clips for the approved one-key/one-note playback path within PATTERN. These are internal performance paths inside the single PATTERN mode, not additional main modes. Whole rhythm recordings are stored as PATTERN_INSTRUMENT assets; they are not confused with pitch-specific note clips.
 
 ## Approved instrument architecture reference
 
