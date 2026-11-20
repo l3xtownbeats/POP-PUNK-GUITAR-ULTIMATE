@@ -39,11 +39,8 @@ from ppgu_theme import NEON_STAGE_THEME, resource_path
 
 APP_VERSION = "3.0.0-dev8"
 BUNDLE_DIR, MANAGER_DIR, PORTABLE_MODE = resolve_runtime_paths(__file__)
-DEFAULT_SAMPLES = (
-    BUNDLE_DIR.parent / "Samples"
-    if PORTABLE_MODE and (BUNDLE_DIR.parent / "Samples").is_dir()
-    else MANAGER_DIR / "Samples"
-)
+# The application can live anywhere. The input library is selected independently.
+DEFAULT_SAMPLES = ""
 STAGING_ROOT = MANAGER_DIR / "staging"
 MANAGER_DIR.mkdir(parents=True, exist_ok=True)
 STAGING_ROOT.mkdir(parents=True, exist_ok=True)
@@ -55,7 +52,8 @@ class LibraryManagerApp:
         self.root.title(f"POP PUNK GUITAR LIBRARY MANAGER {APP_VERSION}")
         self.root.geometry("980x680")
         self.root.minsize(760, 520)
-        self.samples_root = tk.StringVar(value=str(DEFAULT_SAMPLES))
+        self._settings_path = MANAGER_DIR / "manager_settings.json"
+        self.samples_root = tk.StringVar(value=self._load_saved_samples_root())
         self.analyze_audio = tk.BooleanVar(value=True)
         self.guitar_confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Готов. Выберите Samples или непосредственно Import Sample Guitar.")
@@ -72,6 +70,18 @@ class LibraryManagerApp:
         self._active_task_title = None
         self._build()
         self.root.after(100, self._poll_worker_events)
+        if not self.samples_root.get().strip():
+            self.root.after(350, self._prompt_for_library_root)
+        if PORTABLE_MODE and MANAGER_DIR != (BUNDLE_DIR / "UserData").resolve():
+            self._write(
+                "PORTABLE: папка приложения недоступна для записи; "
+                f"пользовательские данные вынесены в резервный каталог: {MANAGER_DIR}"
+            )
+        elif PORTABLE_MODE:
+            self._write(
+                "PORTABLE: приложение можно хранить в любой доступной папке. "
+                f"Пользовательские данные: {MANAGER_DIR}"
+            )
 
     def _build(self) -> None:
         """Build the six-action Manager dashboard using PPGU NEON STAGE DEFAULT."""
@@ -474,8 +484,72 @@ class LibraryManagerApp:
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _load_saved_samples_root(self) -> str:
+        """Restore the last selected library from this installation's data folder."""
+        try:
+            settings = json.loads(self._settings_path.read_text(encoding="utf-8"))
+            value = settings.get("samples_root", "")
+            if isinstance(value, str) and value.strip() and Path(value).expanduser().exists():
+                return value
+        except (OSError, ValueError, TypeError):
+            pass
+        return DEFAULT_SAMPLES
+
+    def _save_settings(self) -> None:
+        """Persist the selected library atomically in UserData / LocalAppData."""
+        import os
+        import tempfile
+
+        self._settings_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": 1,
+            "samples_root": self.samples_root.get().strip(),
+            "app_version": APP_VERSION,
+        }
+        fd, temporary = tempfile.mkstemp(
+            prefix="manager_settings-", suffix=".tmp",
+            dir=self._settings_path.parent,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(payload, stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self._settings_path)
+        except Exception:
+            try:
+                Path(temporary).unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+
+    def _prompt_for_library_root(self) -> None:
+        selected = filedialog.askdirectory(
+            title="Выберите папку Samples или Import Sample Guitar",
+        )
+        if not selected:
+            self.status.set(
+                "Выберите папку библиотеки через меню ПРОЕКТ перед запуском сканирования."
+            )
+            return
+        self.samples_root.set(selected)
+        try:
+            self._save_settings()
+            self.status.set("Папка библиотеки сохранена.")
+            self._write(f"Путь Samples сохранён: {selected}")
+        except OSError as exc:
+            messagebox.showwarning(
+                "Настройки",
+                f"Папка выбрана на этот запуск, но путь не удалось сохранить: {exc}",
+            )
+
     def _samples(self) -> Path:
         """Resolve and log the exact Samples/Import Sample Guitar paths."""
+        if not self.samples_root.get().strip():
+            self._prompt_for_library_root()
+        if not self.samples_root.get().strip():
+            raise ValueError("Сначала выберите папку Samples или Import Sample Guitar.")
         selected = Path(self.samples_root.get()).expanduser()
         resolved = resolve_samples_root(selected)
         incoming = next(
@@ -492,6 +566,13 @@ class LibraryManagerApp:
         )
         if selected:
             self.samples_root.set(selected)
+            try:
+                self._save_settings()
+            except OSError as exc:
+                messagebox.showwarning(
+                    "Настройки",
+                    f"Папка выбрана на этот запуск, но путь не удалось сохранить: {exc}",
+                )
 
     def _background(self, title: str, work) -> None:
         """Run work off the UI thread and deliver all UI updates via a queue."""
