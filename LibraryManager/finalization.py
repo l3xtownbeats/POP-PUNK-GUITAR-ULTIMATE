@@ -210,8 +210,25 @@ def audit_factory_library(
     with csv_path.open("x", newline="", encoding="utf-8-sig") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
+        def record_walk_error(exc: OSError) -> None:
+            nonlocal rows_written
+            counts["WALK_ERROR"] += 1
+            writer.writerow({
+                "factory_wav": str(getattr(exc, "filename", "") or factory),
+                "sidecar": "",
+                "asset_id": "",
+                "status": "WALK_ERROR",
+                "style_family": "",
+                "instrument_family": "",
+                "asset_role": "",
+                "tone_family": "",
+                "sha256": "",
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            rows_written += 1
+
         if factory.is_dir():
-            for current, dirs, files in os.walk(factory):
+            for current, dirs, files in os.walk(factory, onerror=record_walk_error):
                 dirs[:] = [d for d in dirs if not d.startswith(".")]
                 for filename in files:
                     if not filename.lower().endswith((".wav", ".wave")):
