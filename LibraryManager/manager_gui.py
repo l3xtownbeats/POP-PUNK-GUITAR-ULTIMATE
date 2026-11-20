@@ -491,7 +491,7 @@ class LibraryManagerApp:
             value = settings.get("samples_root", "")
             if isinstance(value, str) and value.strip() and Path(value).expanduser().exists():
                 return value
-        except (OSError, ValueError, TypeError):
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
         return DEFAULT_SAMPLES
 
