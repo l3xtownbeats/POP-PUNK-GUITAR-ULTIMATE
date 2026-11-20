@@ -13,8 +13,8 @@ class RuntimePathTests(unittest.TestCase):
             module = Path(directory) / "manager_gui.py"
             module.touch()
             bundle, data, portable = resolve_runtime_paths(module, frozen=False)
-            self.assertEqual(bundle, Path(directory))
-            self.assertEqual(data, Path(directory))
+            self.assertEqual(bundle.resolve(), Path(directory).resolve())
+            self.assertEqual(data.resolve(), Path(directory).resolve())
             self.assertFalse(portable)
 
     def test_portable_run_uses_user_data_beside_executable(self):
@@ -26,7 +26,7 @@ class RuntimePathTests(unittest.TestCase):
                 exe, executable=exe, frozen=True, environ={}
             )
             self.assertEqual(bundle, Path(directory))
-            self.assertEqual(data, Path(directory) / "UserData")
+            self.assertEqual(data.resolve(), (Path(directory) / "UserData").resolve())
             self.assertTrue(portable)
 
     def test_installed_run_uses_local_appdata_not_program_files(self):
@@ -39,8 +39,8 @@ class RuntimePathTests(unittest.TestCase):
                 exe, executable=exe, frozen=True,
                 environ={"LOCALAPPDATA": str(local)}
             )
-            self.assertEqual(bundle, exe.parent)
-            self.assertEqual(data, local / APP_FOLDER_NAME)
+            self.assertEqual(bundle.resolve(), exe.parent.resolve())
+            self.assertEqual(data.resolve(), (local / APP_FOLDER_NAME).resolve())
             self.assertFalse(portable)
             self.assertNotEqual(data, bundle)
 
@@ -52,7 +52,7 @@ class RuntimePathTests(unittest.TestCase):
             (Path(directory) / "portable.mode").touch()
             with patch("app_paths.sys.frozen", True, create=True), \
                  patch("app_paths.sys.executable", str(exe)):
-                self.assertEqual(runtime_staging_root(exe), Path(directory) / "UserData" / "staging")
+                self.assertEqual(runtime_staging_root(exe).resolve(), (Path(directory) / "UserData" / "staging").resolve())
 
     def test_portable_fallback_uses_stable_profile_outside_read_only_bundle(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -78,11 +78,11 @@ class RuntimePathTests(unittest.TestCase):
             )
             self.assertEqual(bundle, exe.parent)
             self.assertEqual(
-                data,
-                local / APP_FOLDER_NAME / "PortableFallback" / "portable-profile-123",
+                data.resolve(),
+                (local / APP_FOLDER_NAME / "PortableFallback" / "portable-profile-123").resolve(),
             )
             self.assertTrue(portable)
-            self.assertEqual(calls[0], exe.parent / "UserData")
+            self.assertEqual(calls[0].resolve(), (exe.parent / "UserData").resolve())
 
     def test_portable_reports_error_when_both_data_locations_are_unwritable(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -109,7 +109,7 @@ class RuntimePathTests(unittest.TestCase):
                 environ={},
             )
             self.assertEqual(bundle, exe.parent)
-            self.assertEqual(data, exe.parent / "UserData")
+            self.assertEqual(data.resolve(), (exe.parent / "UserData").resolve())
             self.assertTrue(portable)
 
     def test_resource_resolution_uses_bundle(self):
