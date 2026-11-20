@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from source_import import register_sources
+from source_import import register_sources, import_sources_to_library
 
 
 class SourceImportTests(unittest.TestCase):
@@ -130,6 +130,78 @@ class SourceImportTests(unittest.TestCase):
         self.assertEqual(data["registry_version"], 2)
         self.assertEqual(data["source_count"], 2)
         self.assertEqual(result["registered_files"], 1)
+
+
+    def test_import_copies_to_scannable_incoming_and_preserves_originals(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        result = import_sources_to_library([self.library], incoming, self.registry)
+        self.assertEqual(result["copied_files"], 2)
+        self.assertEqual(result["copy_integrity"], "SHA256_VERIFIED")
+        self.assertEqual(result["next_stage"], "SCAN_LIBRARY")
+        self.assertFalse(result["source_files_modified"])
+        self.assertFalse(result["source_files_moved"])
+        self.assertFalse(result["source_files_deleted"])
+        batch = Path(result["import_batch"])
+        copied_wav = batch / "Sources" / "001_Guitar Library" / "Nested" / "clean.wav"
+        copied_sfz = batch / "Sources" / "001_Guitar Library" / "instrument.sfz"
+        self.assertEqual(copied_wav.read_bytes(), self.wav.read_bytes())
+        self.assertEqual(copied_sfz.read_bytes(), self.sfz.read_bytes())
+        data = json.loads(self.registry.read_text(encoding="utf-8"))
+        by_name = {item["filename"]: item for item in data["sources"]}
+        self.assertEqual(Path(by_name["clean.wav"]["imported_path"]), copied_wav)
+        self.assertEqual(Path(by_name["instrument.sfz"]["imported_path"]), copied_sfz)
+        self.assertEqual(
+            hashlib.sha256(self.wav.read_bytes()).hexdigest(),
+            self.before[str(self.wav)],
+        )
+        self.assertEqual(
+            hashlib.sha256(self.sfz.read_bytes()).hexdigest(),
+            self.before[str(self.sfz)],
+        )
+
+    def test_reimport_reuses_verified_imported_copies(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        first = import_sources_to_library([self.library], incoming, self.registry)
+        second = import_sources_to_library([self.library], incoming, self.registry)
+        self.assertEqual(first["copied_files"], 2)
+        self.assertEqual(second["copied_files"], 0)
+        self.assertIsNone(second["import_batch"])
+        self.assertEqual(second["registry"]["already_registered"], 2)
+        self.assertEqual(len(list(incoming.glob("IMPORT_BATCH_*"))), 1)
+
+    def test_failed_import_rolls_back_partial_batch_and_keeps_sources(self):
+        from unittest.mock import patch
+        import source_import
+
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        real_copy = source_import._copy_verified
+        calls = {"count": 0}
+
+        def fail_after_first(source, destination, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise OSError("simulated destination disk failure")
+            return real_copy(source, destination, **kwargs)
+
+        with patch("source_import._copy_verified", side_effect=fail_after_first):
+            with self.assertRaisesRegex(OSError, "simulated destination disk failure"):
+                import_sources_to_library([self.library], incoming, self.registry)
+
+        self.assertEqual(list(incoming.iterdir()), [])
+        self.assertFalse(self.registry.exists())
+        self.assertEqual(self.wav.read_bytes(), b"original-wav-bytes")
+        self.assertTrue(self.sfz.exists())
+
+    def test_import_rejects_samples_parent_to_prevent_recursive_self_copy(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        with self.assertRaisesRegex(ValueError, "папку-родитель"):
+            import_sources_to_library([incoming.parent], incoming, self.registry)
+        self.assertEqual(list(incoming.iterdir()), [])
+        self.assertFalse(self.registry.exists())
 
     def test_missing_source_does_not_create_registry(self):
         with self.assertRaises(FileNotFoundError):
