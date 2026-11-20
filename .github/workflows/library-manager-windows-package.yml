@@ -74,7 +74,7 @@ jobs:
           $exe = Join-Path $app "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
           $oldPath = $env:PATH
           try {
-            $env:PATH = $oldPath
+            $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
             $p = Start-Process -FilePath (Resolve-Path $exe) -PassThru
             Start-Sleep -Seconds 5
             $p.Refresh()
@@ -142,7 +142,7 @@ jobs:
 
           $oldPath = $env:PATH
           try {
-            $env:PATH = $oldPath
+            $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
             $p = Start-Process -FilePath $installedExe -PassThru
             Start-Sleep -Seconds 5
             $p.Refresh()
