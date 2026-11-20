@@ -108,7 +108,7 @@ The planned extraction/mapping stage must:
 
 The Manager's output is consumed by the plugin's per-key playback engine: MIDI key → pitch-specific approved note clip → independent voice playback. The plugin handles real-time note-on/note-off, polyphony and release; the Manager handles source analysis, extraction, metadata, review and mapping preparation.
 
-**Current implementation (2.4.0):** the optional full cycle now runs the physical extraction paths for pitch-specific Sample/Melody assets, repeated Pattern occurrences, and review-only chord/Power Chord sample candidates. Derived PCM WAVs and manifests are written only under LibraryManager/staging, then audited and indexed into the VST3 plugin asset catalog. Riff/Phrase remain review candidates unless the source evidence and musical review establish their identity. Chord analysis also feeds ARPEGGIO with bounded fretboard voicing hypotheses under an explicitly unconfirmed standard-tuning assumption. During explicit staged-asset review, the operator can assign one or more of the ten approved modes; this is how evidence-backed Strumming, Articulations and Ending material enters those queues without automatic guessing. Original source files remain read-only and are never moved or deleted by this workflow.
+**Current preparation pipeline (Manager 3.0):** the optional full cycle now runs the physical extraction paths for pitch-specific Sample/Melody assets, repeated Pattern occurrences, and review-only chord/Power Chord sample candidates. Derived PCM WAVs and manifests are written only under LibraryManager/staging, then audited and indexed into the VST3 plugin asset catalog. Riff/Phrase remain review candidates unless the source evidence and musical review establish their identity. Chord analysis also feeds ARPEGGIO with bounded fretboard voicing hypotheses under an explicitly unconfirmed standard-tuning assumption. During explicit staged-asset review, the operator can assign one or more of the ten prepared-library target categories for the separate VST3; this is how evidence-backed Strumming, Articulations and Ending material enters those queues without automatic guessing. These categories are library destinations, not Manager operating modes. Original source files remain read-only and are never moved or deleted by this workflow.
 
 
 ## Extract meaningful guitar patterns; keep full recordings optional
@@ -434,9 +434,9 @@ See [V1_8_RELEASE_NOTES_RU.md](V1_8_RELEASE_NOTES_RU.md) for implemented behavio
 История фоновых задач, этапов, успешных завершений и ошибок описана в [TASK_JOURNAL_RU.md](TASK_JOURNAL_RU.md). Журнал расположен в `LibraryManager/reports/task_history.jsonl` и не возобновляет прерванные операции автоматически.
 
 
-## VST3 integration catalog — Library Manager 2.4.0
+## VST3 integration catalog — Manager 3.0
 
-The full preparation cycle now produces a versioned `plugin_asset_catalog.json` after extraction and staging audit. The catalog contains all ten approved Manager/VST3 mode sections, analysis-only candidates, staged WAV references, source hashes, exact source sample offsets, pitch/chord hypotheses, articulation and velocity metadata where available, and explicit review/license/integrity states.
+The full preparation cycle now produces a versioned `plugin_asset_catalog.json` after extraction and staging audit. The catalog contains ten VST3 library target-category sections, analysis-only candidates, staged WAV references, source hashes, exact source sample offsets, pitch/chord hypotheses, articulation and velocity metadata where available, and explicit review/license/integrity states. The ten categories are not Manager performance modes.
 
 - SAMPLE MODE receives pitch-specific note clips plus review-only chord and Power Chord sample clips.
 - PATTERN MODE receives repeated-rhythm pattern clips and note-event zones that are explicitly marked for this note-playable mode.
@@ -452,12 +452,12 @@ The Manager adds the **Собрать каталог ассетов PPGU** actio
 
 ## Единая карта всех 12 нот и Auto Chords
 
-Manager 2.5.0 формирует единую хроматическую карту для будущего VST3:
+Manager 3.0 формирует единую хроматическую карту как часть подготовленной библиотеки и контракта для отдельного VST3:
 - все 12 pitch classes представлены отдельно и доступны в объявленном MIDI-диапазоне;
 - Sharp/Flat — два способа подписать одну высоту, а не разные ноты;
 - C# = Db, D# = Eb, F# = Gb, G# = Ab, A# = Bb;
 - E и F остаются двумя разными нотами;
-- Auto Chords использует ту же карту pitch class и объединяет только энгармонические дубликаты;
+- AutoChords внутри PATTERN отдельного VST3 использует эту карту pitch class и объединяет только энгармонические дубликаты;
 - хроматические ноты не удаляются из клавиатурного диапазона из-за выбранной тональности или текущего аккорда.
 
 При сборке каталога Manager экспортирует chromatic_pitch_map JSON и включает эту же карту в Performance Manifest для VST3. Точные sample mappings требуют подтверждённых MIDI-нот, лицензии и integrity status. Fallback для отсутствующего WAV записывается как предложение QA, а не как готовый runtime asset.
@@ -477,7 +477,7 @@ Version 3.0 remains a development build until the complete Windows regression su
 
 ## Manager 3.0 — prepared VST3 library structure and coverage
 
-The **Сформировать каталог VST3** action now produces four coordinated artifacts beside the catalog:
+The **Собрать каталог ассетов PPGU** action produces four coordinated artifacts beside the catalog:
 - `plugin_asset_catalog_*.json` — validated assets and ten VST3 library-category queues;
 - `plugin_library_structure_*.json` — logical library layout for the separate VST3's SAMPLE, PATTERN and MELODY engines, with ten prepared asset-category sections and provenance-linked asset references;
 - `plugin_library_coverage_*.json` — explicit coverage/gap report for 12 pitch classes, LOW/MEDIUM/HIGH velocity layers, confirmed techniques, Pattern event structure and Melody note/event timing;
