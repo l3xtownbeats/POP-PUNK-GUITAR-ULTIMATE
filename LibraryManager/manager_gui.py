@@ -494,9 +494,10 @@ class LibraryManagerApp:
         self._job_running = True
         self._cancel_event.clear()
         self._active_task_title = title
-        self._active_task_id = self._task_journal.start(
+        task_id = self._task_journal.start(
             title, details={"samples_root": self.samples_root.get(), "manager_version": APP_VERSION}
         )
+        self._active_task_id = task_id
         self._cancel_button.configure(state="normal")
         self.status.set(title + " — запуск…")
         for button in self._action_buttons:
@@ -506,10 +507,10 @@ class LibraryManagerApp:
         def runner():
             try:
                 result = work()
-                self._task_journal.finish(self._active_task_id, title, result=result)
+                self._task_journal.finish(task_id, title, result=result)
                 self._worker_events.put(("finish", title, result))
             except Exception as exc:
-                self._task_journal.fail(self._active_task_id, title, f"{type(exc).__name__}: {exc}")
+                self._task_journal.fail(task_id, title, f"{type(exc).__name__}: {exc}")
                 self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
 
         worker = threading.Thread(target=runner, name="LibraryManagerWorker", daemon=True)
@@ -517,12 +518,21 @@ class LibraryManagerApp:
         try:
             worker.start()
         except Exception as exc:
+            self._task_journal.fail(task_id, title, f"{type(exc).__name__}: {exc}")
             self._job_running = False
             self._worker_thread = None
             for button in self._action_buttons:
                 button.configure(state="normal")
             details = traceback.format_exc()
             self._error(title, exc, details)
+
+    def _queue_progress(self, message: str) -> None:
+        """Persist worker progress and forward it to the Tk main thread."""
+        task_id = self._active_task_id
+        task = self._active_task_title
+        if task_id and task:
+            self._task_journal.progress(task_id, task, message)
+        self._worker_events.put(("progress", message))
 
     def _poll_worker_events(self) -> None:
         """Process worker events only on Tk's main thread."""
@@ -616,7 +626,7 @@ class LibraryManagerApp:
 
         def work():
             def report_progress(message: str) -> None:
-                self._worker_events.put(("progress", message))
+                self._queue_progress(message)
             return quick_scan(
                 samples, progress=report_progress, cancel_event=self._cancel_event,
             )
@@ -635,7 +645,7 @@ class LibraryManagerApp:
 
         def work():
             def report_progress(message: str) -> None:
-                self._worker_events.put(("progress", message))
+                self._queue_progress(message)
 
             report_progress("ЭТАП 1/2: быстрый filesystem scan без SHA-256 и декодирования.")
             quick_result = quick_scan(
@@ -679,7 +689,7 @@ class LibraryManagerApp:
 
         def work():
             def report_progress(message: str) -> None:
-                self._worker_events.put(("progress", message))
+                self._queue_progress(message)
 
             report_progress("ЭТАП 1/8: быстрое сканирование структуры — только файловая метаинформация.")
             quick_result = quick_scan(
@@ -1575,7 +1585,7 @@ class LibraryManagerApp:
             messagebox.showerror("Папка Samples", str(exc))
             return
         def progress(message: str) -> None:
-            self._worker_events.put(("progress", message))
+            self._queue_progress(message)
         self._background(
             "Финализация библиотеки",
             lambda: finalize_library_audit(
