@@ -18,7 +18,9 @@ from typing import Any
 
 from audio_range_io import audio_source_info, write_pcm_wav_range
 
-STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
+from app_paths import runtime_staging_root
+
+STAGING_BASE = runtime_staging_root(__file__)
 
 VERSION = "0.2.0"
 DEFAULT_WINDOW_MS = 20
