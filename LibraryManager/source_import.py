@@ -117,6 +117,26 @@ def register_sources(
                 resolved = file_path.resolve()
                 stat = resolved.stat()
                 identity = _identity(resolved)
+                imported_path = imported_map.get(identity)
+                expected_import_digest = imported_hash_map.get(identity)
+                if imported_path and expected_import_digest:
+                    imported_file = Path(imported_path)
+                    try:
+                        source_digest = _sha256(resolved)
+                        copied_digest = _sha256(imported_file)
+                    except OSError as exc:
+                        raise ValueError(
+                            f"Не удалось повторно проверить импортированную пару "
+                            f"{resolved} → {imported_file}: {exc}"
+                        ) from exc
+                    if (
+                        source_digest != expected_import_digest
+                        or copied_digest != expected_import_digest
+                    ):
+                        raise ValueError(
+                            "Исходник или импортированная копия изменились после проверки; "
+                            f"пакет не будет зарегистрирован: {resolved} → {imported_file}"
+                        )
                 if identity in known:
                     existing = records_by_identity.get(identity)
                     imported_path = imported_map.get(identity)
