@@ -27,7 +27,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; GroupDescription: "Дополнительные значки:"; Flags: unchecked
 
 [Files]
-Source: "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\*"; DestDir: "{app}"; Excludes: "portable.mode,UserData\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\*"; DestDir: "{app}"; Excludes: "portable.mode;UserData\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\POP PUNK GUITAR Library Manager"; Filename: "{app}\{#MyAppExeName}"
