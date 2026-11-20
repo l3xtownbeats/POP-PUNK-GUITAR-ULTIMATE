@@ -31,6 +31,19 @@ class SfzParserTests(unittest.TestCase):
             rows=parse_sfz_file(main,root)
             self.assertTrue(any(r["status"]=="INCLUDE_CYCLE" for r in rows))
 
+    def test_include_outside_library_is_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            root=base/"Samples"; root.mkdir()
+            outside=base/"outside.sfz"
+            outside.write_text('<region> sample="secret.wav"\\n',encoding="utf-8")
+            main=root/"main.sfz"
+            main.write_text('#include "../outside.sfz"\\n',encoding="utf-8")
+            rows=parse_sfz_file(main,root)
+            self.assertEqual(len(rows),1)
+            self.assertEqual(rows[0]["status"],"INCLUDE_OUTSIDE_LIBRARY")
+            self.assertEqual(rows[0]["sample_opcode"],"")
+
     def test_multiple_regions_keep_individual_ranges(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
