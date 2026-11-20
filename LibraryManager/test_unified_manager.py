@@ -86,6 +86,32 @@ class UnifiedManagerTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError, "Не удаётся прочитать входную папку"):
                 quick_scan(self.samples, reports_root=self.reports)
 
+    def test_unreadable_file_is_recorded_and_scan_continues_to_next_file(self) -> None:
+        broken = self.incoming / "locked.wav"
+        shutil.copyfile(self.wav, broken)
+        healthy = self.incoming / "healthy.wav"
+        shutil.copyfile(self.wav, healthy)
+        real_open = Path.open
+
+        def guarded_open(path, *args, **kwargs):
+            if path.name == "locked.wav" and args and args[0] == "rb":
+                raise PermissionError("simulated locked source")
+            return real_open(path, *args, **kwargs)
+
+        with patch.object(Path, "open", guarded_open):
+            summary = run_manager(self.samples, reports_root=self.reports)
+
+        report_dir = Path(summary["report_directory"])
+        inventory = (report_dir / "unified_inventory.csv").read_text(encoding="utf-8-sig")
+        errors = json.loads((report_dir / "unified_errors.json").read_text(encoding="utf-8"))
+        self.assertIn("locked.wav", inventory)
+        self.assertIn("FILE_READ_ERROR", inventory)
+        self.assertIn("healthy.wav", inventory)
+        self.assertTrue(any(item.get("path") == "locked.wav" for item in errors))
+        self.assertEqual(summary["files_scanned"], 3)
+        self.assertTrue(broken.exists())
+        self.assertTrue(healthy.exists())
+
     def test_inventory_sfz_and_exact_duplicates(self) -> None:
         duplicate = self.incoming / "copy.wav"
         shutil.copyfile(self.wav, duplicate)
