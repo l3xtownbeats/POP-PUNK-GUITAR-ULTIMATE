@@ -1,5 +1,5 @@
 #define MyAppName "POP PUNK GUITAR LIBRARY MANAGER"
-#define MyAppVersion "3.0.0-dev8"
+#define MyAppVersion "3.0.0-dev9"
 #define MyAppPublisher "L3XTOWN"
 #define MyAppExeName "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
 
