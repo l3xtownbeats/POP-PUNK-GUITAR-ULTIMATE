@@ -160,7 +160,7 @@ class UnifiedManagerTests(unittest.TestCase):
         # adds a second readable file and one blocked nested file.
         self.assertEqual(summary["files_found"], 2)
         self.assertEqual(summary["directory_errors"], 1)
-        self.assertEqual(summary["directory_error_details"][0]["path"], str(locked))
+        self.assertEqual(Path(summary["directory_error_details"][0]["path"]).resolve(), locked.resolve())
         report_dir = Path(summary["report_directory"])
         errors = json.loads((report_dir / "quick_errors.json").read_text(encoding="utf-8"))
         self.assertEqual(errors["directory_errors"][0]["stage"], "QUICK_DIRECTORY_SCAN")
