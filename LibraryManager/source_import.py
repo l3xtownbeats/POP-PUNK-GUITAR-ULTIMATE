@@ -35,6 +35,14 @@ def _walk(path: Path, errors: list[dict] | None = None):
     if path.is_file():
         yield path
         return
+    if path.name.startswith(".manager-import-tmp-"):
+        if errors is not None:
+            errors.append({
+                "path": str(path),
+                "stage": "IMPORT_TEMP_SOURCE_REJECTED",
+                "error": "Manager temporary import folders cannot be used as source libraries.",
+            })
+        return
     stack = [path]
     while stack:
         folder = stack.pop()
@@ -50,6 +58,8 @@ def _walk(path: Path, errors: list[dict] | None = None):
                                     "error": "Символические ссылки не копируются; выберите реальный исходный файл или папку.",
                                 })
                         elif entry.is_dir(follow_symlinks=False):
+                            if entry.name.startswith(".manager-import-tmp-"):
+                                continue
                             stack.append(Path(entry.path))
                         elif entry.is_file(follow_symlinks=False):
                             yield Path(entry.path)
@@ -379,6 +389,8 @@ def import_sources_to_library(
             + ", ".join(str(item) for item in symlink_selections[:5])
         )
     selections = [item.resolve() for item in raw_selections]
+    if any(item.name.startswith(".manager-import-tmp-") for item in selections):
+        raise ValueError("Временная папка Manager не может быть источником импорта.")
     incoming = Path(incoming_root).expanduser().resolve()
     if not incoming.is_dir():
         raise NotADirectoryError(f"Папка Import Sample Guitar не найдена: {incoming}")
