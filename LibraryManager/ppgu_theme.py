@@ -19,33 +19,36 @@ CANONICAL_SKIN_NAME = "NEON STAGE DEFAULT"
 PALETTE_KEYS = (
     "window_bg", "panel", "panel_elevated", "control_bg", "control_face",
     "control_border", "text_primary", "text_secondary", "text_disabled",
-    "accent", "accent_glow", "danger", "warning", "success", "lcd_bg",
+    "accent", "accent_glow", "accent_purple", "accent_magenta",
+    "danger", "warning", "success", "lcd_bg",
     "lcd_text", "led_on", "led_off", "shadow", "highlight", "lowlight",
 )
 
-# Exact 21-token fallback from PPGU SKIN/Skin_053/theme.json.
+# Approved 23-token NEON STAGE fallback, aligned to the reference mockups.
 _FALLBACK_PALETTE = {
-    "window_bg": "#0B0F12",
-    "panel": "#141B20",
-    "panel_elevated": "#1D2930",
-    "control_bg": "#0F1519",
-    "control_face": "#192329",
-    "control_border": "#53656B",
-    "text_primary": "#F3F7F5",
-    "text_secondary": "#B7C5C2",
-    "text_disabled": "#879791",
-    "accent": "#D5FF45",
-    "accent_glow": "#DEFF6E",
-    "danger": "#FF5A66",
+    "window_bg": "#060B18",
+    "panel": "#0B1628",
+    "panel_elevated": "#11233C",
+    "control_bg": "#071322",
+    "control_face": "#10243D",
+    "control_border": "#255A86",
+    "text_primary": "#F3F7FF",
+    "text_secondary": "#B9CBE0",
+    "text_disabled": "#788BA4",
+    "accent": "#078BFF",
+    "accent_glow": "#16D4FF",
+    "accent_purple": "#8B5CFF",
+    "accent_magenta": "#F02DCE",
+    "danger": "#FF5577",
     "warning": "#FFC857",
-    "success": "#6EE7A8",
-    "lcd_bg": "#08110E",
-    "lcd_text": "#D7FFB2",
-    "led_on": "#D5FF45",
-    "led_off": "#33443B",
-    "shadow": "#050708",
-    "highlight": "#90A7A0",
-    "lowlight": "#0D1417",
+    "success": "#57E879",
+    "lcd_bg": "#030A17",
+    "lcd_text": "#8CEAFF",
+    "led_on": "#1EC7FF",
+    "led_off": "#203954",
+    "shadow": "#02040C",
+    "highlight": "#83BEFF",
+    "lowlight": "#071225"
 }
 
 
