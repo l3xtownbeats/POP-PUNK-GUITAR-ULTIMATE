@@ -72,13 +72,14 @@ Reports are written beside the tool in `reports/`:
 
 The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compiles the Manager Python modules and runs the full `unittest` regression suite on Ubuntu with Python 3.11. The separate Windows workflow builds and smoke-tests Portable ZIP and Installer EXE. A workflow definition is not proof of a successful run; check the latest CI result before calling a build verified.
 
-### Safety
+### Safety and controlled distribution
 
-- Original files are never changed.
+- Import, registration, scanning, analysis, extraction, audition and FACTORY distribution do not modify, rename, move or delete original source files.
 - Automatic filename hints are not treated as final musical classification.
-- Archives are inventoried only; they are not extracted.
-- Unsupported files are skipped, not deleted.
-- Copy/sort mode remains a separate future stage requiring preview, collision checks, checksum verification, a transaction journal and rollback.
+- Archives are registered/inventoried only; they are not automatically extracted.
+- Unsupported files are skipped and reported, not deleted.
+- FACTORY distribution is implemented as a separate explicit operation. It validates review and license approval, provenance, source/derived hashes, WAV format and sample boundaries; it rejects destination collisions, copies transactionally, journals each operation and rolls back files created by a failed batch.
+- Distribution remains confirmation-gated; unreviewed or unlicensed candidates stay in staging. Original-source cleanup is a separate destructive operation that requires a completed dependency audit and two explicit user confirmations. It is not part of ordinary import, scan, analysis or distribution.
 
 
 ## Critical rule: duplicates are not the same as similar sounds
