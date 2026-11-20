@@ -108,6 +108,12 @@ The Manager must prepare both kinds of content: pitch-specific note assets/mappi
 
 **This is an approved target architecture, not a statement that the chord-performance engine, chord recognition, Pattern Browser, Key Switches or extraction pipeline are implemented.** See docs/KEYBOARD_PLAYBACK_SPEC.md, section 14, for the full requirements and acceptance criteria.
 
+
+
+### Main plugin mode selector — fixed UI contract
+
+The PPGU instrument has exactly two main player-facing mode selectors: **MELODY** and **PATTERN**. **AutoChords is a supporting panel inside PATTERN**, opened from PATTERN with its additional-window button; it is not a third mode and must not appear as a standalone CHORD mode. The Manager's ten library-preparation categories remain unchanged and are not the plugin's main mode selector.
+
 ## 15. Two distinct playable content sets — PATTERN INSTRUMENT and MELODY INSTRUMENT
 
 The Manager must prepare and classify source material according to the actual playback job it can serve. It is not enough to put every guitar WAV into one generic folder or make one universal mapping.
