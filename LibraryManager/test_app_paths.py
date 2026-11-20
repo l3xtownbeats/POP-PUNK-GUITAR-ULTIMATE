@@ -44,6 +44,16 @@ class RuntimePathTests(unittest.TestCase):
             self.assertFalse(portable)
             self.assertNotEqual(data, bundle)
 
+    def test_runtime_staging_root_uses_persistent_data_directory(self):
+        from app_paths import runtime_staging_root
+        with tempfile.TemporaryDirectory() as directory:
+            exe = Path(directory) / "Manager.exe"
+            exe.touch()
+            (Path(directory) / "portable.mode").touch()
+            with patch("app_paths.sys.frozen", True, create=True), \
+                 patch("app_paths.sys.executable", str(exe)):
+                self.assertEqual(runtime_staging_root(exe), Path(directory) / "UserData" / "staging")
+
     def test_resource_resolution_uses_bundle(self):
         with tempfile.TemporaryDirectory() as directory:
             module = Path(directory) / "manager_gui.py"
