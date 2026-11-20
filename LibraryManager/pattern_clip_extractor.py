@@ -132,7 +132,7 @@ def extract_pattern_occurrences(
                     "frame_count": end - start,
                     "duration_seconds": round((end - start) / rate, 6),
                     "kind": "rhythm_pattern",
-                    "engine_targets": ["PATTERN_MODE", "PATTERN_INSTRUMENT"],
+                    "engine_targets": ["PATTERN_INSTRUMENT"],
                     "derived_path": str(clip_path),
                     "derived_sha256": sha256_file(clip_path),
                     "extractor": "pattern_clip_extractor",
