@@ -206,19 +206,34 @@ class SourceImportTests(unittest.TestCase):
         changed_bytes = b"updated-original-wav-with-a-new-size"
         self.wav.write_bytes(changed_bytes)
         second = import_sources_to_library([self.library], incoming, self.registry)
-        self.assertEqual(second["copied_files"], 1)
+        # One changed file refreshes the complete folder so SFZ and its sample
+        # remain together with matching relative paths in the new batch.
+        self.assertEqual(second["copied_files"], 2)
 
         data = json.loads(self.registry.read_text(encoding="utf-8"))
         wave_record = next(item for item in data["sources"] if item["filename"] == "clean.wav")
+        sfz_record = next(item for item in data["sources"] if item["filename"] == "instrument.sfz")
         updated_copy = Path(wave_record["imported_path"])
-        self.assertNotEqual(updated_copy, Path(first["import_batch"]) / "Sources" / "001_Guitar Library" / "Nested" / "clean.wav")
+        updated_sfz = Path(sfz_record["imported_path"])
+        expected_new_batch = Path(second["import_batch"])
+        self.assertEqual(
+            updated_copy,
+            expected_new_batch / "Sources" / "001_Guitar Library" / "Nested" / "clean.wav",
+        )
+        self.assertEqual(
+            updated_sfz,
+            expected_new_batch / "Sources" / "001_Guitar Library" / "instrument.sfz",
+        )
         self.assertEqual(updated_copy.read_bytes(), changed_bytes)
+        self.assertTrue(updated_sfz.is_file())
         self.assertEqual(wave_record["size_bytes"], self.wav.stat().st_size)
         self.assertEqual(wave_record["modified_ns"], self.wav.stat().st_mtime_ns)
         self.assertEqual(
             wave_record["imported_sha256"],
             hashlib.sha256(changed_bytes).hexdigest().upper(),
         )
+        self.assertEqual(len(list(expected_new_batch.rglob("clean.wav"))), 1)
+        self.assertEqual(len(list(expected_new_batch.rglob("instrument.sfz"))), 1)
 
         third = import_sources_to_library([self.library], incoming, self.registry)
         self.assertEqual(third["copied_files"], 0)
