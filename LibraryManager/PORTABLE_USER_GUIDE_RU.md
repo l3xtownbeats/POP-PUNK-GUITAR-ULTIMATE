@@ -1,4 +1,4 @@
-# POP PUNK GUITAR LIBRARY MANAGER 2.2.0 — инструкция пользователя (Windows 10 x64)
+# POP PUNK GUITAR LIBRARY MANAGER 3.0.0-dev9 — инструкция пользователя (Windows 10 x64)
 
 ## 1. Первый запуск
 
