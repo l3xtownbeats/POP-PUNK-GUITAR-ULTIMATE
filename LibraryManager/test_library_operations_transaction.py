@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from library_operations import distribute_assets_transactional
+from library_operations import cleanup_original_sources, distribute_assets_transactional
 
 
 class TransactionalDistributionTests(unittest.TestCase):
@@ -143,6 +143,86 @@ class TransactionalDistributionTests(unittest.TestCase):
         self.assertEqual(first_destination.read_bytes(), b"existing-user-file")
         second_destination = Path(self.entries[1]["destination_path"])
         self.assertFalse(second_destination.exists())
+
+    def _make_cleanup_fixture(self):
+        incoming = self.samples / "Import Sample Guitar" / "IMPORT_BATCH_TEST"
+        incoming.mkdir(parents=True)
+        source = incoming / "original.wav"
+        source_payload = b"original-source-audio"
+        source.write_bytes(source_payload)
+        source_hash = hashlib.sha256(source_payload).hexdigest().upper()
+
+        destination = (
+            self.samples / "FACTORY" / "POP_PUNK" / "WAV"
+            / "ELECTRIC_GUITAR" / "RIFF" / "DISTORTION" / "original.wav"
+        )
+        destination.parent.mkdir(parents=True)
+        destination_payload = b"verified-derived-audio"
+        destination.write_bytes(destination_payload)
+        destination_hash = hashlib.sha256(destination_payload).hexdigest().upper()
+
+        distributed = {
+            "source_path": str(source.resolve()),
+            "source_sha256": source_hash,
+            "distributed_path": str(destination.resolve()),
+            "distributed_sha256": destination_hash,
+            "distribution_status": "VERIFIED_COPIED",
+        }
+        sidecar = destination.with_suffix(destination.suffix + ".json")
+        sidecar.write_text(json.dumps(distributed), encoding="utf-8")
+        staging_manifest = self.clips / "original.json"
+        staging_manifest.write_text(json.dumps({
+            **distributed,
+            "asset_id": "CLEANUP-TEST",
+        }), encoding="utf-8")
+        return source, destination, sidecar, staging_manifest, distributed
+
+    def test_cleanup_requires_verified_factory_sidecar_and_deletes_only_original(self):
+        source, destination, sidecar, manifest, _ = self._make_cleanup_fixture()
+        result = cleanup_original_sources(
+            [manifest],
+            samples_root=self.samples,
+            confirm_delete=True,
+            confirm_all_dependents_accounted_for=True,
+            journal_path=self.journal,
+        )
+        self.assertEqual(result["status"], "ORIGINAL_CLEANUP_COMPLETE")
+        self.assertFalse(source.exists())
+        self.assertTrue(destination.is_file())
+        self.assertTrue(sidecar.is_file())
+        self.assertEqual(result["deleted"][0]["source"], str(source.resolve()))
+
+    def test_cleanup_refuses_unverified_or_tampered_factory_sidecar(self):
+        source, destination, sidecar, manifest, distributed = self._make_cleanup_fixture()
+        distributed["distributed_sha256"] = "0" * 64
+        sidecar.write_text(json.dumps(distributed), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "sidecar does not verify"):
+            cleanup_original_sources(
+                [manifest],
+                samples_root=self.samples,
+                confirm_delete=True,
+                confirm_all_dependents_accounted_for=True,
+                journal_path=self.journal,
+            )
+        self.assertTrue(source.is_file())
+        self.assertTrue(destination.is_file())
+
+    def test_cleanup_rejects_factory_path_outside_factory_root(self):
+        source, destination, sidecar, manifest, distributed = self._make_cleanup_fixture()
+        outside = self.root / "outside.wav"
+        outside.write_bytes(destination.read_bytes())
+        distributed["distributed_path"] = str(outside.resolve())
+        sidecar.write_text(json.dumps(distributed), encoding="utf-8")
+        manifest.write_text(json.dumps(distributed), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "inside FACTORY"):
+            cleanup_original_sources(
+                [manifest],
+                samples_root=self.samples,
+                confirm_delete=True,
+                confirm_all_dependents_accounted_for=True,
+                journal_path=self.journal,
+            )
+        self.assertTrue(source.is_file())
 
 
 if __name__ == "__main__":
