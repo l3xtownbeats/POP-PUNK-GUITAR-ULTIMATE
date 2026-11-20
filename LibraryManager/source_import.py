@@ -47,7 +47,7 @@ def _walk(path: Path, errors: list[dict] | None = None):
                                 errors.append({
                                     "path": entry.path,
                                     "stage": "IMPORT_SYMLINK_SKIPPED",
-                                    "error": "Symbolic links are not followed during import; select the real source folder or file.",
+                                    "error": "Символические ссылки не копируются; выберите реальный исходный файл или папку.",
                                 })
                         elif entry.is_dir(follow_symlinks=False):
                             stack.append(Path(entry.path))
