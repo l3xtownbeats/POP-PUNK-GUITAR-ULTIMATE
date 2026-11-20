@@ -741,7 +741,6 @@ class LibraryManagerApp:
             extracted_sample = 0
             extracted_melody_notes = 0
             extracted_melody = 0
-            max_total_assets = 500
             extraction_failures = []
             report_file = Path(analysis_result["report_directory"]) / "unified_audio_analysis.json"
             if analyze_audio and guitar_confirmed and report_file.is_file():
@@ -757,17 +756,22 @@ class LibraryManagerApp:
                     virtual = record.get("virtual_extraction")
                     if not isinstance(virtual, dict) or not virtual.get("candidates"):
                         continue
-                    remaining = max_total_assets - extracted_region
-                    if remaining <= 0:
-                        break
                     try:
-                        clips = extract_virtual_ranges(
-                            virtual, STAGING_ROOT,
-                            max_clips=min(100, remaining),
-                            cancel_event=self._cancel_event,
-                            progress=report_progress,
-                        )
-                        extracted_region += len(clips)
+                        candidates = virtual.get("candidates") or []
+                        for offset in range(0, len(candidates), 1000):
+                            if self._cancel_event.is_set():
+                                raise RuntimeError("Извлечение длинных отрывков остановлено.")
+                            chunk_report = {
+                                **virtual,
+                                "candidates": candidates[offset:offset + 1000],
+                            }
+                            clips = extract_virtual_ranges(
+                                chunk_report, STAGING_ROOT,
+                                max_clips=1000,
+                                cancel_event=self._cancel_event,
+                                progress=report_progress,
+                            )
+                            extracted_region += len(clips)
                     except Exception as exc:
                         if self._cancel_event.is_set():
                             raise
@@ -785,16 +789,30 @@ class LibraryManagerApp:
                     if not pattern_data.get("patterns"):
                         continue
                     try:
-                        remaining = max_total_assets - extracted_region - extracted_pattern
-                        if remaining <= 0:
-                            break
-                        clips = extract_pattern_occurrences({
+                        source_report = {
                             "source": record["source_path"],
                             "source_sha256": record["source_sha256"],
-                            "pattern_analysis": pattern_data,
-                        }, STAGING_ROOT, max_clips=min(100, remaining),
-                            cancel_event=self._cancel_event)
-                        extracted_pattern += len(clips)
+                        }
+                        patterns = pattern_data.get("patterns") or []
+                        # Split large candidate sets into bounded chunks. This
+                        # removes the old global 500-asset ceiling without
+                        # building one enormous in-memory extraction batch.
+                        for pattern in patterns:
+                            occurrences = pattern.get("occurrences") or []
+                            for offset in range(0, len(occurrences), 10000):
+                                if self._cancel_event.is_set():
+                                    raise RuntimeError("Извлечение Pattern остановлено.")
+                                chunk_pattern = {
+                                    **pattern,
+                                    "occurrences": occurrences[offset:offset + 10000],
+                                }
+                                chunk_analysis = {"patterns": [chunk_pattern]}
+                                clips = extract_pattern_occurrences({
+                                    **source_report,
+                                    "pattern_analysis": chunk_analysis,
+                                }, STAGING_ROOT, max_clips=10000,
+                                    cancel_event=self._cancel_event)
+                                extracted_pattern += len(clips)
                     except Exception as exc:
                         if self._cancel_event.is_set():
                             raise
@@ -803,8 +821,6 @@ class LibraryManagerApp:
                             "stage": "PATTERN_EXTRACTION",
                             "error": f"{type(exc).__name__}: {exc}",
                         })
-                    if extracted_region + extracted_pattern >= max_total_assets:
-                        break
 
                 report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV для SAMPLE MODE / Chord / Auto Chords.")
                 from chord_clip_extractor import extract_chord_samples
@@ -814,15 +830,20 @@ class LibraryManagerApp:
                     chord_data = record.get("chord_analysis") or {}
                     if not chord_data.get("chord_candidates"):
                         continue
-                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord
-                    if remaining <= 0:
-                        break
                     try:
-                        clips = extract_chord_samples(
-                            chord_data, STAGING_ROOT, max_clips=min(100, remaining),
-                            cancel_event=self._cancel_event,
-                        )
-                        extracted_chord += len(clips)
+                        candidates = chord_data.get("chord_candidates") or []
+                        for offset in range(0, len(candidates), 5000):
+                            if self._cancel_event.is_set():
+                                raise RuntimeError("Извлечение Chord остановлено.")
+                            chunk_report = {
+                                **chord_data,
+                                "chord_candidates": candidates[offset:offset + 5000],
+                            }
+                            clips = extract_chord_samples(
+                                chunk_report, STAGING_ROOT, max_clips=5000,
+                                cancel_event=self._cancel_event,
+                            )
+                            extracted_chord += len(clips)
                     except Exception as exc:
                         if self._cancel_event.is_set():
                             raise
@@ -836,18 +857,18 @@ class LibraryManagerApp:
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
-                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord - extracted_sample - extracted_melody
-                    if remaining <= 0:
-                        break
                     source = Path(record.get("source_path", ""))
                     if source.suffix.lower() not in AUDIO_EXT:
                         continue
                     try:
-                        remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord - extracted_sample - extracted_melody
+                        pitch_events = record.get("pitch_candidates") or []
+                        # This engine processes the full per-source event list;
+                        # note WAVs are shared by Sample and Melody assignments.
+                        source_asset_budget = max(1, len(pitch_events) * 2)
                         result = prepare_sample_and_melody(
                             source, STAGING_ROOT,
-                            max_note_events=min(100, remaining),
-                            max_assets=remaining,
+                            max_note_events=max(1, len(pitch_events) or 500),
+                            max_assets=source_asset_budget,
                             pitch_candidates=record.get("pitch_candidates"),
                             expected_source_sha256=record.get("source_sha256"),
                             source_metadata=record.get("filename_metadata"),
@@ -919,7 +940,7 @@ class LibraryManagerApp:
                     "melody_mode_single_note_bindings": extracted_melody_notes,
                     "melody_mode_phrase_wav_count": extracted_melody,
                     "total_new_wav_candidates": extracted_region + extracted_pattern + extracted_chord + extracted_sample + extracted_melody,
-                    "global_asset_limit": max_total_assets,
+                    "extraction_batching": "CHUNKED_PER_ENGINE_NO_GLOBAL_500_ASSET_CAP",
                     "manifest_count_in_staging": finalization_result["staging"]["manifests_checked"],
                     "failures": extraction_failures,
                     "review_status": "NEEDS_MUSICAL_REVIEW",
