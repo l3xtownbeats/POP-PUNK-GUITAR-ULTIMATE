@@ -35,7 +35,7 @@ from library_operations import (
     distribution_plan,
     auto_distribute_approved,
 )
-from ppgu_theme import NEON_STAGE_THEME, resource_path
+from ppgu_theme import NEON_STAGE_THEME, resource_path, configure_neon_stage_ttk
 
 APP_VERSION = "3.0.0-dev9"
 BUNDLE_DIR, MANAGER_DIR, PORTABLE_MODE = resolve_runtime_paths(__file__)
@@ -116,6 +116,7 @@ class LibraryManagerApp:
             style.theme_use("clam")
         except tk.TclError:
             pass
+        configure_neon_stage_ttk(style, palette)
 
         style.configure(
             "PPGU.Primary.TButton",
@@ -1213,6 +1214,7 @@ class LibraryManagerApp:
         window = tk.Toplevel(self.root)
         window.title("POP PUNK GUITAR ULTIMATE — Sample Browser / VST3 Modes")
         window.geometry("1120x650")
+        window.configure(bg=NEON_STAGE_THEME["palette"]["window_bg"])
         window.transient(self.root)
         frame = ttk.Frame(window, padding=10)
         frame.pack(fill="both", expand=True)
@@ -1244,7 +1246,15 @@ class LibraryManagerApp:
             tree.column(column, width=width, anchor="w")
         tree.pack(fill="both", expand=True, pady=(8, 6))
 
-        details = tk.Text(frame, height=7, wrap="word", font=("Consolas", 9))
+        details = tk.Text(
+            frame, height=7, wrap="word", font=("Consolas", 9),
+            bg=NEON_STAGE_THEME["palette"]["lowlight"],
+            fg=NEON_STAGE_THEME["palette"]["lcd_text"],
+            insertbackground=NEON_STAGE_THEME["palette"]["accent_glow"],
+            selectbackground=NEON_STAGE_THEME["palette"]["control_face"],
+            relief="flat", highlightthickness=1,
+            highlightbackground=NEON_STAGE_THEME["palette"]["control_border"],
+        )
         details.pack(fill="x")
         item_records = {}
 
@@ -1458,6 +1468,7 @@ class LibraryManagerApp:
         window = tk.Toplevel(self.root)
         window.title("Очередь ручной проверки — Staging")
         window.geometry("960x460")
+        window.configure(bg=NEON_STAGE_THEME["palette"]["window_bg"])
         window.transient(self.root)
         frame = ttk.Frame(window, padding=10)
         frame.pack(fill="both", expand=True)
