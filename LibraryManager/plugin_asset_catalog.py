@@ -510,7 +510,7 @@ def build_plugin_asset_catalog(
         "schema": CATALOG_SCHEMA,
         "status": catalog["status"],
         "mode_count": len(modes),
-        "asset_count": sum(item["asset_count"] for item in modes),
+        "asset_count": sum(item["asset_count"] for item in modes) + len(pattern_instrument_assets),
         "candidate_count": sum(item["candidate_count"] for item in modes),
         "playable_asset_count": len(playable_assets),
         "unassigned_review_asset_count": len(review_queue),
