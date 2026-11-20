@@ -156,13 +156,16 @@ class UnifiedManagerTests(unittest.TestCase):
                 self.samples, reports_root=self.reports,
             )
 
-        self.assertEqual(summary["files_found"], 1)
+        # setUp already placed guitar.wav in Import Sample Guitar; this test
+        # adds a second readable file and one blocked nested file.
+        self.assertEqual(summary["files_found"], 2)
         self.assertEqual(summary["directory_errors"], 1)
         self.assertEqual(summary["directory_error_details"][0]["path"], str(locked))
         report_dir = Path(summary["report_directory"])
         errors = json.loads((report_dir / "quick_errors.json").read_text(encoding="utf-8"))
         self.assertEqual(errors["directory_errors"][0]["stage"], "QUICK_DIRECTORY_SCAN")
         inventory = (report_dir / "quick_inventory.csv").read_text(encoding="utf-8-sig")
+        self.assertIn("guitar.wav", inventory)
         self.assertIn("healthy.wav", inventory)
         self.assertNotIn("hidden.wav", inventory)
 
