@@ -53,7 +53,7 @@ jobs:
       - name: Mark portable data mode and create portable archive
         shell: pwsh
         run: |
-          New-Item -ItemType File -Path "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/portable.mode" -Force | Out-Null
+          [guid]::NewGuid().ToString("N") | Set-Content -NoNewline "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/portable.mode"
           $exe = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
           $oldPath = $env:PATH
           try {
