@@ -994,3 +994,11 @@ PPGU использует собственный визуальный язык �
 - Установочная версия устанавливается в выбранный пользователем путь (стартовое значение — LocalAppData\Programs); mutable data остаётся в LocalAppData.
 - Локальный Windows BAT builder усилен: перед упаковкой выполняет compileall и полный unittest discover, сохраняет логи, строит Portable onedir, проверяет startup и создание UserData, удаляет smoke-test state из ZIP и, при наличии Inno Setup, собирает installer.
 - Это даёт резервный локальный путь проверки/сборки, когда GitHub-hosted runner не запускается. Сборка по-прежнему не считается успешной до фактического запуска BAT на Windows.
+
+
+## Запись TJ-2026-11-20-MANAGER-RUNNER-025 — Windows runner blocker
+
+- Дата: 2026-11-20
+- Повторный запуск failed jobs предыдущего workflow не помог: runner снова не выделен, `runner_id=0`, `runner_name=""`, `steps=[]`, логи отсутствуют.
+- GitHub Status на 2026-11-20 показывает Actions Operational. При этом в GitHub Community от 2026-11-15 опубликован случай с практически теми же симптомами для private repository на GitHub Free: runner_id=0, пустые steps/logs и мгновенный failure; автор того случая сообщил, что included Actions compute исчерпан и Actions budget заблокирован. Это возможный сценарий для текущего проекта, но фактический billing status аккаунта владельца этого репозитория мне недоступен и я его не утверждаю.
+- В локальный `BUILD_PORTABLE_WINDOWS.bat` включены compileall, полный unittest, smoke-start Portable и упаковка; это альтернативный проверяемый путь, если hosted runners блокируются на уровне аккаунта. Успех этого BAT ещё должен быть фактически получен на Windows.
