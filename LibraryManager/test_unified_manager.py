@@ -61,6 +61,40 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
                          self.original_hash)
 
+
+    def test_quick_scan_default_reports_to_runtime_data_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data_root = Path(tmp) / "UserData"
+            module_root = Path(tmp) / "bundle"
+            with patch(
+                "unified_manager.resolve_runtime_paths",
+                return_value=(module_root, data_root, True),
+            ):
+                result = quick_scan(self.samples)
+            report_dir = Path(result["report_directory"])
+            self.assertEqual(report_dir.parent, data_root / "reports")
+            self.assertTrue((data_root / "reports").is_dir())
+
+    def test_deep_scan_uses_runtime_reports_cache_and_staging_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data_root = Path(tmp) / "UserData"
+            module_root = Path(tmp) / "bundle"
+            expected_staging = data_root / "staging"
+            expected_staging.mkdir(parents=True)
+            index_result = {"assignment_count": 0, "status": "NO_REVIEWED_ASSETS", "assignments": []}
+            with patch(
+                "unified_manager.resolve_runtime_paths",
+                return_value=(module_root, data_root, True),
+            ), patch(
+                "unified_manager.build_mode_assignment_index",
+                return_value=index_result,
+            ) as build_index:
+                result = run_manager(self.samples)
+            report_dir = Path(result["report_directory"])
+            self.assertEqual(report_dir.parent, data_root / "reports")
+            self.assertTrue((data_root / "reports" / "scan_cache.sqlite3").is_file())
+            build_index.assert_called_once_with(expected_staging)
+
     def test_quick_scan_reports_empty_import_folder_as_completed(self) -> None:
         self.wav.unlink()
         messages = []
