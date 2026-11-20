@@ -43,7 +43,11 @@
 
 Manager подготавливает библиотеку. Он не является самим музыкальным инструментом и не выполняет роль VST3-плагина.
 
-### 3.2. POP PUNK GUITAR ULTIMATE VST3
+#### IMPORT GUITAR — import handoff
+
+IMPORT GUITAR must make selected external sources available to subsequent Manager stages. The approved non-destructive implementation is to create SHA-256-verified copies under the active `Samples/Import Sample Guitar` folder, preserve the original source files and their hierarchy/dependency paths, and register original-to-copy provenance. Failed imports roll back the incomplete batch. SCAN LIBRARY and START HUNTING process the verified copies. Archives remain opaque and are not automatically extracted.
+
+## 3.2. POP PUNK GUITAR ULTIMATE VST3
 
 Отдельный музыкальный инструмент, который загружает подготовленную Manager библиотеку и воспроизводит гитарные партии.
 
