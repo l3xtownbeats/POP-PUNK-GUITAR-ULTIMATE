@@ -33,6 +33,10 @@ jobs:
           if (!$pythonRuntime) { throw "Bundled python311.dll is missing; package is not self-contained." }
           $userGuide = Get-ChildItem "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -Recurse -Filter "PORTABLE_USER_GUIDE_RU.md" | Select-Object -First 1
           if (!$userGuide) { throw "Russian user guide is missing from the portable package." }
+          $skinTheme = Get-ChildItem "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -Recurse -Filter "theme.json" | Where-Object { $_.FullName -match "ppgu_skin" } | Select-Object -First 1
+          if (!$skinTheme) { throw "PPGU NEON STAGE theme manifest is missing from the portable package." }
+          $skinHero = Get-ChildItem "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -Recurse -Filter "hero.png" | Where-Object { $_.FullName -match "ppgu_skin" } | Select-Object -First 1
+          if (!$skinHero) { throw "PPGU NEON STAGE hero asset is missing from the portable package." }
           # Smoke-test with PATH restricted to Windows system folders. PyInstaller
           # must provide its own Python runtime and bundled dependencies.
           $oldPath = $env:PATH
@@ -51,6 +55,8 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
           if (!($entries -match "python311.dll")) { throw "Portable ZIP does not contain its bundled Python runtime." }
           if (!($entries -match "PORTABLE_USER_GUIDE_RU.md")) { throw "Portable ZIP does not contain the Russian user guide." }
+          if (!($entries -match "ppgu_skin/theme.json")) { throw "Portable ZIP does not contain the PPGU theme manifest." }
+          if (!($entries -match "ppgu_skin/assets/hero.png")) { throw "Portable ZIP does not contain the PPGU theme hero asset." }
           if (!($entries -match "ppgu_skin/theme.json")) { throw "Portable ZIP does not contain the PPGU theme manifest." }
           if (!($entries -match "ppgu_skin/assets/hero.png")) { throw "Portable ZIP does not contain the PPGU theme hero asset." }
       - uses: actions/upload-artifact@v4

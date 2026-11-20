@@ -174,7 +174,8 @@ class LibraryManagerApp:
             ("Sample Browser / VST3", self.open_plugin_browser),
         ])
         add_menu("02  SCAN LIBRARY", [
-            ("Быстрое сканирование", self.deep_scan_only),
+            ("Быстрое сканирование — только файловая инвентаризация", self.quick_scan_only),
+            ("Глубокое сканирование — SHA-256 / SFZ / кэш", self.deep_scan_only),
         ])
         add_menu("03  START HUNTING", [
             ("Запустить полный анализ", self.scan),
