@@ -366,7 +366,11 @@ def import_sources_to_library(
     # Individual files selected from the same library retain their common
     # relative directory tree. This keeps SFZ sample= and #include references
     # resolvable when the user selects an SFZ and its samples as separate files.
-    selected_directories = [item for item in selections if item.is_dir()]
+    all_selected_directories = [item for item in selections if item.is_dir()]
+    selected_directories = [
+        item for item in all_selected_directories
+        if not any(parent in item.parents for parent in all_selected_directories if parent != item)
+    ]
     file_groups: dict[str, list[Path]] = {}
     for item in selections:
         if not item.is_file():
@@ -407,10 +411,10 @@ def import_sources_to_library(
                 raise InterruptedError("IMPORT GUITAR остановлен пользователем.")
             root_is_incoming = selected == incoming
             if selected.is_dir():
-                if root_is_incoming:
-                    files = list(_walk(selected, errors))
-                else:
-                    files = list(_walk(selected, errors))
+                if selected not in selected_directories:
+                    # A nested directory is already included by a selected parent.
+                    continue
+                files = list(_walk(selected, errors))
                 source_root = selected
                 destination_base = temporary_root / "Sources" / (
                     f"{selection_index:03d}_{_safe_folder_name(selected.name)}"
