@@ -114,7 +114,7 @@ class TransactionalDistributionTests(unittest.TestCase):
             "entries": [self.entries[0]],
         }
         with patch("library_operations.distribution_plan",
-                   side_effect=[ValueError("broken manifest"), single_plan]), \\
+                   side_effect=[ValueError("broken manifest"), single_plan]), \
              patch("library_operations.distribute_assets_transactional",
                    return_value={"results": [{"status": "VERIFIED_COPIED"}]}) as distribute, \
              patch("finalization.finalize_library",
