@@ -26,29 +26,29 @@ PALETTE_KEYS = (
 
 # Approved 23-token NEON STAGE fallback, aligned to the reference mockups.
 _FALLBACK_PALETTE = {
-    "window_bg": "#060B18",
-    "panel": "#0B1628",
-    "panel_elevated": "#11233C",
-    "control_bg": "#071322",
-    "control_face": "#10243D",
-    "control_border": "#255A86",
+    "window_bg": "#000612",
+    "panel": "#010B1C",
+    "panel_elevated": "#06152E",
+    "control_bg": "#000A1E",
+    "control_face": "#06112A",
+    "control_border": "#0B4E9C",
     "text_primary": "#F3F7FF",
     "text_secondary": "#B9CBE0",
     "text_disabled": "#788BA4",
-    "accent": "#078BFF",
-    "accent_glow": "#16D4FF",
-    "accent_purple": "#8B5CFF",
-    "accent_magenta": "#F02DCE",
+    "accent": "#075CE8",
+    "accent_glow": "#00BFFF",
+    "accent_purple": "#7115B8",
+    "accent_magenta": "#E51BD4",
     "danger": "#FF5577",
     "warning": "#FFC857",
     "success": "#57E879",
-    "lcd_bg": "#030A17",
+    "lcd_bg": "#02091E",
     "lcd_text": "#8CEAFF",
-    "led_on": "#1EC7FF",
-    "led_off": "#203954",
-    "shadow": "#02040C",
-    "highlight": "#83BEFF",
-    "lowlight": "#071225"
+    "led_on": "#00C8FF",
+    "led_off": "#18345A",
+    "shadow": "#00020A",
+    "highlight": "#3E9CFF",
+    "lowlight": "#000612"
 }
 
 
