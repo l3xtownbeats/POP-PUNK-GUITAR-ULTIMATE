@@ -40,6 +40,12 @@ def parse_sfz_file(sfz_path: Path, library_root: Path) -> list[dict]:
     def parse_file(path: Path, inherited: dict, inherited_default: str, stack: tuple):
         nonlocal region_counter
         path=path.resolve()
+        try:
+            path.relative_to(library_root)
+        except ValueError:
+            rows.append({"sfz_file":str(sfz_path),"source_sfz":str(path),"region":"",
+                         "sample_opcode":"","resolved_sample":"","status":"INCLUDE_OUTSIDE_LIBRARY"})
+            return
         if path in stack:
             rows.append({"sfz_file":str(sfz_path),"source_sfz":str(path),"region":"",
                          "sample_opcode":"","resolved_sample":"","status":"INCLUDE_CYCLE"})
@@ -74,7 +80,7 @@ def parse_sfz_file(sfz_path: Path, library_root: Path) -> list[dict]:
             rows.append({
                 "sfz_file":str(sfz_path),"source_sfz":str(path),"region":region_counter,
                 "sample_opcode":sample,"resolved_sample":str(candidate),
-                "status":"FOUND" if candidate.is_file() else ("OUTSIDE_LIBRARY" if not inside else "MISSING"),
+                "status":"OUTSIDE_LIBRARY" if not inside else ("FOUND" if candidate.is_file() else "MISSING"),
                 "lokey":lo_key if lo_key is not None else (hi_key if hi_key is not None else ""),
                 "hikey":hi_key if hi_key is not None else (lo_key if lo_key is not None else ""),
                 "lovel":lo_vel if lo_vel is not None else (hi_vel if hi_vel is not None else ""),
