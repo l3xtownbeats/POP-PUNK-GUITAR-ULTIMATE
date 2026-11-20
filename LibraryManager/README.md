@@ -447,7 +447,7 @@ The full preparation cycle now produces a versioned `plugin_asset_catalog.json` 
 
 The catalog's WAV paths are relative to the catalog file and resolve into `LibraryManager/staging`. It is a bridge contract for the future VST3 loader, not a compiled plugin or a packaged factory sound bank. A staged asset becomes runtime-playable only after its derived/source hashes and sample boundaries validate and its manifest contains explicit `REVIEWED` + `LICENSE_APPROVED` evidence. No automatic FACTORY promotion occurs.
 
-The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
+The Manager adds the **Собрать каталог ассетов PPGU** action and the **Браузер подготовленных ассетов для VST3**. The browser filters library-preparation categories; it is not a Manager operating-mode selector. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
 
 
 ## Единая карта всех 12 нот и Auto Chords
@@ -465,25 +465,25 @@ Manager 2.5.0 формирует единую хроматическую кар�
 **Граница реализации:** текущий репозиторий содержит Manager и manifests, но отдельного C++/JUCE VST3 playback source tree здесь пока нет. Поэтому карта и контракт подготовлены для плагина; реальное звучание каждой клавиши требует реализации VST3 playback/fallback engine и аудио-QA.
 
 
-## 3.0 development: reviewed multi-mode assignment index
+## 3.0 development: reviewed VST3 library-category assignment index
 
 The unified run now emits `reviewed_mode_assignment_index.json` beside the analysis-only `mode_sorting_report.json`. These are intentionally separate:
 - analysis report = evidence-backed hypotheses requiring listening review;
-- reviewed assignment index = explicit `mode_assignments` saved by the human review workflow, with WAV hash validation and per-mode runtime blockers.
+- reviewed assignment index = explicit `mode_assignments` saved by the human review workflow, with WAV hash validation and per-category VST3 runtime blockers.
 
-All ten approved modes are always represented. One staged WAV can be logically assigned to several modes without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
+All ten approved VST3 library target categories are always represented in the catalog. These categories are asset-preparation destinations, not Manager operating modes. One staged WAV can be logically assigned to several categories without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
 
 Version 3.0 remains a development build until the complete Windows regression suite, portable package smoke test, real-library validation, and user-side workflow checks are successful.
 
-## Manager 3.0 — plugin library structure and coverage
+## Manager 3.0 — prepared VST3 library structure and coverage
 
 The **Сформировать каталог VST3** action now produces four coordinated artifacts beside the catalog:
-- `plugin_asset_catalog_*.json` — validated asset and ten-mode queues;
-- `plugin_library_structure_*.json` — logical library layout for SAMPLE, PATTERN and MELODY engines, with all ten Manager mode sections and provenance-linked asset references;
+- `plugin_asset_catalog_*.json` — validated assets and ten VST3 library-category queues;
+- `plugin_library_structure_*.json` — logical library layout for the separate VST3's SAMPLE, PATTERN and MELODY engines, with ten prepared asset-category sections and provenance-linked asset references;
 - `plugin_library_coverage_*.json` — explicit coverage/gap report for 12 pitch classes, LOW/MEDIUM/HIGH velocity layers, confirmed techniques, Pattern event structure and Melody note/event timing;
 - `chromatic_pitch_map_*.json` and `performance_manifest_*.json` — shared chromatic mapping and runtime contract.
 
-The structure builder does not copy WAV files. One physical staged asset may be referenced from several modes by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
+The structure builder does not copy WAV files. One physical staged asset may be referenced from several VST3 library categories by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
 
 
 ### 3.0-dev3 — review metadata for real library structure
