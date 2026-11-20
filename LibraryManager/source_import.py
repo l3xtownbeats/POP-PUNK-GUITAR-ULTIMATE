@@ -591,7 +591,9 @@ def import_sources_to_library(
                     imported_hashes[str(source)] = reusable[1]
                     continue
 
-                relative = source.relative_to(source_root) if selected.is_dir() else Path(source.name)
+                # Preserve paths relative to the shared selected-file root too;
+                # flattening individual selections breaks SFZ sample= dependencies.
+                relative = source.relative_to(source_root)
                 destination = destination_base / relative
                 digest, size = _copy_verified(
                     source, destination, cancel_event=cancel_event, progress=progress,
