@@ -32,16 +32,16 @@ def _identity(path: Path) -> str:
 
 def _walk(path: Path, errors: list[dict] | None = None):
     """Yield files recursively without following symlinks; report inaccessible paths."""
-    if path.is_file():
-        yield path
-        return
-    if path.name.startswith(".manager-import-tmp-"):
+    if any(part.startswith(".manager-import-tmp-") for part in path.parts):
         if errors is not None:
             errors.append({
                 "path": str(path),
                 "stage": "IMPORT_TEMP_SOURCE_REJECTED",
                 "error": "Manager temporary import folders cannot be used as source libraries.",
             })
+        return
+    if path.is_file():
+        yield path
         return
     stack = [path]
     while stack:
@@ -389,8 +389,11 @@ def import_sources_to_library(
             + ", ".join(str(item) for item in symlink_selections[:5])
         )
     selections = [item.resolve() for item in raw_selections]
-    if any(item.name.startswith(".manager-import-tmp-") for item in selections):
-        raise ValueError("Временная папка Manager не может быть источником импорта.")
+    if any(
+        any(part.startswith(".manager-import-tmp-") for part in item.parts)
+        for item in selections
+    ):
+        raise ValueError("Файлы из временной папки Manager не могут быть источником импорта.")
     incoming = Path(incoming_root).expanduser().resolve()
     if not incoming.is_dir():
         raise NotADirectoryError(f"Папка Import Sample Guitar не найдена: {incoming}")
