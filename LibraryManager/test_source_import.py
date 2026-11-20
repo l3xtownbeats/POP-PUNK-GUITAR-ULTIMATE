@@ -198,6 +198,33 @@ class SourceImportTests(unittest.TestCase):
         self.assertEqual(second["registry"]["already_registered"], 2)
         self.assertEqual(len(list(incoming.glob("IMPORT_BATCH_*"))), 1)
 
+    def test_changed_source_updates_registry_and_next_import_reuses_new_copy(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        first = import_sources_to_library([self.library], incoming, self.registry)
+
+        changed_bytes = b"updated-original-wav-with-a-new-size"
+        self.wav.write_bytes(changed_bytes)
+        second = import_sources_to_library([self.library], incoming, self.registry)
+        self.assertEqual(second["copied_files"], 1)
+
+        data = json.loads(self.registry.read_text(encoding="utf-8"))
+        wave_record = next(item for item in data["sources"] if item["filename"] == "clean.wav")
+        updated_copy = Path(wave_record["imported_path"])
+        self.assertNotEqual(updated_copy, Path(first["import_batch"]) / "Sources" / "001_Guitar Library" / "Nested" / "clean.wav")
+        self.assertEqual(updated_copy.read_bytes(), changed_bytes)
+        self.assertEqual(wave_record["size_bytes"], self.wav.stat().st_size)
+        self.assertEqual(wave_record["modified_ns"], self.wav.stat().st_mtime_ns)
+        self.assertEqual(
+            wave_record["imported_sha256"],
+            hashlib.sha256(changed_bytes).hexdigest().upper(),
+        )
+
+        third = import_sources_to_library([self.library], incoming, self.registry)
+        self.assertEqual(third["copied_files"], 0)
+        self.assertIsNone(third["import_batch"])
+        self.assertEqual(len(list(incoming.glob("IMPORT_BATCH_*"))), 2)
+
     def test_tampered_existing_import_copy_blocks_reimport(self):
         incoming = self.root / "Samples" / "Import Sample Guitar"
         incoming.mkdir(parents=True)
