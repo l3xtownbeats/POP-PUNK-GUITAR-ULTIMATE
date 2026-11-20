@@ -83,9 +83,17 @@ def _pattern_readiness(metadata: dict[str, Any], frame_count: int | None = None)
         pattern = {}
     missing: list[str] = []
     start, end = pattern.get("loop_start_sample"), pattern.get("loop_end_sample")
-    if (type(start) is not int or type(end) is not int or start < 0 or end <= start
-            or (type(frame_count) is int and end > frame_count)):
-        missing.append("valid_loop_start_end_sample_within_clip")
+    start_ok = type(start) is int and start >= 0
+    end_ok = type(end) is int and end >= 0
+    if not start_ok:
+        missing.append("loop_start_sample")
+    if not end_ok:
+        missing.append("loop_end_sample")
+    if start_ok and end_ok:
+        if end <= start:
+            missing.append("loop_end_after_start")
+        if type(frame_count) is int and end > frame_count:
+            missing.append("loop_end_within_clip")
     tempo = pattern.get("tempo_bpm")
     if not isinstance(tempo, (int, float)) or not 20 <= tempo <= 400:
         missing.append("tempo_bpm")
