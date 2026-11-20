@@ -1107,3 +1107,9 @@ PPGU использует собственный визуальный язык �
 - Sample Browser теперь объединяет обычные note-clip assets режима PATTERN MODE и отдельный массив `pattern_instrument_assets` при отображении выбранной вкладки PATTERN.
 - Цельные chord-driven pattern performances показываются с типом `PATTERN INSTRUMENT` и отдельной фиолетовой меткой, но не становятся третьим режимом и не попадают в список MELODY.
 - Добавлена чистая функция `browser_assets_for_mode()` и регрессионный тест, подтверждающий, что Pattern Instrument assets видны внутри PATTERN tab, а главные режимы остаются двумя: MELODY и PATTERN.
+
+
+## Дополнение к TJ-2026-11-20-MANAGER-PORTABLE-032 — изоляция теста runtime staging
+
+- Уточнён regression test `test_deep_scan_uses_runtime_reports_cache_and_staging_paths`: он отдельно подменяет runtime staging resolver и проверяет, что `run_manager()` передаёт полученный UserData/staging в индекс ручных назначений.
+- Это устраняет зависимость теста от хоста, на котором запущен unittest (source checkout vs frozen Portable), не меняя runtime реализацию.
