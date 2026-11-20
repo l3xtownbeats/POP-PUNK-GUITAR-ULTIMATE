@@ -1265,8 +1265,8 @@ class LibraryManagerApp:
         if not catalogs:
             messagebox.showinfo(
                 "Sample Browser",
-                "Каталог VST3 ещё не создан. Сначала выполните полный цикл подготовки "
-                "или нажмите «Сформировать каталог VST3».",
+                "Каталог ассетов для VST3 ещё не создан. Сначала выполните START HUNTING "
+                "или выберите «Собрать каталог ассетов PPGU» в меню BUILD LIBRARY.",
             )
             return
         catalog_path = catalogs[0]
