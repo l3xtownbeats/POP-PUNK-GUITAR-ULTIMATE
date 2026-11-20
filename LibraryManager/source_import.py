@@ -308,8 +308,6 @@ def _copy_verified(
     progress=None,
 ) -> tuple[str, int]:
     """Copy one source without modifying it; verify the completed destination hash."""
-    import hashlib
-
     digest = hashlib.sha256()
     size = 0
     source_before = source.stat()
@@ -479,7 +477,6 @@ def import_sources_to_library(
         for selection_index, selected in enumerate(selections, start=1):
             if cancel_event is not None and cancel_event.is_set():
                 raise InterruptedError("IMPORT GUITAR остановлен пользователем.")
-            root_is_incoming = selected == incoming
             if selected.is_dir():
                 if selected not in selected_directories:
                     # A nested directory is already included by a selected parent.
