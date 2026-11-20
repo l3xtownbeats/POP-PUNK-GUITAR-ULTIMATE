@@ -112,6 +112,13 @@ jobs:
           }
           if ($entries -match "UserData/") { throw "Portable ZIP must not contain smoke-test user data." }
 
+      - uses: actions/upload-artifact@v4
+        name: upload-portable-zip
+        with:
+          name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Portable-Windows-x64
+          path: LibraryManager/dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
+          if-no-files-found: error
+
       - name: Install Inno Setup compiler
         shell: pwsh
         run: choco install innosetup --yes --no-progress
@@ -165,8 +172,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
-          path: |
-            LibraryManager/dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
-            LibraryManager/dist/installer/POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe
+          name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Installer-Windows-x64
+          path: LibraryManager/dist/installer/POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe
           if-no-files-found: error
