@@ -206,6 +206,41 @@ class PluginAssetCatalogTests(unittest.TestCase):
             self.assertEqual(result["pattern_instrument_asset_count"], 1)
             self.assertEqual(result["playable_asset_count"], 0)
 
+    def test_summary_asset_count_includes_pattern_instrument_assets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            staging = base / "staging"
+            (staging / "manifests").mkdir(parents=True)
+            (staging / "clips").mkdir()
+            source = base / "source.wav"
+            derived = staging / "clips" / "whole.wav"
+            write_wav(source)
+            write_wav(derived)
+            record = {
+                "asset_id": "WHOLE-COUNTED",
+                "kind": "rhythm_pattern",
+                "source_path": str(source),
+                "source_sha256": digest(source),
+                "source_start_sample": 0,
+                "source_end_sample": 800,
+                "sample_rate": 8000,
+                "channels": 1,
+                "frame_count": 800,
+                "duration_seconds": 0.1,
+                "derived_path": str(derived),
+                "derived_sha256": digest(derived),
+                "engine_targets": ["PATTERN_INSTRUMENT"],
+                "review_status": "NEEDS_MUSICAL_REVIEW",
+                "license_status": "UNREVIEWED",
+                "musical_metadata": {},
+            }
+            (staging / "manifests" / "whole.json").write_text(json.dumps(record), encoding="utf-8")
+            output = base / "catalog.json"
+            with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
+                result = build_plugin_asset_catalog(staging, output)
+            self.assertEqual(result["pattern_instrument_asset_count"], 1)
+            self.assertEqual(result["asset_count"], 1)
+
     def test_pattern_browser_shows_pattern_instrument_assets_inside_pattern_tab(self):
         catalog = {
             "modes": [
