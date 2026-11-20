@@ -1138,3 +1138,13 @@ PPGU использует собственный визуальный язык �
 - Уже имеющееся в цели изменение source.relative_to(source_root) для сохранения структуры SFZ dependencies повторно не переносилось, поскольку оно уже присутствовало в целевой ветке.
 - Не переносились устаревшие workflow-only настройки исходного clean snapshot и не откатывались более новые целевые изменения.
 - Acceptance: эта запись подтверждает перенос кода, но **не** подтверждает успешный полный CI, Windows Portable/Installer build или реальный Windows 10 x64 smoke/functional test. PR остаётся проверочным до отдельного прохождения соответствующих gate.
+
+## Запись TJ-2026-11-20-MANAGER-CI-FIX-036 — исправление compile-блокера после exact-head проверки
+
+- Дата: 2026-11-20
+- Тип: ФАКТИЧЕСКАЯ ЗАПИСЬ О ПРИЁМОЧНОЙ ПРОВЕРКЕ И ИСПРАВЛЕНИИ
+- Первый запуск CI для PR #6 дошёл до runner и compileall, где обнаружил IndentationError в LibraryManager/test_pattern_clip_extractor.py:61.
+- Причина: regression assertion review_status была сдвинута наружу из цикла for.
+- Исправление взято из clean Manager snapshot без изменения production extraction logic; commit: c27d8df7400c11a06178f2198678cb408f2106d0.
+- После исправления автоматически запущены новые exact-head workflows: Library Manager Tests #1463 и Library Manager Windows Package #1197.
+- Статус на момент записи: workflows ещё выполняются; до завершения не считать regression/build gate пройденным.
