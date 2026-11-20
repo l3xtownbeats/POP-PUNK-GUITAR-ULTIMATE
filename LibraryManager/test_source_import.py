@@ -314,6 +314,19 @@ class SourceImportTests(unittest.TestCase):
         self.assertFalse(self.registry.exists())
         self.assertEqual(self.wav.read_bytes(), b"original-wav-bytes")
 
+    def test_import_rejects_target_folder_as_its_own_source(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        existing = incoming / "already-there.wav"
+        existing.write_bytes(b"already in active library")
+
+        with self.assertRaisesRegex(ValueError, "сама целевая папка"):
+            import_sources_to_library([incoming], incoming, self.registry)
+
+        self.assertEqual(list(incoming.iterdir()), [existing])
+        self.assertFalse(self.registry.exists())
+        self.assertEqual(existing.read_bytes(), b"already in active library")
+
     def test_import_rejects_samples_parent_to_prevent_recursive_self_copy(self):
         incoming = self.root / "Samples" / "Import Sample Guitar"
         incoming.mkdir(parents=True)
