@@ -186,6 +186,8 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
                             raise RuntimeError("Быстрое сканирование остановлено пользователем.")
                         try:
                             if entry.is_dir(follow_symlinks=False):
+                                if entry.name.startswith(".manager-import-tmp-"):
+                                    continue
                                 stack.append(Path(entry.path))
                                 continue
                             if not entry.is_file(follow_symlinks=False):
@@ -340,6 +342,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         raise RuntimeError("Глубокая инвентаризация остановлена пользователем при обходе папок.")
                     try:
                         if entry.is_dir(follow_symlinks=False):
+                            if entry.name.startswith(".manager-import-tmp-"):
+                                continue
                             directory_stack.append(Path(entry.path))
                         elif entry.is_file(follow_symlinks=False):
                             candidate = Path(entry.path)
