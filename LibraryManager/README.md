@@ -95,6 +95,10 @@ The Manager must not simply add every full WAV as the default asset. It must ins
 
 This does not make a full pattern or whole WAV the payload for ordinary MELODY MODE/PATTERN MODE key presses: those modes continue to use their individual pitch-specific note mappings. Full rhythm excerpts and whole takes remain separately selectable library assets for preview or other explicitly supported uses.
 
+
+
+**Important playback separation:** whole rhythm/pattern recordings are indexed separately for the chord-driven PATTERN INSTRUMENT. They are not assigned to the keyboard note-playable PATTERN MODE, whose ordinary MIDI keys must trigger only pitch-specific individual note clips.
+
 ## Approved instrument architecture reference
 
 The approved product direction follows the broad player-facing workflow of Native Instruments SESSION GUITARIST — ELECTRIC SUNBURST DELUXE, implemented with original code and legally distributable source material. The architecture has two complementary engines:
