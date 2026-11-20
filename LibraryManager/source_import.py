@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Non-destructive source registration for the Manager 3.0 IMPORT GUITAR stage.
+"""Non-destructive source import and provenance registration for Manager 3.0.
 
-Import records point to original files; this module never copies, moves, renames,
-rewrites, or deletes user assets. Expensive hashing/decoding belongs to later stages.
+The explicit import workflow makes verified copies inside Import Sample Guitar;
+original source files are never modified, moved, renamed, overwritten or deleted.
+Expensive audio decoding and musical analysis belong to later stages.
 """
 from __future__ import annotations
 
@@ -267,6 +268,7 @@ def _copy_verified(
 
     digest = hashlib.sha256()
     size = 0
+    source_before = source.stat()
     destination.parent.mkdir(parents=True, exist_ok=True)
     with source.open("rb") as src, destination.open("xb") as dst:
         while True:
@@ -278,14 +280,23 @@ def _copy_verified(
             dst.write(block)
             digest.update(block)
             size += len(block)
-            if progress:
+            if progress and (size % (16 * 1024 * 1024) < len(block)):
                 progress(f"Копирование: {source.name} — {size:,} байт…")
         dst.flush()
         os.fsync(dst.fileno())
     source_digest = digest.hexdigest().upper()
+    source_after = source.stat()
+    if (
+        size != source_before.st_size
+        or source_after.st_size != source_before.st_size
+        or source_after.st_mtime_ns != source_before.st_mtime_ns
+    ):
+        raise IOError(f"Исходный файл изменился во время импорта: {source}")
     try:
-        stat = source.stat()
-        os.utime(destination, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        os.utime(
+            destination,
+            ns=(source_after.st_atime_ns, source_after.st_mtime_ns),
+        )
     except OSError:
         pass
     destination_digest = _sha256(destination)
