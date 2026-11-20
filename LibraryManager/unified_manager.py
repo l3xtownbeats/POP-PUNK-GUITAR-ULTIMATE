@@ -159,6 +159,7 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
     files_found = 0
     stat_errors = 0
     directory_errors = 0
+    directory_error_details: list[dict[str, str]] = []
     directories_scanned = 0
     stack = [incoming]
     csv_path = report_dir / "quick_inventory.csv"
@@ -227,6 +228,11 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
             except OSError as exc:
                 directory_errors += 1
                 directories_scanned += 1
+                directory_error_details.append({
+                    "path": str(folder),
+                    "stage": "QUICK_DIRECTORY_SCAN",
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
                 emit(f"[ОШИБКА ПАПКИ] Не удалось прочитать {folder}: {type(exc).__name__}: {exc}")
                 if folder.resolve() == incoming.resolve():
                     raise OSError(
@@ -243,6 +249,7 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "directories_scanned": directories_scanned,
         "stat_errors": stat_errors,
         "directory_errors": directory_errors,
+        "directory_error_details": directory_error_details,
         "total_bytes": total_bytes,
         "formats": dict(sorted(counts.items())),
         "excluded_non_audio_files": sum(excluded_counts.values()),
@@ -257,6 +264,10 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "next_stage": "DEEP_INVENTORY_AND_ANALYSIS",
     }
     _write_json(report_dir / "quick_summary.json", summary)
+    _write_json(report_dir / "quick_errors.json", {
+        "directory_errors": directory_error_details,
+        "stat_error_count": stat_errors,
+    })
     emit(
         f"БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО: {files_found:,} файлов за {elapsed:.2f} сек.; "
         f"ошибок метаданных: {stat_errors}. Отчёт: {report_dir}"
