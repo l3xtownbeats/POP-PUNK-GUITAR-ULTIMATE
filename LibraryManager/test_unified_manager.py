@@ -99,7 +99,7 @@ class UnifiedManagerTests(unittest.TestCase):
             ):
                 result = quick_scan(self.samples)
             report_dir = Path(result["report_directory"])
-            self.assertEqual(report_dir.parent, data_root / "reports")
+            self.assertEqual(report_dir.parent.resolve(), (data_root / "reports").resolve())
             self.assertTrue((data_root / "reports").is_dir())
 
     def test_deep_scan_uses_runtime_reports_cache_and_staging_paths(self) -> None:
