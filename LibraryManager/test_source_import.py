@@ -114,12 +114,14 @@ class SourceImportTests(unittest.TestCase):
         self.assertTrue(outside.exists())
 
     def test_existing_v1_registry_is_migrated_without_losing_records(self):
+        import os
+
         self.registry.parent.mkdir(parents=True)
         legacy = {
             "registry_version": 1,
             "source_count": 1,
             "sources": [{
-                "identity": str(self.wav.resolve()).casefold(),
+                "identity": os.path.normcase(str(self.wav.resolve())),
                 "source_path": str(self.wav.resolve()),
                 "filename": self.wav.name,
             }],
