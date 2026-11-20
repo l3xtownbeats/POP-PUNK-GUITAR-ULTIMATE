@@ -595,12 +595,23 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 size = stat.st_size
             except OSError:
                 size = ""
-            relative = str(path.relative_to(incoming))
+            # Avoid resolving/stat'ing the failed path again while building
+            # its error row: network drives and ACL failures can make even a
+            # second metadata lookup fail. The lexical absolute path is enough
+            # for an auditable per-file failure record.
+            try:
+                relative = str(path.relative_to(incoming))
+            except (ValueError, OSError):
+                relative = path.name
+            try:
+                source_path = str(path.absolute())
+            except OSError:
+                source_path = str(path)
             return {
                 "row": {
                     "relative_path": relative, "filename": path.name,
                     "extension": path.suffix.lower(), "bytes": size, "sha256": "",
-                    "source_path": str(path.resolve()), "source_modified_by_manager": False,
+                    "source_path": source_path, "source_modified_by_manager": False,
                     "hash_source": "ERROR", "category_suggestion": "MANUAL_REVIEW_REQUIRED",
                     "audio_analysis_status": "FILE_READ_ERROR",
                     "classification_status": "MANUAL_REVIEW_REQUIRED",
