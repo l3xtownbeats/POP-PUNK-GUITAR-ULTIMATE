@@ -483,24 +483,32 @@ def import_sources_to_library(
     # selected folder so SFZ sample/include paths resolve within one versioned
     # package rather than mixing old and new batches.
     force_copy_directories: set[str] = set()
+    fully_reusable_directories: set[str] = set()
     for directory in selected_directories:
         try:
             directory.relative_to(incoming)
             continue
         except ValueError:
             pass
+        directory_identity = _identity(directory)
+        fully_reusable = True
         for source in _walk(directory, errors):
             if reusable_existing(source) is None:
-                force_copy_directories.add(_identity(directory))
+                force_copy_directories.add(directory_identity)
+                fully_reusable = False
                 break
+        if fully_reusable:
+            fully_reusable_directories.add(directory_identity)
 
     force_copy_file_groups: set[str] = set()
-    for group_key, group in file_groups.items():
+    fully_reusable_file_groups: set[str] = set()
+    for group in file_groups.values():
+        common = Path(os.path.commonpath([str(item.parent) for item in group])).resolve()
+        group_key = hashlib.sha256(str(common).encode("utf-8")).hexdigest()[:10]
         if any(reusable_existing(source) is None for source in group):
-            common = Path(os.path.commonpath([str(item.parent) for item in group])).resolve()
-            force_copy_file_groups.add(
-                hashlib.sha256(str(common).encode("utf-8")).hexdigest()[:10]
-            )
+            force_copy_file_groups.add(group_key)
+        else:
+            fully_reusable_file_groups.add(group_key)
 
     if errors:
         first = errors[0]
@@ -517,6 +525,10 @@ def import_sources_to_library(
             if selected.is_dir():
                 if selected not in selected_directories:
                     # A nested directory is already included by a selected parent.
+                    continue
+                if _identity(selected) in fully_reusable_directories:
+                    # Hash preflight proved that this complete source tree already
+                    # has a valid imported copy; avoid hashing it a second time.
                     continue
                 force_refresh_group = _identity(selected) in force_copy_directories
                 files = _walk(selected, errors)
