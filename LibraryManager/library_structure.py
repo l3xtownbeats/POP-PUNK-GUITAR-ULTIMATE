@@ -199,6 +199,7 @@ def build_library_structure(catalog: dict[str, Any], *, catalog_path: str | Path
                 "asset_id": asset_id,
                 "asset_file": asset.get("asset_file"),
                 "manifest_file": asset.get("manifest_file"),
+                "playable_modes": list(asset.get("playable_modes") or []),
                 "kind": asset.get("kind", "UNKNOWN"),
                 "status": status,
                 "runtime_ready": playable,
