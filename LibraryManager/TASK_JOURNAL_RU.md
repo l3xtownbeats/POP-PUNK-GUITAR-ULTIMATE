@@ -983,3 +983,14 @@ PPGU использует собственный визуальный язык �
 - Добавлены тесты для произвольного расположения Portable и read-only fallback.
 - Статус: изменения внесены в branch; Windows CI / smoke-test ещё не подтверждены.
 
+
+
+## Запись TJ-2026-11-20-MANAGER-PORTABLE-024 — выбор Samples, relocation fallback и локальная верификация
+
+- Дата: 2026-11-20
+- Версия кода повышена до `3.0.0-dev9` в GUI, scanner и installer metadata.
+- Portable не использует каталог Samples рядом с EXE как обязательный путь. При первом запуске показывает выбор библиотеки; путь сохраняется атомарно в `UserData/manager_settings.json` (или в LocalAppData fallback) и восстанавливается в дальнейшем.
+- Если сама папка EXE недоступна для записи, Manager использует отдельный стабильный профиль LocalAppData, ключом которого является marker ID конкретного Portable build. При перемещении каталога marker перемещается вместе с ним и профиль сохраняется.
+- Установочная версия устанавливается в выбранный пользователем путь (стартовое значение — LocalAppData\Programs); mutable data остаётся в LocalAppData.
+- Локальный Windows BAT builder усилен: перед упаковкой выполняет compileall и полный unittest discover, сохраняет логи, строит Portable onedir, проверяет startup и создание UserData, удаляет smoke-test state из ZIP и, при наличии Inno Setup, собирает installer.
+- Это даёт резервный локальный путь проверки/сборки, когда GitHub-hosted runner не запускается. Сборка по-прежнему не считается успешной до фактического запуска BAT на Windows.
