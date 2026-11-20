@@ -74,7 +74,7 @@ The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compil
 
 ### IMPORT GUITAR — verified, non-destructive ingest
 
-IMPORT GUITAR copies selected files/folders into a unique `IMPORT_BATCH_...` directory under the active `Samples/Import Sample Guitar` root. Each copied file is checked against its source with SHA-256 and original metadata/provenance are registered. Original files are never modified, moved, renamed or deleted. A failed batch is rolled back; re-importing unchanged registered sources reuses their existing verified copies. Archives remain opaque files and are not automatically extracted. The resulting copies are the inputs consumed by SCAN LIBRARY and START HUNTING.
+IMPORT GUITAR copies selected files/folders into a unique `IMPORT_BATCH_...` directory under the active `Samples/Import Sample Guitar` root. Each copied file is checked against its source with SHA-256 and original metadata/provenance are registered. Original files are never modified, moved, renamed or deleted. A failed batch is rolled back. Re-importing an unchanged registered folder reuses its verified copy; when any file in that folder changes or is added, a new complete folder package is copied so SFZ relative dependencies remain together. Previous import batches are retained for comparison/recovery and both versions remain visible to SCAN LIBRARY until reviewed. Archives remain opaque files and are not automatically extracted. The resulting copies are the inputs consumed by SCAN LIBRARY and START HUNTING.
 
 ### Safety and controlled distribution
 
