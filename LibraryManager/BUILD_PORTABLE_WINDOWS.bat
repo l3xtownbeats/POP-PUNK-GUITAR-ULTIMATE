@@ -1,17 +1,44 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+if not exist reports\build_verification mkdir reports\build_verification
+if exist dist rmdir /s /q dist
+if exist build rmdir /s /q build
+
 py -3.11 -m pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 py -3.11 -m pip install -r requirements-build.txt
 if errorlevel 1 exit /b 1
+
+echo [1/5] Compile Manager Python modules...
+py -3.11 -m compileall -q . > reports\build_verification\compile.log 2>&1
+if errorlevel 1 (
+  type reports\build_verification\compile.log
+  exit /b 1
+)
+
+echo [2/5] Run complete Manager regression suite...
+py -3.11 -m unittest discover -v -p "test_*.py" > reports\build_verification\tests.log 2>&1
+if errorlevel 1 (
+  type reports\build_verification\tests.log
+  exit /b 1
+)
+type reports\build_verification\tests.log
+
+echo [3/5] Build Windows x64 onedir application...
 py -3.11 -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_GUITAR_LIBRARY_MANAGER --paths . --add-data "ppgu_skin;ppgu_skin" --add-data "PORTABLE_USER_GUIDE_RU.md;." --collect-all soundfile --collect-all _soundfile_data manager_gui.py
 if errorlevel 1 exit /b 1
-echo.
-echo Build completed: %~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER
-if exist "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData" rmdir /s /q "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData"
+if not exist "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\POP_PUNK_GUITAR_LIBRARY_MANAGER.exe" exit /b 1
+
+echo [4/5] Mark and smoke-test relocatable Portable mode...
 powershell -NoProfile -Command "[guid]::NewGuid().ToString('N') | Set-Content -NoNewline 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\portable.mode'"
-powershell -NoProfile -Command "if (Test-Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip') { Remove-Item 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip' -Force }; Compress-Archive -Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER' -DestinationPath 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip'"
+if errorlevel 1 exit /b 1
+powershell -NoProfile -Command "$exe='dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\POP_PUNK_GUITAR_LIBRARY_MANAGER.exe'; $p=Start-Process -FilePath $exe -PassThru; Start-Sleep -Seconds 5; $p.Refresh(); if($p.HasExited){throw ('Portable startup failed: '+$p.ExitCode)}; Stop-Process -Id $p.Id -Force; if(!(Test-Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData')){throw 'Portable UserData was not created'}"
+if errorlevel 1 exit /b 1
+if exist "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData" rmdir /s /q "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData"
+
+echo [5/5] Create Portable ZIP and optional Installer EXE...
+powershell -NoProfile -Command "Compress-Archive -Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER' -DestinationPath 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip' -Force"
 if errorlevel 1 exit /b 1
 if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
   "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%~dp0POP_PUNK_GUITAR_LIBRARY_MANAGER.iss"
@@ -19,6 +46,10 @@ if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
 ) else (
   echo Inno Setup not found. Portable ZIP is ready; install Inno Setup to build installer EXE.
 )
+echo.
+echo BUILD FINISHED.
+echo Test log: %~dp0reports\build_verification\tests.log
+echo Compile log: %~dp0reports\build_verification\compile.log
 echo Portable ZIP: %~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
-echo User data will be stored in UserData for portable mode.
+if exist "dist\installer\POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe" echo Installer: %~dp0dist\installer\POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe
 endlocal
