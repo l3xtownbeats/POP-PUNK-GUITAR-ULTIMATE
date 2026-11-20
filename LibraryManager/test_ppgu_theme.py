@@ -30,8 +30,8 @@ class NeonStageThemeTests(unittest.TestCase):
                 self.assertRegex(value, re.compile(r"^#[0-9A-Fa-f]{6}$"))
 
     def test_exact_ppgu_neon_stage_signature(self) -> None:
-        self.assertEqual(NEON_STAGE_PALETTE["window_bg"], "#0B0F12")
-        self.assertEqual(NEON_STAGE_PALETTE["panel"], "#141B20")
+        self.assertEqual(NEON_STAGE_PALETTE["window_bg"], "#060B18")
+        self.assertEqual(NEON_STAGE_PALETTE["panel"], "#0B1628")
         self.assertEqual(NEON_STAGE_PALETTE["accent"], "#078BFF")
         self.assertEqual(NEON_STAGE_PALETTE["accent_glow"], "#16D4FF")
         self.assertEqual(NEON_STAGE_PALETTE["accent_purple"], "#8B5CFF")
