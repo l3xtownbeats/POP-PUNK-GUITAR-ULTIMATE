@@ -30,6 +30,12 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-build.txt
 
+      - name: Compile modules and run Windows regression suite
+        working-directory: LibraryManager
+        run: |
+          python -m compileall -q .
+          python -m unittest discover -v -p "test_*.py"
+
       - name: Build portable folder
         working-directory: LibraryManager
         run: |
@@ -112,7 +118,7 @@ jobs:
         working-directory: LibraryManager
         shell: pwsh
         run: |
-          $iscc = Join-Path "${env:ProgramFiles(x86)}" "Inno Setup 6\\ISCC.exe"
+          $iscc = "$env:ProgramFiles(x86)\\Inno Setup 6\\ISCC.exe"
           if (!(Test-Path $iscc)) { throw "Inno Setup compiler was not installed: $iscc" }
 
           & $iscc "POP_PUNK_GUITAR_LIBRARY_MANAGER.iss"
