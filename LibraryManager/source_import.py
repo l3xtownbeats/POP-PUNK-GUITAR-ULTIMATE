@@ -147,6 +147,9 @@ def register_sources(
                             if imported_path == str(resolved)
                             else "COPIED_AND_VERIFIED"
                         )
+                        existing["size_bytes"] = stat.st_size
+                        existing["modified_ns"] = stat.st_mtime_ns
+                        existing["last_imported_at"] = datetime.now(timezone.utc).isoformat()
                         if identity in imported_hash_map:
                             existing["imported_sha256"] = imported_hash_map[identity]
                         updated.append(existing)
