@@ -1057,3 +1057,15 @@ PPGU использует собственный визуальный язык �
 - Палитра — нормализованные UI-токены для базовых состояний; не заменяет сложные градиенты, блики и текстуры оригинального макета.
 - Остальные операции Manager, шесть основных кнопок и десять режимов подготовки библиотеки не меняются.
 - Тестовый набор и Windows Portable/Installer остаются не принятыми до фактического запуска на Windows.
+
+
+## Запись TJ-2026-11-20-MANAGER-PATTERN-031 — разделение цельных Pattern и клавишных нот PATTERN MODE
+
+- Дата: 2026-11-20
+- Тип: **ФАКТИЧЕСКАЯ ЗАПИСЬ О КОРРЕКЦИИ КЛАССИФИКАЦИИ**
+- Обнаружено несоответствие: цельные повторяющиеся rhythm_pattern WAV имели engine target PATTERN_MODE и автоматически попадали в одноимённую очередь, хотя утверждённая спецификация требует, чтобы каждая обычная клавиша PATTERN MODE воспроизводила только pitch-specific single-note clip.
+- Исправлено: pattern_clip_extractor выдаёт цельные ритмические исполнения только с engine target PATTERN_INSTRUMENT. В plugin_asset_catalog целый rhythm_pattern или любой актив PATTERN_INSTRUMENT не может быть автоматически/через legacy target назначен в PATTERN MODE.
+- Добавлен отдельный массив pattern_instrument_assets в каталоге. Эти WAV сохраняются как review-only Pattern Instrument candidates, явно не playable до проверенного chord/event compatibility и event timeline. Исходные файлы не меняются.
+- Обычные note_event с target PATTERN_MODE остаются в соответствующей очереди и не теряют одноклавишную нотную семантику.
+- Обновлены тесты extractor/catalog и описание PATTERN MODE в README. Десять категорий Manager не меняются; третьего CHORD режима не добавляется.
+- Проверка тестов и Windows-сборки ожидает исполнения CI/локального Windows builder.
