@@ -86,6 +86,17 @@ class SourceImportTests(unittest.TestCase):
         self.assertEqual(result["sfz_dependencies_found"], 1)
         self.assertEqual(result["sfz_dependencies_blocked"], 0)
 
+    def test_multiple_sfz_files_are_audited_without_registry_lookup_loss(self):
+        extra = self.library / "second.sfz"
+        extra.write_text('<region> sample="Nested/clean.wav"\n', encoding="utf-8")
+        result = register_sources([self.library], self.registry)
+        data = json.loads(self.registry.read_text(encoding="utf-8"))
+        sfz_rows = data["sfz_dependency_audit"]
+        self.assertEqual(result["sfz_dependency_rows"], 2)
+        self.assertEqual(result["sfz_dependencies_found"], 2)
+        self.assertEqual({Path(row["sfz_path"]).name for row in sfz_rows},
+                         {"instrument.sfz", "second.sfz"})
+
     def test_sfz_missing_and_outside_dependencies_are_blocked(self):
         outside = self.root / "outside.wav"
         outside.write_bytes(b"not part of library")
