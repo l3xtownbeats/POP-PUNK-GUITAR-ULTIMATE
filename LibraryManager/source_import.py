@@ -74,6 +74,7 @@ def register_sources(
     registry_path: str | Path,
     *,
     imported_paths: dict[str, str | Path] | None = None,
+    imported_hashes: dict[str, str] | None = None,
 ) -> dict:
     """Register multiple files/folders, retaining exact original paths and hierarchy."""
     selections = [Path(item).expanduser().resolve() for item in selected_paths]
@@ -103,6 +104,10 @@ def register_sources(
         _identity(Path(source)): str(Path(destination).expanduser().resolve())
         for source, destination in (imported_paths or {}).items()
     }
+    imported_hash_map = {
+        _identity(Path(source)): str(digest).upper()
+        for source, digest in (imported_hashes or {}).items()
+    }
     added, duplicates, updated, errors = [], [], [], []
     sfz_roots: dict[str, Path] = {}
     for selected in selections:
@@ -117,7 +122,13 @@ def register_sources(
                     imported_path = imported_map.get(identity)
                     if existing is not None and imported_path:
                         existing["imported_path"] = imported_path
-                        existing["import_status"] = "COPIED_AND_VERIFIED"
+                        existing["import_status"] = (
+                            "ALREADY_IN_IMPORT_LIBRARY"
+                            if imported_path == str(resolved)
+                            else "COPIED_AND_VERIFIED"
+                        )
+                        if identity in imported_hash_map:
+                            existing["imported_sha256"] = imported_hash_map[identity]
                         updated.append(existing)
                     duplicates.append(str(resolved))
                     continue
@@ -144,7 +155,13 @@ def register_sources(
                 }
                 if identity in imported_map:
                     record["imported_path"] = imported_map[identity]
-                    record["import_status"] = "COPIED_AND_VERIFIED"
+                    record["import_status"] = (
+                        "ALREADY_IN_IMPORT_LIBRARY"
+                        if imported_map[identity] == str(resolved)
+                        else "COPIED_AND_VERIFIED"
+                    )
+                    if identity in imported_hash_map:
+                        record["imported_sha256"] = imported_hash_map[identity]
                 records.append(record)
                 records_by_identity[identity] = record
                 known.add(identity)
@@ -367,6 +384,7 @@ def import_sources_to_library(
     copied_bytes = 0
     errors = []
     imported_paths: dict[str, Path] = {}
+    imported_hashes: dict[str, str] = {}
     seen_sources: set[str] = set()
     has_new_copy = False
 
@@ -398,15 +416,23 @@ def import_sources_to_library(
         for item in group:
             file_plan[_identity(item)] = (common, destination_base)
 
-    def reusable_existing(source: Path) -> Path | None:
+    def reusable_existing(source: Path) -> tuple[Path, str] | None:
         record = existing_records.get(_identity(source), {})
         target = Path(record.get("imported_path", "")) if record else Path()
-        if not target.is_absolute() or not target.is_file():
+        expected_digest = str(record.get("imported_sha256") or "").upper()
+        if not expected_digest or not target.is_absolute() or not target.is_file():
             return None
         try:
             stat = source.stat()
-            if record.get("size_bytes") == stat.st_size and record.get("modified_ns") == stat.st_mtime_ns:
-                return target.resolve()
+            if (
+                record.get("size_bytes") != stat.st_size
+                or record.get("modified_ns") != stat.st_mtime_ns
+            ):
+                return None
+            source_digest = _sha256(source)
+            destination_digest = _sha256(target)
+            if source_digest == expected_digest == destination_digest:
+                return target.resolve(), source_digest
         except OSError:
             return None
         return None
@@ -453,7 +479,8 @@ def import_sources_to_library(
 
                 reusable = reusable_existing(source)
                 if reusable is not None:
-                    imported_paths[str(source)] = reusable
+                    imported_paths[str(source)] = reusable[0]
+                    imported_hashes[str(source)] = reusable[1]
                     continue
 
                 relative = source.relative_to(source_root) if selected.is_dir() else Path(source.name)
@@ -466,6 +493,7 @@ def import_sources_to_library(
                 has_new_copy = True
                 # The batch is renamed below; store the final destination now.
                 imported_paths[str(source)] = final_root / destination.relative_to(temporary_root)
+                imported_hashes[str(source)] = digest
                 if progress:
                     progress(f"Проверена копия: {source.name} — SHA-256 {digest}")
 
@@ -485,7 +513,9 @@ def import_sources_to_library(
 
         try:
             registry_result = register_sources(
-                selections, registry, imported_paths=imported_paths,
+                selections, registry,
+                imported_paths=imported_paths,
+                imported_hashes=imported_hashes,
             )
         except Exception:
             if has_new_copy:
