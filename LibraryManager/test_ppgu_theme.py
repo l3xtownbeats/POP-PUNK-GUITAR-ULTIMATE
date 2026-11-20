@@ -30,15 +30,17 @@ class NeonStageThemeTests(unittest.TestCase):
                 self.assertRegex(value, re.compile(r"^#[0-9A-Fa-f]{6}$"))
 
     def test_exact_ppgu_neon_stage_signature(self) -> None:
-        self.assertEqual(NEON_STAGE_PALETTE["window_bg"], "#060B18")
-        self.assertEqual(NEON_STAGE_PALETTE["panel"], "#0B1628")
-        self.assertEqual(NEON_STAGE_PALETTE["accent"], "#078BFF")
-        self.assertEqual(NEON_STAGE_PALETTE["accent_glow"], "#16D4FF")
-        self.assertEqual(NEON_STAGE_PALETTE["accent_purple"], "#8B5CFF")
-        self.assertEqual(NEON_STAGE_PALETTE["accent_magenta"], "#F02DCE")
-        self.assertEqual(NEON_STAGE_PALETTE["lcd_bg"], "#030A17")
+        self.assertEqual(NEON_STAGE_PALETTE["window_bg"], "#000612")
+        self.assertEqual(NEON_STAGE_PALETTE["panel"], "#010B1C")
+        self.assertEqual(NEON_STAGE_PALETTE["accent"], "#075CE8")
+        self.assertEqual(NEON_STAGE_PALETTE["accent_glow"], "#00BFFF")
+        self.assertEqual(NEON_STAGE_PALETTE["accent_purple"], "#7115B8")
+        self.assertEqual(NEON_STAGE_PALETTE["accent_magenta"], "#E51BD4")
+        self.assertEqual(NEON_STAGE_PALETTE["lcd_bg"], "#02091E")
         self.assertEqual(NEON_STAGE_PALETTE["lcd_text"], "#8CEAFF")
         self.assertTrue(NEON_STAGE_THEME["reduceInEco"])
+        self.assertNotEqual(NEON_STAGE_PALETTE["accent"], "#D5FF45")
+        self.assertNotEqual(NEON_STAGE_PALETTE["accent_glow"], "#DEFF6E")
 
     def test_theme_is_visual_only(self) -> None:
         compatibility = NEON_STAGE_THEME["compatibility"]
