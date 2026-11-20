@@ -86,6 +86,9 @@ class UnifiedManagerTests(unittest.TestCase):
                 "unified_manager.resolve_runtime_paths",
                 return_value=(module_root, data_root, True),
             ), patch(
+                "unified_manager.runtime_staging_root",
+                return_value=expected_staging,
+            ) as staging_root, patch(
                 "unified_manager.build_mode_assignment_index",
                 return_value=index_result,
             ) as build_index:
@@ -93,6 +96,7 @@ class UnifiedManagerTests(unittest.TestCase):
             report_dir = Path(result["report_directory"])
             self.assertEqual(report_dir.parent, data_root / "reports")
             self.assertTrue((data_root / "reports" / "scan_cache.sqlite3").is_file())
+            staging_root.assert_called_once()
             build_index.assert_called_once_with(expected_staging)
 
     def test_quick_scan_reports_empty_import_folder_as_completed(self) -> None:
