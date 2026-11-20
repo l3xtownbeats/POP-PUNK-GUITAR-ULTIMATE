@@ -1113,3 +1113,10 @@ PPGU использует собственный визуальный язык �
 
 - Уточнён regression test `test_deep_scan_uses_runtime_reports_cache_and_staging_paths`: он отдельно подменяет runtime staging resolver и проверяет, что `run_manager()` передаёт полученный UserData/staging в индекс ручных назначений.
 - Это устраняет зависимость теста от хоста, на котором запущен unittest (source checkout vs frozen Portable), не меняя runtime реализацию.
+
+
+## Запись TJ-2026-11-20-MANAGER-CI-034 — разделение CI runner-ов
+
+- В workflow регрессионных тестов runner переключён с Windows на Ubuntu Latest: этот набор проверяет Python-логику, парсинг, каталоги, WAV и FakeStyle, а не нативную установку Windows. Это снижает зависимость unit tests от доступности Windows runner pool.
+- Windows Package workflow оставлен на Windows Latest, поскольку PyInstaller onedir, Inno Setup, Portable/Installer startup smoke tests являются Windows-специфичными.
+- Это изменение workflow-конфигурации, а не подтверждение успешного CI. Требуется дождаться новых run results.
