@@ -18,7 +18,9 @@ from typing import Any
 from audio_range_io import audio_source_info
 
 CATALOG_SCHEMA = "ppgu.plugin_asset_catalog/1.0.0"
-STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
+from app_paths import runtime_staging_root
+
+STAGING_BASE = runtime_staging_root(__file__)
 MODE_ORDER = (
     "SAMPLE MODE", "STRUMMING", "ARPEGGIO", "PATTERN MODE", "RIFF MODE",
     "MELODY MODE", "PHRASE MODE", "ONE PITCH", "ARTICULATIONS", "ENDING",
