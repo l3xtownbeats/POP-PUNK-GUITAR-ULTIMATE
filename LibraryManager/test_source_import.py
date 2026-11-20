@@ -152,6 +152,10 @@ class SourceImportTests(unittest.TestCase):
         self.assertEqual(Path(by_name["clean.wav"]["imported_path"]), copied_wav)
         self.assertEqual(Path(by_name["instrument.sfz"]["imported_path"]), copied_sfz)
         self.assertEqual(
+            by_name["clean.wav"]["imported_sha256"],
+            hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
+        )
+        self.assertEqual(
             hashlib.sha256(self.wav.read_bytes()).hexdigest(),
             self.before[str(self.wav)],
         )
@@ -191,6 +195,24 @@ class SourceImportTests(unittest.TestCase):
         self.assertIsNone(second["import_batch"])
         self.assertEqual(second["registry"]["already_registered"], 2)
         self.assertEqual(len(list(incoming.glob("IMPORT_BATCH_*"))), 1)
+
+    def test_tampered_existing_import_copy_blocks_reimport(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        first = import_sources_to_library([self.library], incoming, self.registry)
+        batch = Path(first["import_batch"])
+        copied_wav = batch / "Sources" / "001_Guitar Library" / "Nested" / "clean.wav"
+        copied_wav.write_bytes(b"tampered copy")
+
+        with self.assertRaisesRegex(IOError, "копия была изменена или повреждена"):
+            import_sources_to_library([self.library], incoming, self.registry)
+
+        self.assertEqual(len(list(incoming.glob("IMPORT_BATCH_*"))), 1)
+        self.assertEqual(copied_wav.read_bytes(), b"tampered copy")
+        self.assertEqual(self.wav.read_bytes(), b"original-wav-bytes")
+        registry_data = json.loads(self.registry.read_text(encoding="utf-8"))
+        record = next(item for item in registry_data["sources"] if item["filename"] == "clean.wav")
+        self.assertEqual(Path(record["imported_path"]), copied_wav)
 
     def test_failed_import_rolls_back_partial_batch_and_keeps_sources(self):
         from unittest.mock import patch
