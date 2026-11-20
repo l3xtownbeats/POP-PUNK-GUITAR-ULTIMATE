@@ -43,24 +43,63 @@ def _runtime_gate(mode: str, manifest: dict[str, Any], wav_valid: bool) -> tuple
         reasons.append("MUSICAL_REVIEW_NOT_APPROVED")
     if manifest.get("license_status") != "LICENSE_APPROVED":
         reasons.append("LICENSE_NOT_APPROVED")
+
     metadata = manifest.get("musical_metadata") or {}
     validation = manifest.get("review_validation") or {}
+
+    # A review label alone is not sufficient for runtime readiness. Require
+    # persisted provenance, integrity, and explicit approval confirmations.
+    required_review_checks = (
+        "source_sha256_verified",
+        "derived_sha256_verified",
+        "sample_boundaries_verified",
+        "explicit_musical_approval",
+        "explicit_license_approval",
+    )
+    for field in required_review_checks:
+        if validation.get(field) is not True:
+            reasons.append(f"REVIEW_VALIDATION_{field.upper()}_NOT_CONFIRMED")
+
+    midi_note = metadata.get("confirmed_midi_note")
+    confirmed_midi = type(midi_note) is int and 0 <= midi_note <= 127
+    note_sequence = metadata.get("confirmed_note_sequence")
+    confirmed_sequence = (
+        isinstance(note_sequence, list)
+        and len(note_sequence) >= 2
+        and all(type(note) is int and 0 <= note <= 127 for note in note_sequence)
+    )
+    chord_name = metadata.get("confirmed_chord_name")
+    confirmed_chord = isinstance(chord_name, str) and bool(chord_name.strip())
+
     if mode == "MELODY MODE":
-        if not (metadata.get("confirmed_note_sequence") or metadata.get("confirmed_midi_note") is not None):
+        if not (confirmed_sequence or confirmed_midi):
             reasons.append("MELODY_NOTE_MAPPING_NOT_CONFIRMED")
-        if not validation.get("musical_mapping_verified"):
+        if validation.get("musical_mapping_verified") is not True:
             reasons.append("MELODY_MAPPING_VALIDATION_MISSING")
     elif mode == "SAMPLE MODE":
-        if metadata.get("confirmed_midi_note") is None and not metadata.get("confirmed_chord_name"):
+        if not (confirmed_midi or confirmed_chord or confirmed_sequence):
             reasons.append("SAMPLE_NOTE_OR_CHORD_MAPPING_NOT_CONFIRMED")
+        if validation.get("musical_mapping_verified") is not True:
+            reasons.append("SAMPLE_MAPPING_VALIDATION_MISSING")
     elif mode == "PATTERN MODE":
-        if not (metadata.get("confirmed_note_sequence") or metadata.get("confirmed_chord_name")
-                or metadata.get("pattern_performance_review")):
+        pattern_review = metadata.get("pattern_performance_review")
+        valid_pattern_review = (
+            isinstance(pattern_review, dict)
+            and pattern_review.get("cycle_integrity_verified") is True
+            and pattern_review.get("musical_review_verified") is True
+            and type(pattern_review.get("loop_start_sample")) is int
+            and type(pattern_review.get("loop_end_sample")) is int
+            and pattern_review["loop_start_sample"] >= 0
+            and pattern_review["loop_end_sample"] > pattern_review["loop_start_sample"]
+        )
+        if not (confirmed_sequence or confirmed_chord or valid_pattern_review):
             reasons.append("PATTERN_PERFORMANCE_MAPPING_NOT_CONFIRMED")
+        if validation.get("musical_mapping_verified") is not True:
+            reasons.append("PATTERN_MAPPING_VALIDATION_MISSING")
     else:
         reasons.append("MODE_SPECIFIC_RUNTIME_VALIDATION_REQUIRED")
-    return ("RUNTIME_READY" if not reasons else "NOT_RUNTIME_READY"), reasons
 
+    return ("RUNTIME_READY" if not reasons else "NOT_RUNTIME_READY"), reasons
 
 def build_mode_assignment_index(staging_root: Path) -> dict[str, Any]:
     """Index reviewed manifest assignments without moving, copying or editing assets."""
