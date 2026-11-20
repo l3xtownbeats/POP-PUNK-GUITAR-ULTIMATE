@@ -64,6 +64,7 @@ jobs:
             if ($p.HasExited) { throw "Portable-mode app startup failed (code $($p.ExitCode))." }
             Stop-Process -Id $p.Id -Force
           } finally { $env:PATH = $oldPath }
+          if (!(Test-Path "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/UserData")) { throw "Portable mode did not create its persistent UserData directory." }
           $zip = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -DestinationPath $zip
@@ -87,6 +88,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed." }
           $setup = "dist/installer/POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe"
           if (!(Test-Path $setup) -or (Get-Item $setup).Length -lt 1024) { throw "Installer EXE is missing or unexpectedly small." }
+          $installDir = Join-Path $env:TEMP "PPGU-Manager-Installer-Smoke"
+          if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
+          Start-Process -FilePath (Resolve-Path $setup) -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir" -Wait
+          $installedExe = Join-Path $installDir "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
+          if (!(Test-Path $installedExe)) { throw "Silent installer did not place the GUI executable." }
+          $oldPath = $env:PATH
+          try {
+            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+            $p = Start-Process -FilePath $installedExe -PassThru
+            Start-Sleep -Seconds 5
+            $p.Refresh()
+            if ($p.HasExited) { throw "Installed app startup failed (code $($p.ExitCode))." }
+            Stop-Process -Id $p.Id -Force
+          } finally { $env:PATH = $oldPath }
+          $installedData = Join-Path $env:LOCALAPPDATA "POP PUNK GUITAR Library Manager"
+          if (!(Test-Path $installedData)) { throw "Installed mode did not create persistent LocalAppData." }
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          if (Test-Path $uninstaller) {
+            Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Windows-x64
