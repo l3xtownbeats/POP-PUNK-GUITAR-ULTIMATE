@@ -1148,3 +1148,14 @@ PPGU использует собственный визуальный язык �
 - Исправление взято из clean Manager snapshot без изменения production extraction logic; commit: c27d8df7400c11a06178f2198678cb408f2106d0.
 - После исправления автоматически запущены новые exact-head workflows: Library Manager Tests #1463 и Library Manager Windows Package #1197.
 - Статус на момент записи: workflows ещё выполняются; до завершения не считать regression/build gate пройденным.
+
+## Запись TJ-2026-11-20-MANAGER-CI-FIX-037 — устранение трёх регрессий после полного Linux regression run
+
+- Дата: 2026-11-20
+- Тип: ФАКТИЧЕСКАЯ ЗАПИСЬ О ПРИЁМОЧНОЙ ПРОВЕРКЕ И СИНХРОНИЗАЦИИ С CLEAN BASELINE
+- Exact-head regression run #1463 выполнил полный unittest discovery: 239 тестов, из них 2 failures + 1 error.
+- Ошибка 1: test_sample_melody_pipeline ожидал устаревшее поле melody_asset_role; clean baseline использует canonical asset_role. Тест синхронизирован.
+- Ошибка 2: test_chromatic_pitch_map ожидал устаревший SOURCE_MISSING; актуальный production-контракт возвращает FALLBACK_PROPOSAL_REQUIRES_QA и явно runtime_ready_in_catalog=false. Тест синхронизирован.
+- Ошибка 3: source_import.py в target branch ещё использовал flattening одиночного выбранного файла через Path(source.name). Clean baseline сохраняет путь относительно общего selected-file root, что необходимо для SFZ sample= dependencies. Production code синхронизирован.
+- Все три файла после переноса побайтно совпадают с соответствующими файлами integration/manager-3.0-clean.
+- Новый Windows/Linux workflow должен подтвердить exact-head после этих исправлений; release gate по-прежнему закрыт до успешного полного regression и Windows package/smoke acceptance.
