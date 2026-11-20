@@ -11,6 +11,7 @@ from ppgu_theme import (
     NEON_STAGE_THEME,
     PALETTE_KEYS,
     resource_path,
+    configure_neon_stage_ttk,
 )
 
 
@@ -47,6 +48,32 @@ class NeonStageThemeTests(unittest.TestCase):
         self.assertFalse(compatibility["apvtsChanges"])
         self.assertFalse(compatibility["layoutChanges"])
         self.assertFalse(compatibility["audioChanges"])
+
+    def test_shared_ttk_widgets_receive_neon_stage_colors(self) -> None:
+        class FakeStyle:
+            def __init__(self):
+                self.configured = {}
+                self.mapped = {}
+
+            def configure(self, name, **options):
+                self.configured[name] = options
+
+            def map(self, name, **options):
+                self.mapped[name] = options
+
+        style = FakeStyle()
+        configure_neon_stage_ttk(style, NEON_STAGE_PALETTE)
+        for widget_style in (
+            "TFrame", "TLabel", "TButton", "TCombobox", "TEntry",
+            "Treeview", "Treeview.Heading", "TScrollbar",
+        ):
+            self.assertIn(widget_style, style.configured)
+        self.assertEqual(style.configured["TFrame"]["background"], "#010B1C")
+        self.assertEqual(style.configured["TLabel"]["foreground"], "#F3F7FF")
+        self.assertEqual(style.configured["Treeview"]["fieldbackground"], "#000A1E")
+        self.assertEqual(style.configured["Treeview.Heading"]["background"], "#06152E")
+        self.assertIn("TButton", style.mapped)
+        self.assertIn("Treeview", style.mapped)
 
     def test_real_neon_stage_art_assets_are_bundled(self) -> None:
         required = (
