@@ -3,7 +3,7 @@
 
 Combines inventory/SHA-256/WAV metadata/SFZ audit with the existing acoustic,
 rhythm, repeated-pattern and optional virtual-range analyzers. Original assets
-are read-only. Derived reports live under LibraryManager/reports; virtual
+are read-only. Derived reports live under the resolved persistent runtime data directory; virtual
 sidecars are opt-in and live under Import Sample Guitar.
 """
 from __future__ import annotations
@@ -30,6 +30,7 @@ from other_audit import audit_other_library
 from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
 from mode_sorter import build_mode_sorting_report
 from mode_assignment_index import build_mode_assignment_index
+from app_paths import resolve_runtime_paths, runtime_staging_root
 
 VERSION = "3.0.0-dev9"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
@@ -145,7 +146,8 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
     )
     if incoming is None:
         raise FileNotFoundError(f"Не найдена папка Import Sample Guitar внутри {samples_root}")
-    report_base = (reports_root or (Path(__file__).resolve().parent / "reports")).expanduser().resolve()
+    report_data_root = resolve_runtime_paths(__file__)[1]
+    report_base = (reports_root or (report_data_root / "reports")).expanduser().resolve()
     report_base.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     report_dir = report_base / f"quick_scan_{run_id}"
@@ -308,8 +310,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     if write_virtual and not (analyze_audio and guitar_source_confirmed):
         raise ValueError("--write-virtual-index requires --analyze-audio and --guitar-source-confirmed")
 
-    manager_root = Path(__file__).resolve().parent
-    report_base = (reports_root or (manager_root / "reports")).expanduser().resolve()
+    report_data_root = resolve_runtime_paths(__file__)[1]
+    report_base = (reports_root or (report_data_root / "reports")).expanduser().resolve()
     report_base.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     reports = report_base / f"run_{run_id}"
@@ -791,7 +793,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     mode_sorting = build_mode_sorting_report(audio_reports)
     # Separate index of explicitly human-reviewed staged assets. This connects
     # manual mode assignments to the same ten queues without trusting hypotheses.
-    mode_assignment_index = build_mode_assignment_index(manager_root / "staging")
+    mode_assignment_index = build_mode_assignment_index(runtime_staging_root(__file__))
     mode_candidate_counts = {
         item["mode"]: item["candidate_count"] for item in mode_sorting["modes"]
     }
