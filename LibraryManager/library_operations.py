@@ -270,6 +270,131 @@ def distribute_assets(plan: dict[str, Any], *, approve: bool = False,
     }
 
 
+
+def auto_distribute_approved(
+    samples_root: Path,
+    staging_root: Path,
+    *,
+    approve: bool = False,
+    journal_path: Path | None = None,
+    cancel_event: Any = None,
+    progress=None,
+) -> dict[str, Any]:
+    """Process every staging manifest independently; bad assets never block later ones.
+
+    Only manifests that pass the existing musical-review, license, provenance,
+    PCM, bounds and SHA-256 gates are copied. Each asset is its own transaction:
+    a failed item is recorded and the next approved candidate is attempted.
+    Completed transactions are retained if a later item fails or cancellation
+    is requested. Original source files are never modified.
+    """
+    samples = Path(samples_root).resolve()
+    staging = Path(staging_root).resolve()
+    manifests_dir = staging / "manifests"
+    manifests = sorted(manifests_dir.glob("*.json")) if manifests_dir.is_dir() else []
+    journal = journal_path or (
+        samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl"
+    )
+    ready: list[tuple[Path, dict[str, Any]]] = []
+    rejected: list[dict[str, str]] = []
+    for index, manifest in enumerate(manifests, 1):
+        if cancel_event is not None and cancel_event.is_set():
+            return {
+                "status": "CANCELLED_DURING_PREFLIGHT",
+                "manifests_seen": index - 1,
+                "ready_count": len(ready),
+                "copied_count": 0,
+                "rejected": rejected,
+                "results": [],
+                "source_originals_deleted": False,
+            }
+        try:
+            plan = distribution_plan([manifest], samples, staging)
+            if len(plan.get("entries", [])) != 1:
+                raise ValueError("Manifest did not produce exactly one eligible FACTORY asset")
+            ready.append((manifest, plan))
+        except Exception as exc:
+            rejected.append({
+                "manifest_path": str(manifest),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+        if progress and (index == 1 or index % 25 == 0 or index == len(manifests)):
+            progress(f"Автораспределение: проверено манифестов {index}/{len(manifests)}; готово {len(ready)}; пропущено {len(rejected)}.")
+
+    if not approve:
+        return {
+            "status": "DRY_RUN",
+            "manifests_seen": len(manifests),
+            "ready_count": len(ready),
+            "copied_count": 0,
+            "rejected": rejected,
+            "ready_manifest_paths": [str(path) for path, _ in ready],
+            "results": [],
+            "source_originals_deleted": False,
+        }
+
+    results: list[dict[str, Any]] = []
+    failed: list[dict[str, str]] = []
+    cancelled = False
+    for index, (manifest, plan) in enumerate(ready, 1):
+        if cancel_event is not None and cancel_event.is_set():
+            cancelled = True
+            break
+        try:
+            result = distribute_assets_transactional(
+                plan,
+                staging_root=staging,
+                approve=True,
+                journal_path=journal,
+                cancel_event=cancel_event,
+            )
+            results.extend(result.get("results", []))
+        except Exception as exc:
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                break
+            failed.append({
+                "manifest_path": str(manifest),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+        if progress and (index == 1 or index % 10 == 0 or index == len(ready)):
+            progress(f"Автораспределение: обработано {index}/{len(ready)} одобренных кандидатов; скопировано {len(results)}; ошибок {len(failed)}.")
+
+    finalization = None
+    finalization_error = None
+    if not cancelled:
+        try:
+            from finalization import finalize_library
+            finalization = finalize_library(
+                samples, staging, progress=progress, cancel_event=cancel_event,
+            )
+        except Exception as exc:
+            # Copies already verified in their own transactions are retained;
+            # report-generation failure must not erase successful distribution.
+            finalization_error = f"{type(exc).__name__}: {exc}"
+            if progress:
+                progress(f"ПРЕДУПРЕЖДЕНИЕ: распределение сохранено, но финальный аудит не завершился: {finalization_error}")
+
+    status = "CANCELLED_PARTIAL" if cancelled else (
+        "DISTRIBUTION_COMPLETE_WITH_ERRORS"
+        if failed or rejected or finalization_error else "DISTRIBUTION_COMPLETE"
+    )
+    return {
+        "status": status,
+        "manifests_seen": len(manifests),
+        "ready_count": len(ready),
+        "copied_count": len(results),
+        "rejected": rejected,
+        "failed": failed,
+        "results": results,
+        "journal_path": str(journal),
+        "transaction_per_asset": True,
+        "finalization": finalization,
+        "finalization_error": finalization_error,
+        "source_originals_deleted": False,
+    }
+
+
 def cleanup_original_sources(distributed_manifest_paths: list[Path], *,
                              samples_root: Path, confirm_delete: bool = False,
                              confirm_all_dependents_accounted_for: bool = False,
@@ -294,14 +419,34 @@ def cleanup_original_sources(distributed_manifest_paths: list[Path], *,
         record = json.loads(path.read_text(encoding="utf-8"))
         if record.get("distribution_status") != "VERIFIED_COPIED":
             raise ValueError(f"Dependent asset is not successfully distributed: {path}")
-        destination = Path(record.get("distributed_path", ""))
+        factory_root = (samples_root / "FACTORY").resolve()
+        destination = Path(record.get("distributed_path", "")).resolve()
         expected_derived = str(record.get("distributed_sha256", "")).upper()
-        if not destination.is_file() or not expected_derived:
-            raise ValueError(f"Distributed asset missing: {destination}")
+        if not _inside(destination, factory_root) or not destination.is_file() or not expected_derived:
+            raise ValueError(
+                f"Verified dependent must be an existing file inside FACTORY: {destination}"
+            )
         if sha256_file(destination) != expected_derived:
             raise ValueError(f"Distributed asset integrity check failed: {destination}")
+        # Never trust the staging manifest alone: the installed FACTORY sidecar
+        # must independently attest to the exact source and copied destination.
+        sidecar = destination.with_suffix(destination.suffix + ".json")
+        if not sidecar.is_file():
+            raise ValueError(f"Verified FACTORY sidecar is missing: {sidecar}")
+        distributed_record = json.loads(sidecar.read_text(encoding="utf-8"))
+        if (
+            distributed_record.get("distribution_status") != "VERIFIED_COPIED"
+            or Path(distributed_record.get("distributed_path", "")).resolve() != destination
+            or str(distributed_record.get("distributed_sha256", "")).upper() != expected_derived
+        ):
+            raise ValueError(f"FACTORY sidecar does not verify this distributed asset: {sidecar}")
         source = Path(record.get("source_path", "")).resolve()
         source_hash = str(record.get("source_sha256", "")).upper()
+        if (
+            Path(distributed_record.get("source_path", "")).resolve() != source
+            or str(distributed_record.get("source_sha256", "")).upper() != source_hash
+        ):
+            raise ValueError(f"FACTORY sidecar source provenance mismatch: {sidecar}")
         if not _inside(source, incoming_root) or not source.is_file():
             raise ValueError(f"Original must be an existing file inside Import Sample Guitar: {source}")
         if not source_hash or sha256_file(source) != source_hash:

@@ -27,7 +27,8 @@ class TaskJournal:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def append(self, event: str, *, task_id: str, task: str,
-               details: dict[str, Any] | None = None) -> dict[str, Any]:
+               details: dict[str, Any] | None = None,
+               durable: bool = True) -> dict[str, Any]:
         if not event or not task_id or not task:
             raise ValueError("event, task_id and task are required")
         record = {
@@ -43,7 +44,8 @@ class TaskJournal:
             with self.path.open("a", encoding="utf-8", newline="\n") as stream:
                 stream.write(payload + "\n")
                 stream.flush()
-                os.fsync(stream.fileno())
+                if durable:
+                    os.fsync(stream.fileno())
         return record
 
     def start(self, task: str, *, details: dict[str, Any] | None = None) -> str:
@@ -52,8 +54,10 @@ class TaskJournal:
         return task_id
 
     def progress(self, task_id: str, task: str, message: str) -> None:
+        # Progress is frequent on large libraries. Flush the stream but avoid
+        # a disk fsync for every line; lifecycle boundaries remain durable.
         self.append("PROGRESS", task_id=task_id, task=task,
-                    details={"message": str(message)})
+                    details={"message": str(message)}, durable=False)
 
     def finish(self, task_id: str, task: str, *, result: Any = None) -> None:
         if isinstance(result, dict):
@@ -73,6 +77,10 @@ class TaskJournal:
     def fail(self, task_id: str, task: str, error: str) -> None:
         self.append("FAILED", task_id=task_id, task=task,
                     details={"error": str(error)})
+
+    def cancel(self, task_id: str, task: str, reason: str = "Операция остановлена пользователем.") -> None:
+        self.append("CANCELLED", task_id=task_id, task=task,
+                    details={"reason": str(reason)})
 
     def history(self, *, limit: int | None = None) -> list[dict[str, Any]]:
         if not self.path.exists():

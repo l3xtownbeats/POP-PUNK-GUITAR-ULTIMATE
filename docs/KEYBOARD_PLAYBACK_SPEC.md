@@ -291,6 +291,13 @@ The Library Manager must prepare the content and mappings required by both engin
 
 **Status note:** This section records the user's approved product architecture and requirements. It is not a claim that the chord engine, MIDI controls, browser, chord recognition, extraction pipeline, plugin playback or acceptance tests have already been implemented or passed.
 
+
+### 14.4 Fixed main mode selector and AutoChords placement
+
+The plugin's main mode selector contains exactly two entries: **MELODY** and **PATTERN**. AutoChords is a supporting tool belonging to PATTERN. It opens as a separate auxiliary window/panel only when the user activates the AutoChords additional-window button while PATTERN is selected. AutoChords is not a standalone main mode, and no third CHORD mode or CHORD/PERFORMANCE selector may be added. This UI placement does not remove chord-input, chord-recognition or chord-adaptive pattern-performance capabilities from the PATTERN engine described above.
+
+The PATTERN tab is the single player-facing container for the chord-driven Pattern Instrument path, its pattern assets/performance controls, and the auxiliary AutoChords window. Pitch-specific single-note clips used by the one-key/one-note playback contract remain distinct from whole rhythm-pattern assets inside this same PATTERN tab. These are internal data/playback paths, not separate top-level modes or tabs.
+
 ## 15. Explicit library preparation split for the two instrument engines
 
 **User-confirmed requirement — 2026-11-18:** the most important Library Manager outcome is to prepare the material so the chord-driven PATTERN INSTRUMENT can perform the available guitar patterns and chord-based parts, while the MELODY INSTRUMENT plays individual guitar notes across the keyboard.

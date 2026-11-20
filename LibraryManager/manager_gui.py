@@ -14,15 +14,17 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 
+from app_paths import resolve_runtime_paths, resource_file
+
 from unified_manager import AUDIO_EXT, run_manager, quick_scan, resolve_samples_root
-from source_import import register_sources
+from source_import import import_sources_to_library
 from pattern_clip_extractor import extract_pattern_occurrences
 from other_audit import audit_other_library, route_approved_to_other
 from cleanup_audit import audit_all_import_sources, cleanup_sources_from_audit
 from finalization import finalize_library as finalize_library_audit
 from manifest_review import review_manifest
 from task_journal import TaskJournal
-from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog
+from plugin_asset_catalog import MODE_ORDER, build_plugin_asset_catalog, browser_assets_for_mode
 from performance_manifest import build_performance_manifest
 from pattern_song_manager import open_pattern_song_manager
 from chromatic_pitch_map import build_chromatic_pitch_map, chromatic_note_table
@@ -31,12 +33,17 @@ from library_operations import (
     cleanup_original_sources,
     distribute_assets_transactional,
     distribution_plan,
+    auto_distribute_approved,
 )
+from ppgu_theme import NEON_STAGE_THEME, resource_path, configure_neon_stage_ttk
 
-APP_VERSION = "3.0.0-dev6"
-MANAGER_DIR = Path(__file__).resolve().parent
-DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
+APP_VERSION = "3.0.0-dev9"
+BUNDLE_DIR, MANAGER_DIR, PORTABLE_MODE = resolve_runtime_paths(__file__)
+# The application can live anywhere. The input library is selected independently.
+DEFAULT_SAMPLES = ""
 STAGING_ROOT = MANAGER_DIR / "staging"
+MANAGER_DIR.mkdir(parents=True, exist_ok=True)
+STAGING_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 class LibraryManagerApp:
@@ -45,8 +52,9 @@ class LibraryManagerApp:
         self.root.title(f"POP PUNK GUITAR LIBRARY MANAGER {APP_VERSION}")
         self.root.geometry("980x680")
         self.root.minsize(760, 520)
-        self.samples_root = tk.StringVar(value=str(DEFAULT_SAMPLES))
-        self.analyze_audio = tk.BooleanVar(value=False)
+        self._settings_path = MANAGER_DIR / "manager_settings.json"
+        self.samples_root = tk.StringVar(value=self._load_saved_samples_root())
+        self.analyze_audio = tk.BooleanVar(value=True)
         self.guitar_confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Готов. Выберите Samples или непосредственно Import Sample Guitar.")
         # Worker threads must never call Tkinter methods. They only enqueue events;
@@ -62,137 +70,260 @@ class LibraryManagerApp:
         self._active_task_title = None
         self._build()
         self.root.after(100, self._poll_worker_events)
+        if not self.samples_root.get().strip():
+            self.root.after(350, self._prompt_for_library_root)
+        if PORTABLE_MODE and MANAGER_DIR != (BUNDLE_DIR / "UserData").resolve():
+            self._write(
+                "PORTABLE: папка приложения недоступна для записи; "
+                f"пользовательские данные вынесены в резервный каталог: {MANAGER_DIR}"
+            )
+        elif PORTABLE_MODE:
+            self._write(
+                "PORTABLE: приложение можно хранить в любой доступной папке. "
+                f"Пользовательские данные: {MANAGER_DIR}"
+            )
 
     def _build(self) -> None:
-        """Build the premium NEON STAGE dashboard without changing action handlers."""
-        self.root.configure(bg="#080B12")
-        self.root.geometry("1320x940")
-        self.root.minsize(1040, 760)
+        """Build the six-action Manager dashboard using PPGU NEON STAGE DEFAULT."""
+        palette = NEON_STAGE_THEME["palette"]
+        bg = palette["window_bg"]
+        panel = palette["panel"]
+        panel_alt = palette["panel_elevated"]
+        control_bg = palette["control_bg"]
+        control_face = palette["control_face"]
+        border = palette["control_border"]
+        text = palette["text_primary"]
+        muted = palette["text_secondary"]
+        disabled = palette["text_disabled"]
+        accent = palette["accent"]
+        accent_glow = palette["accent_glow"]
+        accent_purple = palette["accent_purple"]
+        accent_magenta = palette["accent_magenta"]
+        green = palette["success"]
+        amber = palette["warning"]
+        red = palette["danger"]
+        lcd_bg = palette["lcd_bg"]
+        lcd_text = palette["lcd_text"]
+        lowlight = palette["lowlight"]
 
-        bg = "#080B12"
-        panel = "#111824"
-        panel_alt = "#151F2D"
-        border = "#26354A"
-        text = "#EAF2FF"
-        muted = "#8D9DB4"
-        cyan = "#43E7F5"
-        violet = "#9B82FF"
-        green = "#69F0AE"
-        amber = "#FFC66D"
-        red = "#FF668A"
+        self.root.title(f"POP PUNK GUITAR  •  NEON STAGE DEFAULT  •  {APP_VERSION}")
+        self.root.geometry("1280x850")
+        self.root.minsize(980, 700)
+        self.root.configure(bg=bg)
 
         style = ttk.Style(self.root)
         try:
             style.theme_use("clam")
         except tk.TclError:
             pass
+        configure_neon_stage_ttk(style, palette)
+
         style.configure(
-            "Neon.TButton", background="#1B2B3D", foreground=text,
-            bordercolor="#2C4962", lightcolor="#1B2B3D", darkcolor="#1B2B3D",
-            padding=(12, 8), font=("Segoe UI Semibold", 9), relief="flat",
+            "PPGU.Primary.TButton",
+            background=accent,
+            foreground=bg,
+            bordercolor=accent,
+            lightcolor=accent,
+            darkcolor=accent,
+            padding=(14, 10),
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
         )
         style.map(
-            "Neon.TButton",
-            background=[("active", "#28435A"), ("disabled", "#151D29")],
-            foreground=[("disabled", "#65738A")],
-            bordercolor=[("active", cyan)],
+            "PPGU.Primary.TButton",
+            background=[("disabled", control_face), ("pressed", accent_glow), ("active", accent_glow)],
+            foreground=[("disabled", disabled)],
+            bordercolor=[("active", accent_glow)],
         )
         style.configure(
-            "NeonDanger.TButton", background="#3B1D30", foreground="#FFEAF0",
-            bordercolor="#7D3455", padding=(12, 8),
-            font=("Segoe UI Semibold", 9), relief="flat",
-        )
-        style.map("NeonDanger.TButton", background=[("active", "#56243D")])
-        style.configure(
-            "Neon.TCheckbutton", background=panel, foreground=text,
-            font=("Segoe UI", 9), padding=(4, 4),
+            "PPGU.Danger.TButton",
+            background=red,
+            foreground=bg,
+            bordercolor=red,
+            padding=(12, 8),
+            font=("Segoe UI", 8, "bold"),
+            relief="flat",
         )
         style.map(
-            "Neon.TCheckbutton",
+            "PPGU.Danger.TButton",
+            background=[("disabled", control_face), ("active", "#FF7B83")],
+            foreground=[("disabled", disabled)],
+        )
+        style.configure(
+            "PPGU.TCheckbutton",
+            background=panel,
+            foreground=text,
+            font=("Segoe UI", 9),
+            padding=(4, 4),
+        )
+        style.map(
+            "PPGU.TCheckbutton",
             background=[("active", panel)],
-            foreground=[("disabled", muted)],
+            foreground=[("disabled", disabled)],
         )
+
+        # Secondary actions remain available, grouped by their matching workflow.
+        # They are intentionally menus rather than extra dashboard buttons.
+        menu_bar = tk.Menu(
+            self.root, tearoff=0, bg=panel, fg=text,
+            activebackground=control_face, activeforeground=accent,
+            bd=0, relief="flat",
+        )
+        self.root.configure(menu=menu_bar)
+
+        def add_menu(label: str, commands: list[tuple[str, object]]) -> None:
+            submenu = tk.Menu(
+                menu_bar, tearoff=0, bg=panel, fg=text,
+                activebackground=control_face, activeforeground=accent,
+                bd=0, relief="flat",
+            )
+            for item_label, command in commands:
+                if item_label == "---":
+                    submenu.add_separator()
+                else:
+                    submenu.add_command(label=item_label, command=command)
+            menu_bar.add_cascade(label=label, menu=submenu)
+
+        add_menu("ПРОЕКТ", [
+            ("Выбрать папку Samples…", self.choose_samples),
+            ("---", None),
+            ("Открыть отчёты", self.open_reports),
+            ("Открыть staging", self.open_staging),
+            ("Инструкция", self.open_user_guide),
+        ])
+        add_menu("01  IMPORT GUITAR", [
+            ("Импортировать гитарные материалы", self.import_guitar),
+            ("Браузер подготовленных ассетов для VST3", self.open_plugin_browser),
+        ])
+        add_menu("02  SCAN LIBRARY", [
+            ("Быстрое сканирование — только файловая инвентаризация", self.quick_scan_only),
+            ("Глубокое сканирование — SHA-256 / SFZ / кэш", self.deep_scan_only),
+        ])
+        add_menu("03  START HUNTING", [
+            ("Запустить полный анализ", self.scan),
+            ("Аудит OTHER", self.audit_other),
+            ("Направить одобренные материалы в OTHER", self.distribute_other),
+        ])
+        add_menu("04  REVIEW QUEUE", [
+            ("Открыть очередь проверки", self.open_review_queue),
+            ("Прослушать WAV", self.preview_audio),
+            ("Остановить прослушивание", self.stop_preview),
+            ("История задач", self.show_task_history),
+        ])
+        add_menu("05  BUILD LIBRARY", [
+            ("Собрать каталог ассетов PPGU", self.build_plugin_catalog),
+            ("Pattern Song Manager", self.open_pattern_song_library),
+            ("12-нотная карта (для AutoChords в PATTERN)", self.open_chromatic_pitch_map),
+            ("Распределить одобренные ассеты", self.distribute),
+        ])
+        add_menu("06  VERIFY / RECOVERY", [
+            ("Проверить staging и FACTORY", self.finalize_library),
+            ("Аудит исходников перед очисткой", self.audit_cleanup),
+            ("Очистить исходники (двойное подтверждение)", self.cleanup),
+        ])
+        settings_menu = tk.Menu(
+            menu_bar, tearoff=0, bg=panel, fg=text,
+            activebackground=control_face, activeforeground=accent,
+            selectcolor=accent, bd=0, relief="flat",
+        )
+        settings_menu.add_checkbutton(
+            label="Полный аудиоанализ и извлечение кандидатов (рекомендуется)",
+            variable=self.analyze_audio,
+        )
+        settings_menu.add_checkbutton(
+            label="Источник уже отфильтрован как гитарный",
+            variable=self.guitar_confirmed,
+        )
+        menu_bar.add_cascade(label="НАСТРОЙКИ", menu=settings_menu)
 
         outer = tk.Frame(self.root, bg=bg)
-        outer.pack(fill="both", expand=True, padx=18, pady=14)
+        outer.pack(fill="both", expand=True, padx=20, pady=16)
 
-        # Header / brand area
+        # Premium brand header, using the actual PPGU NEON STAGE hero asset.
         header = tk.Frame(outer, bg=bg)
-        header.pack(fill="x", pady=(0, 12))
+        header.pack(fill="x", pady=(0, 14))
         brand = tk.Frame(header, bg=bg)
         brand.pack(side="left", fill="x", expand=True)
         tk.Label(
-            brand, text="NEON STAGE  /  LIBRARY CONTROL",
-            bg=bg, fg=cyan, font=("Segoe UI", 9, "bold"),
+            brand, text="POP PUNK GUITAR ULTIMATE   /   LIBRARY MANAGER",
+            bg=bg, fg=accent, font=("Segoe UI", 8, "bold"),
         ).pack(anchor="w")
         tk.Label(
-            brand, text="POP PUNK GUITAR",
-            bg=bg, fg=text, font=("Segoe UI", 25, "bold"),
-        ).pack(anchor="w", pady=(1, 0))
+            brand, text="NEON STAGE DEFAULT",
+            bg=bg, fg=text, font=("Segoe UI", 24, "bold"),
+        ).pack(anchor="w", pady=(3, 0))
         tk.Label(
             brand,
-            text="Профессиональная подготовка, анализ и сборка гитарной библиотеки",
+            text="Профессиональная подготовка и контроль гитарной библиотеки",
             bg=bg, fg=muted, font=("Segoe UI", 10),
         ).pack(anchor="w", pady=(2, 0))
+        tk.Label(
+            brand,
+            text="SKIN-1  •  NEON STAGE  •  BLUE / PURPLE / MAGENTA",
+            bg=bg, fg=disabled, font=("Consolas", 8),
+        ).pack(anchor="w", pady=(7, 0))
 
-        version = tk.Frame(header, bg=panel, highlightbackground=border,
-                           highlightthickness=1, padx=16, pady=11)
+        self._skin_hero = None
+        try:
+            hero = tk.PhotoImage(file=str(resource_path("assets", "hero.png")))
+            factor = max(1, (hero.width() + 179) // 180, (hero.height() + 89) // 90)
+            self._skin_hero = hero.subsample(factor, factor)
+            tk.Label(
+                header, image=self._skin_hero, bg=panel,
+                highlightbackground=border, highlightthickness=1,
+                padx=8, pady=6,
+            ).pack(side="right", padx=(18, 0))
+        except (tk.TclError, OSError):
+            self._skin_hero = None
+
+        version = tk.Frame(
+            header, bg=panel_alt, highlightbackground=border,
+            highlightthickness=1, padx=14, pady=10,
+        )
         version.pack(side="right", anchor="n")
-        tk.Label(version, text="MANAGER BUILD", bg=panel, fg=muted,
-                 font=("Segoe UI", 8, "bold")).pack(anchor="e")
-        tk.Label(version, text=APP_VERSION, bg=panel, fg=cyan,
-                 font=("Consolas", 11, "bold")).pack(anchor="e", pady=(3, 0))
-        tk.Label(version, text="NEON STAGE  •  DARK EDITION", bg=panel,
-                 fg=violet, font=("Segoe UI", 8, "bold")).pack(anchor="e", pady=(5, 0))
+        tk.Label(
+            version, text="MANAGER BUILD", bg=panel_alt, fg=muted,
+            font=("Segoe UI", 7, "bold"),
+        ).pack(anchor="e")
+        tk.Label(
+            version, text=APP_VERSION, bg=panel_alt, fg=accent,
+            font=("Consolas", 11, "bold"),
+        ).pack(anchor="e", pady=(3, 0))
+        tk.Label(
+            version, text="PPGU  /  SKIN-1", bg=panel_alt, fg=accent_magenta,
+            font=("Segoe UI", 8, "bold"),
+        ).pack(anchor="e", pady=(5, 0))
 
-        # Source folder selection
+        # The location is visible, but path-changing controls live in the Project menu.
         path_panel = tk.Frame(
             outer, bg=panel, highlightbackground=border,
             highlightthickness=1, padx=14, pady=10,
         )
-        path_panel.pack(fill="x", pady=(0, 10))
-        path_head = tk.Frame(path_panel, bg=panel)
-        path_head.pack(fill="x")
-        tk.Label(path_head, text="БИБЛИОТЕКА ИСТОЧНИКОВ",
-                 bg=panel, fg=cyan, font=("Segoe UI", 9, "bold")).pack(side="left")
-        tk.Label(path_head, text="Выберите Samples или Import Sample Guitar",
-                 bg=panel, fg=muted, font=("Segoe UI", 8)).pack(side="right")
-        path_row = tk.Frame(path_panel, bg=panel)
-        path_row.pack(fill="x", pady=(7, 0))
+        path_panel.pack(fill="x", pady=(0, 15))
+        tk.Label(
+            path_panel, text="АКТИВНАЯ БИБЛИОТЕКА",
+            bg=panel, fg=accent, font=("Segoe UI", 8, "bold"),
+        ).pack(anchor="w")
         self.samples_entry = tk.Entry(
-            path_row, textvariable=self.samples_root,
-            bg="#0B111B", fg=text, insertbackground=cyan,
+            path_panel, textvariable=self.samples_root,
+            bg=control_bg, fg=text, insertbackground=accent,
             relief="flat", highlightthickness=1,
-            highlightbackground=border, highlightcolor=cyan,
-            font=("Segoe UI", 10),
+            highlightbackground=border, highlightcolor=accent,
+            font=("Consolas", 9), readonlybackground=control_bg,
+            state="readonly",
         )
-        self.samples_entry.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 10))
-        browse = ttk.Button(path_row, text="ОБЗОР ПАПКИ", style="Neon.TButton",
-                            command=self.choose_samples)
-        browse.pack(side="right")
+        self.samples_entry.pack(fill="x", ipady=7, pady=(6, 0))
 
-        # Safe analysis options
-        settings = tk.Frame(outer, bg=panel, highlightbackground=border,
-                            highlightthickness=1, padx=12, pady=6)
-        settings.pack(fill="x", pady=(0, 12))
-        ttk.Checkbutton(
-            settings,
-            text="ТЯЖЁЛЫЙ АУДИОАНАЛИЗ  •  pitch / ритм / акустика (медленнее)",
-            variable=self.analyze_audio, style="Neon.TCheckbutton",
-        ).pack(side="left")
-        ttk.Checkbutton(
-            settings,
-            text="Подтверждаю, что источник уже отфильтрован как гитарный",
-            variable=self.guitar_confirmed, style="Neon.TCheckbutton",
-        ).pack(side="left", padx=(22, 0))
-
-        # Main workflow cards. Numbering follows the safe working order.
         section_head = tk.Frame(outer, bg=bg)
         section_head.pack(fill="x", pady=(0, 8))
-        tk.Label(section_head, text="ОСНОВНОЙ РАБОЧИЙ ПОТОК",
-                 bg=bg, fg=text, font=("Segoe UI", 12, "bold")).pack(side="left")
-        tk.Label(section_head, text="Выполняйте этапы по порядку  •  исходники защищены",
-                 bg=bg, fg=muted, font=("Segoe UI", 8)).pack(side="right")
+        tk.Label(
+            section_head, text="ОСНОВНОЙ РАБОЧИЙ ПОТОК",
+            bg=bg, fg=text, font=("Segoe UI", 12, "bold"),
+        ).pack(side="left")
+        tk.Label(
+            section_head, text="6 ОСНОВНЫХ ЭТАПОВ  •  ОРИГИНАЛЫ ЗАЩИЩЕНЫ",
+            bg=bg, fg=muted, font=("Segoe UI", 8, "bold"),
+        ).pack(side="right")
 
         cards = tk.Frame(outer, bg=bg)
         cards.pack(fill="x")
@@ -201,123 +332,82 @@ class LibraryManagerApp:
 
         workflow = [
             ("01", "IMPORT GUITAR",
-             "Отдельная входная точка: несколько аудиофайлов и папок, вложенные библиотеки, SFZ. Только регистрация ссылок на оригиналы.",
-             self.import_guitar, cyan, "SOURCE REGISTRATION"),
+             "Импорт файлов и папок в Import Sample Guitar с SHA-256-проверкой копий. Оригиналы остаются нетронутыми.",
+             self.import_guitar, "SOURCE INTAKE"),
             ("02", "SCAN LIBRARY",
-             "Инвентаризация структуры, форматов, SFZ-зависимостей, SHA-256 и дубликатов.",
-             self.deep_scan_only, violet, "LIBRARY SCAN"),
+             "Быстрая инвентаризация структуры, форматов и SFZ-зависимостей. Хеширование и декодирование — только по необходимости.",
+             self.deep_scan_only, "SMART SCAN"),
             ("03", "START HUNTING",
-             "Автоматический анализ, поиск паттернов, мелодий и кандидатов извлечения. Тяжёлый анализ — отдельно.",
-             self.scan, green, "AUTO ANALYSIS"),
+             "Поиск нот, паттернов, риффов и музыкальных кандидатов. Сомнительные результаты не получают выдуманных тегов.",
+             self.scan, "AUDIO INTELLIGENCE"),
             ("04", "REVIEW QUEUE",
-             "Прослушивание оригиналов и производных, сравнение, исправление границ и подтверждение тегов.",
-             self.open_review_queue, violet, "MANUAL REVIEW"),
+             "Прослушивание оригиналов и производных, проверка границ, нот, артикуляций, категорий библиотеки VST3 и лицензии.",
+             self.open_review_queue, "HUMAN APPROVAL"),
             ("05", "BUILD LIBRARY",
-             "Формирование каталогов, карт режимов, velocity/technique coverage и безопасная сборка одобренного.",
-             self.build_plugin_catalog, green, "LIBRARY BUILD"),
+             "Сборка каталога подготовленных ассетов и Performance Manifest для отдельного VST3. Неодобренное остаётся в staging.",
+             self.build_plugin_catalog, "LIBRARY CATALOG"),
             ("06", "VERIFY / RECOVERY",
-             "Проверка staging/FACTORY, путей, WAV, manifests, SHA-256, лицензий и доступных операций восстановления.",
-             self.finalize_library, cyan, "INTEGRITY GATES"),
+             "Целостность WAV и manifests, SHA-256, provenance, лицензии, отчёты и безопасное восстановление.",
+             self.finalize_library, "INTEGRITY / RECOVERY"),
         ]
 
         self._action_buttons = []
-        for index, (number, title, description, command, accent, tag) in enumerate(workflow):
+        for index, (number, title, description, command, tag) in enumerate(workflow):
             row, column = divmod(index, 3)
             card = tk.Frame(
                 cards, bg=panel, highlightbackground=border,
-                highlightthickness=1, padx=12, pady=10,
+                highlightthickness=1, padx=14, pady=12,
             )
             card.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
-            tk.Frame(card, bg=accent, height=3).pack(fill="x", pady=(0, 8))
+            tk.Frame(card, bg=(accent, accent_purple, accent_magenta)[index % 3], height=3).pack(fill="x", pady=(0, 10))
             top = tk.Frame(card, bg=panel)
             top.pack(fill="x")
             tk.Label(
                 top, text=number, bg=panel, fg=accent,
-                font=("Consolas", 16, "bold"),
+                font=("Consolas", 17, "bold"),
             ).pack(side="left")
             tk.Label(
                 top, text=tag, bg=panel, fg=muted,
-                font=("Segoe UI", 8, "bold"),
+                font=("Segoe UI", 7, "bold"),
             ).pack(side="right")
             tk.Label(
                 card, text=title, bg=panel, fg=text,
                 font=("Segoe UI", 10, "bold"), anchor="w",
-            ).pack(fill="x", pady=(3, 3))
+            ).pack(fill="x", pady=(4, 5))
             tk.Label(
                 card, text=description, bg=panel, fg=muted,
                 font=("Segoe UI", 8), justify="left", anchor="nw",
-                wraplength=350, height=3,
-            ).pack(fill="both", expand=True, pady=(0, 8))
-            button_style = "NeonDanger.TButton" if number == "10" else "Neon.TButton"
+                wraplength=330, height=3,
+            ).pack(fill="both", expand=True, pady=(0, 10))
             button = ttk.Button(
-                card, text=("УДАЛИТЬ ПОСЛЕ АУДИТА" if number == "10" else "ОТКРЫТЬ ЭТАП"),
-                command=command, style=button_style,
+                card, text="ОТКРЫТЬ ЭТАП",
+                command=command, style="PPGU.Primary.TButton",
             )
             button.pack(fill="x")
             self._action_buttons.append(button)
 
-        # Secondary utilities kept available but visually separated from the
-        # mandatory numbered sequence.
-        tools_panel = tk.Frame(
-            outer, bg=panel, highlightbackground=border,
+        # Persistent activity console: the only always-visible secondary surface.
+        log_panel = tk.Frame(
+            outer, bg=lcd_bg, highlightbackground=border,
             highlightthickness=1, padx=12, pady=9,
         )
-        tools_panel.pack(fill="x", pady=(11, 9))
-        tools_header = tk.Frame(tools_panel, bg=panel)
-        tools_header.pack(fill="x", pady=(0, 7))
-        tk.Label(tools_header, text="СТУДИЙНЫЕ ИНСТРУМЕНТЫ",
-                 bg=panel, fg=cyan, font=("Segoe UI", 9, "bold")).pack(side="left")
-        tk.Label(tools_header, text="Вспомогательные действия",
-                 bg=panel, fg=muted, font=("Segoe UI", 8)).pack(side="right")
-        tools = [
-            ("Sample Browser / VST3", self.open_plugin_browser),
-            ("Pattern Song Manager", self.open_pattern_song_library),
-            ("12 нот / Auto Chords", self.open_chromatic_pitch_map),
-            ("Прослушать WAV", self.preview_audio),
-            ("Остановить звук", self.stop_preview),
-            ("Аудит OTHER", self.audit_other),
-            ("Направить в OTHER", self.distribute_other),
-            ("Отчёты", self.open_reports),
-            ("История задач", self.show_task_history),
-            ("Открыть staging", self.open_staging),
-            ("Инструкция", self.open_user_guide),
-        ]
-        tool_grid = tk.Frame(tools_panel, bg=panel)
-        tool_grid.pack(fill="x")
-        for column in range(4):
-            tool_grid.grid_columnconfigure(column, weight=1, uniform="tools")
-        self._action_buttons.extend([])
-        for index, (label, command) in enumerate(tools):
-            button = ttk.Button(tool_grid, text=label, command=command, style="Neon.TButton")
-            button.grid(row=index // 4, column=index % 4, sticky="ew", padx=3, pady=3)
-            self._action_buttons.append(button)
-
-        # Persistent activity console
-        log_panel = tk.Frame(
-            outer, bg="#0C121D", highlightbackground=border,
-            highlightthickness=1, padx=10, pady=8,
-        )
-        log_panel.pack(fill="both", expand=True)
-        log_header = tk.Frame(log_panel, bg="#0C121D")
-        log_header.pack(fill="x", pady=(0, 5))
-        tk.Label(log_header, text="LIVE ACTIVITY  /  ЖУРНАЛ",
-                 bg="#0C121D", fg=cyan, font=("Segoe UI", 9, "bold")).pack(side="left")
-        log_actions = tk.Frame(log_header, bg="#0C121D")
-        log_actions.pack(side="right")
-        for label, command in (
-            ("Выделить всё", self.select_log_all),
-            ("Копировать выделенное", self.copy_log_selection),
-            ("Копировать весь журнал", self.copy_log_all),
-        ):
-            ttk.Button(log_actions, text=label, style="Neon.TButton",
-                       command=command).pack(side="left", padx=2)
-
-        log_frame = tk.Frame(log_panel, bg="#0C121D")
+        log_panel.pack(fill="both", expand=True, pady=(12, 0))
+        log_header = tk.Frame(log_panel, bg=lcd_bg)
+        log_header.pack(fill="x", pady=(0, 6))
+        tk.Label(
+            log_header, text="LIVE ACTIVITY  /  ЖУРНАЛ ОПЕРАЦИЙ",
+            bg=lcd_bg, fg=accent, font=("Segoe UI", 8, "bold"),
+        ).pack(side="left")
+        tk.Label(
+            log_header, text="ПКМ: копирование  •  CTRL+A / CTRL+C",
+            bg=lcd_bg, fg=muted, font=("Segoe UI", 7),
+        ).pack(side="right")
+        log_frame = tk.Frame(log_panel, bg=lcd_bg)
         log_frame.pack(fill="both", expand=True)
         self.log = tk.Text(
             log_frame, wrap="word", height=7, font=("Consolas", 9),
-            bg="#080E17", fg="#C8D6E8", insertbackground=cyan,
-            selectbackground="#24465B", relief="flat", padx=10, pady=8,
+            bg=lowlight, fg=lcd_text, insertbackground=accent,
+            selectbackground=control_face, relief="flat", padx=10, pady=8,
             exportselection=True, undo=False,
         )
         log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log.yview)
@@ -331,29 +421,29 @@ class LibraryManagerApp:
         self.log.bind("<Button-3>", self.show_log_context_menu)
         self.log.configure(state="disabled")
 
-        # Status line; no fake percentage is shown because stages do not yet
-        # expose a uniform measurable progress fraction.
         status_panel = tk.Frame(
-            outer, bg="#101C2A", highlightbackground="#28516A",
-            highlightthickness=1, padx=10, pady=7,
+            outer, bg=panel_alt, highlightbackground=border,
+            highlightthickness=1, padx=12, pady=8,
         )
-        status_panel.pack(fill="x", pady=(8, 0))
-        tk.Label(status_panel, text="●", bg="#101C2A", fg=green,
-                 font=("Segoe UI", 11, "bold")).pack(side="left", padx=(0, 7))
+        status_panel.pack(fill="x", pady=(9, 0))
         tk.Label(
-            status_panel, textvariable=self.status, bg="#101C2A",
-            fg=text, font=("Segoe UI", 9), anchor="w",
+            status_panel, text="●", bg=panel_alt, fg=green,
+            font=("Segoe UI", 10, "bold"),
+        ).pack(side="left", padx=(0, 8))
+        tk.Label(
+            status_panel, textvariable=self.status, bg=panel_alt,
+            fg=text, font=("Segoe UI", 8), anchor="w",
         ).pack(side="left", fill="x", expand=True)
         self._cancel_button = ttk.Button(
-            status_panel, text="ОСТАНОВИТЬ ТЕКУЩУЮ ЗАДАЧУ",
-            command=self.cancel_job, style="NeonDanger.TButton", state="disabled",
+            status_panel, text="ОСТАНОВИТЬ ЗАДАЧУ",
+            command=self.cancel_job, style="PPGU.Danger.TButton", state="disabled",
         )
         self._cancel_button.pack(side="right", padx=(8, 0))
 
         self._write(
-            "NEON STAGE готов. AUTO SOUND HUNTER: шесть основных этапов.\\n"
-            "IMPORT GUITAR только регистрирует оригиналы; исходники не перемещаются и не изменяются.\\n"
-            "FACTORY принимает только REVIEWED + LICENSE_APPROVED + VERIFIED материалы.\\n"
+            "NEON STAGE DEFAULT / SKIN-1 загружена из темы PPGU.\n"
+            "На главном экране — шесть рабочих этапов; вспомогательные инструменты находятся в меню своих разделов.\n"
+            "Оригиналы read-only. В FACTORY допускаются только REVIEWED + LICENSE_APPROVED + VERIFIED материалы.\n"
         )
 
     def _copy_log_text(self, value: str) -> None:
@@ -397,8 +487,72 @@ class LibraryManagerApp:
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _load_saved_samples_root(self) -> str:
+        """Restore the last selected library from this installation's data folder."""
+        try:
+            settings = json.loads(self._settings_path.read_text(encoding="utf-8"))
+            value = settings.get("samples_root", "")
+            if isinstance(value, str) and value.strip() and Path(value).expanduser().exists():
+                return value
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+        return DEFAULT_SAMPLES
+
+    def _save_settings(self) -> None:
+        """Persist the selected library atomically in UserData / LocalAppData."""
+        import os
+        import tempfile
+
+        self._settings_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": 1,
+            "samples_root": self.samples_root.get().strip(),
+            "app_version": APP_VERSION,
+        }
+        fd, temporary = tempfile.mkstemp(
+            prefix="manager_settings-", suffix=".tmp",
+            dir=self._settings_path.parent,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(payload, stream, ensure_ascii=False, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self._settings_path)
+        except Exception:
+            try:
+                Path(temporary).unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+
+    def _prompt_for_library_root(self) -> None:
+        selected = filedialog.askdirectory(
+            title="Выберите папку Samples или Import Sample Guitar",
+        )
+        if not selected:
+            self.status.set(
+                "Выберите папку библиотеки через меню ПРОЕКТ перед запуском сканирования."
+            )
+            return
+        self.samples_root.set(selected)
+        try:
+            self._save_settings()
+            self.status.set("Папка библиотеки сохранена.")
+            self._write(f"Путь Samples сохранён: {selected}")
+        except OSError as exc:
+            messagebox.showwarning(
+                "Настройки",
+                f"Папка выбрана на этот запуск, но путь не удалось сохранить: {exc}",
+            )
+
     def _samples(self) -> Path:
         """Resolve and log the exact Samples/Import Sample Guitar paths."""
+        if not self.samples_root.get().strip():
+            self._prompt_for_library_root()
+        if not self.samples_root.get().strip():
+            raise ValueError("Сначала выберите папку Samples или Import Sample Guitar.")
         selected = Path(self.samples_root.get()).expanduser()
         resolved = resolve_samples_root(selected)
         incoming = next(
@@ -415,6 +569,13 @@ class LibraryManagerApp:
         )
         if selected:
             self.samples_root.set(selected)
+            try:
+                self._save_settings()
+            except OSError as exc:
+                messagebox.showwarning(
+                    "Настройки",
+                    f"Папка выбрана на этот запуск, но путь не удалось сохранить: {exc}",
+                )
 
     def _background(self, title: str, work) -> None:
         """Run work off the UI thread and deliver all UI updates via a queue."""
@@ -426,9 +587,10 @@ class LibraryManagerApp:
         self._job_running = True
         self._cancel_event.clear()
         self._active_task_title = title
-        self._active_task_id = self._task_journal.start(
+        task_id = self._task_journal.start(
             title, details={"samples_root": self.samples_root.get(), "manager_version": APP_VERSION}
         )
+        self._active_task_id = task_id
         self._cancel_button.configure(state="normal")
         self.status.set(title + " — запуск…")
         for button in self._action_buttons:
@@ -438,23 +600,40 @@ class LibraryManagerApp:
         def runner():
             try:
                 result = work()
-                self._task_journal.finish(self._active_task_id, title, result=result)
-                self._worker_events.put(("finish", title, result))
+                if self._cancel_event.is_set():
+                    self._task_journal.cancel(task_id, title)
+                    self._worker_events.put(("cancelled", title, result))
+                else:
+                    self._task_journal.finish(task_id, title, result=result)
+                    self._worker_events.put(("finish", title, result))
             except Exception as exc:
-                self._task_journal.fail(self._active_task_id, title, f"{type(exc).__name__}: {exc}")
-                self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
+                if self._cancel_event.is_set():
+                    self._task_journal.cancel(task_id, title, f"{type(exc).__name__}: {exc}")
+                    self._worker_events.put(("cancelled", title, {"error": f"{type(exc).__name__}: {exc}"}))
+                else:
+                    self._task_journal.fail(task_id, title, f"{type(exc).__name__}: {exc}")
+                    self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
 
         worker = threading.Thread(target=runner, name="LibraryManagerWorker", daemon=True)
         self._worker_thread = worker
         try:
             worker.start()
         except Exception as exc:
+            self._task_journal.fail(task_id, title, f"{type(exc).__name__}: {exc}")
             self._job_running = False
             self._worker_thread = None
             for button in self._action_buttons:
                 button.configure(state="normal")
             details = traceback.format_exc()
             self._error(title, exc, details)
+
+    def _queue_progress(self, message: str) -> None:
+        """Persist worker progress and forward it to the Tk main thread."""
+        task_id = self._active_task_id
+        task = self._active_task_title
+        if task_id and task:
+            self._task_journal.progress(task_id, task, message)
+        self._worker_events.put(("progress", message))
 
     def _poll_worker_events(self) -> None:
         """Process worker events only on Tk's main thread."""
@@ -472,6 +651,15 @@ class LibraryManagerApp:
                     for button in self._action_buttons:
                         button.configure(state="normal")
                     self._finish(title, result)
+                elif kind == "cancelled":
+                    _, title, result = event
+                    self._job_running = False
+                    self._worker_thread = None
+                    self._cancel_button.configure(state="disabled")
+                    for button in self._action_buttons:
+                        button.configure(state="normal")
+                    self._write("[ОСТАНОВЛЕНО] " + json.dumps(result, ensure_ascii=False, indent=2, default=str))
+                    self.status.set(title + ": остановлено; частичные отчёты сохранены")
                 elif kind == "error":
                     _, title, error_text, details = event
                     self._job_running = False
@@ -508,8 +696,55 @@ class LibraryManagerApp:
             self.status.set("Остановка запрошена — завершаю текущий безопасный блок…")
             self._write("[ОТМЕНА] Запрошена остановка. Исходные файлы не затрагиваются.")
 
+    def _prepare_import_target(self) -> Path | None:
+        """Create/resolve the active Samples folder and its incoming destination."""
+        chosen = self.samples_root.get().strip()
+        if not chosen:
+            chosen = filedialog.askdirectory(
+                title="Выберите или создайте папку Samples для библиотеки Manager",
+            )
+            if not chosen:
+                return None
+
+        selected = Path(chosen).expanduser().resolve()
+        if not selected.is_dir():
+            raise NotADirectoryError(f"Выбранный каталог Samples не существует: {selected}")
+
+        if selected.name.strip().casefold() == "import sample guitar":
+            samples = selected.parent
+            incoming = selected
+        else:
+            samples = selected
+            children = [
+                item for item in samples.iterdir()
+                if item.is_dir() and item.name.strip().casefold() == "import sample guitar"
+            ]
+            if len(children) > 1:
+                raise RuntimeError(
+                    "В выбранной папке найдено несколько Import Sample Guitar. "
+                    "Выберите нужную входную папку напрямую."
+                )
+            incoming = children[0] if children else samples / "Import Sample Guitar"
+
+        incoming.mkdir(parents=True, exist_ok=True)
+        (samples / "FACTORY").mkdir(parents=True, exist_ok=True)
+        (samples / "OTHER").mkdir(parents=True, exist_ok=True)
+        self.samples_root.set(str(samples))
+        self._save_settings()
+        self._write(f"Целевая папка импорта: {incoming}")
+        return incoming
+
     def import_guitar(self) -> None:
-        """Register user-selected files and folders without copying or altering them."""
+        """Copy selected source libraries into Import Sample Guitar, preserving originals."""
+        try:
+            incoming = self._prepare_import_target()
+        except Exception as exc:
+            messagebox.showerror("IMPORT GUITAR — папка библиотеки", str(exc), parent=self.root)
+            return
+        if incoming is None:
+            self.status.set("IMPORT GUITAR: папка Samples не выбрана.")
+            return
+
         selected = list(filedialog.askopenfilenames(
             title="IMPORT GUITAR — выберите аудио, SFZ или архивы",
             filetypes=[
@@ -520,8 +755,9 @@ class LibraryManagerApp:
         while messagebox.askyesno(
             "IMPORT GUITAR",
             "Добавить целую папку библиотеки? Можно добавить несколько папок подряд.",
+            parent=self.root,
         ):
-            folder = filedialog.askdirectory(title="Выберите папку гитарной библиотеки")
+            folder = filedialog.askdirectory(title="Выберите папку исходной гитарной библиотеки")
             if not folder:
                 break
             selected.append(folder)
@@ -529,14 +765,31 @@ class LibraryManagerApp:
             self.status.set("IMPORT GUITAR: источники не выбраны.")
             return
 
+        if not messagebox.askyesno(
+            "Подтверждение импорта",
+            f"Менеджер создаст проверенные копии выбранных файлов в:\n{incoming}\n\n"
+            "Оригиналы останутся на прежнем месте и не будут изменены, перемещены или удалены. "
+            "Для копирования требуется дополнительное место на диске. "
+            "После импорта копии будут доступны этапам SCAN LIBRARY и START HUNTING. Продолжить?",
+            parent=self.root,
+        ):
+            self.status.set("IMPORT GUITAR: копирование отменено.")
+            return
+
         registry = MANAGER_DIR / "reports" / "import_registry.json"
 
         def work():
-            return register_sources(selected, registry)
+            return import_sources_to_library(
+                selected,
+                incoming,
+                registry,
+                progress=self._queue_progress,
+                cancel_event=self._cancel_event,
+            )
 
         self._write("=== IMPORT GUITAR ===")
-        self._write(f"Выбрано источников: {len(selected)}. Регистрация без копирования, перемещения и изменения оригиналов.")
-        self._background("IMPORT GUITAR — регистрация источников", work)
+        self._write(f"Выбрано источников: {len(selected)}. Будут созданы SHA-256-проверенные копии; оригиналы останутся нетронутыми.")
+        self._background("IMPORT GUITAR — копирование и регистрация источников", work)
 
     def quick_scan_only(self) -> None:
         """Run only the fast filesystem inventory; never start deep analysis."""
@@ -548,7 +801,7 @@ class LibraryManagerApp:
 
         def work():
             def report_progress(message: str) -> None:
-                self._worker_events.put(("progress", message))
+                self._queue_progress(message)
             return quick_scan(
                 samples, progress=report_progress, cancel_event=self._cancel_event,
             )
@@ -567,7 +820,7 @@ class LibraryManagerApp:
 
         def work():
             def report_progress(message: str) -> None:
-                self._worker_events.put(("progress", message))
+                self._queue_progress(message)
 
             report_progress("ЭТАП 1/2: быстрый filesystem scan без SHA-256 и декодирования.")
             quick_result = quick_scan(
@@ -583,14 +836,14 @@ class LibraryManagerApp:
                 write_virtual=False,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
-                workers=2,
+                workers=1,
             )
             return {
                 "quick_scan": quick_result,
                 "deep_inventory": deep_result,
                 "acoustic_analysis_performed": False,
                 "physical_extraction_performed": False,
-                "workers": 2,
+                "workers": 1,
                 "source_files_modified": False,
             }
 
@@ -608,10 +861,20 @@ class LibraryManagerApp:
             return
         analyze_audio = self.analyze_audio.get()
         guitar_confirmed = self.guitar_confirmed.get()
+        if analyze_audio and not guitar_confirmed:
+            guitar_confirmed = messagebox.askyesno(
+                "Подтверждение гитарного источника",
+                "Подтверждаете, что выбранная библиотека предназначена для гитарного плагина "
+                "и уже очищена от Piano / Bell / Drum материалов?\n\n"
+                "При ответе «Нет» Manager всё равно завершит инвентаризацию и акустический анализ, "
+                "но не будет запускать гитарное извлечение Pattern / Chord / Sample / Melody.",
+            )
+            if guitar_confirmed:
+                self.guitar_confirmed.set(True)
 
         def work():
             def report_progress(message: str) -> None:
-                self._worker_events.put(("progress", message))
+                self._queue_progress(message)
 
             report_progress("ЭТАП 1/8: быстрое сканирование структуры — только файловая метаинформация.")
             quick_result = quick_scan(
@@ -633,7 +896,7 @@ class LibraryManagerApp:
             mode_counts = analysis_result.get("mode_candidate_counts", {})
             mode_report_path = Path(analysis_result["report_directory"]) / "mode_sorting_report.json"
             report_progress(
-                "СОРТИРОВКА ПО 10 РЕЖИМАМ VST3: "
+                "КЛАССИФИКАЦИЯ ПО 10 КАТЕГОРИЯМ ПОДГОТОВКИ БИБЛИОТЕКИ ДЛЯ VST3: "
                 + "; ".join(f"{name}: {count}" for name, count in mode_counts.items())
                 + f". Отчёт: {mode_report_path}"
             )
@@ -644,7 +907,6 @@ class LibraryManagerApp:
             extracted_sample = 0
             extracted_melody_notes = 0
             extracted_melody = 0
-            max_total_assets = 500
             extraction_failures = []
             report_file = Path(analysis_result["report_directory"]) / "unified_audio_analysis.json"
             if analyze_audio and guitar_confirmed and report_file.is_file():
@@ -660,18 +922,25 @@ class LibraryManagerApp:
                     virtual = record.get("virtual_extraction")
                     if not isinstance(virtual, dict) or not virtual.get("candidates"):
                         continue
-                    remaining = max_total_assets - extracted_region
-                    if remaining <= 0:
-                        break
                     try:
-                        clips = extract_virtual_ranges(
-                            virtual, STAGING_ROOT,
-                            max_clips=min(100, remaining),
-                            cancel_event=self._cancel_event,
-                            progress=report_progress,
-                        )
-                        extracted_region += len(clips)
+                        candidates = virtual.get("candidates") or []
+                        for offset in range(0, len(candidates), 1000):
+                            if self._cancel_event.is_set():
+                                raise RuntimeError("Извлечение длинных отрывков остановлено.")
+                            chunk_report = {
+                                **virtual,
+                                "candidates": candidates[offset:offset + 1000],
+                            }
+                            clips = extract_virtual_ranges(
+                                chunk_report, STAGING_ROOT,
+                                max_clips=1000,
+                                cancel_event=self._cancel_event,
+                                progress=report_progress,
+                            )
+                            extracted_region += len(clips)
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "LONG_RECORDING_RANGE_EXTRACTION",
@@ -686,25 +955,40 @@ class LibraryManagerApp:
                     if not pattern_data.get("patterns"):
                         continue
                     try:
-                        remaining = max_total_assets - extracted_region - extracted_pattern
-                        if remaining <= 0:
-                            break
-                        clips = extract_pattern_occurrences({
+                        source_report = {
                             "source": record["source_path"],
                             "source_sha256": record["source_sha256"],
-                            "pattern_analysis": pattern_data,
-                        }, STAGING_ROOT, max_clips=min(100, remaining))
-                        extracted_pattern += len(clips)
+                        }
+                        patterns = pattern_data.get("patterns") or []
+                        # Split large candidate sets into bounded chunks. This
+                        # removes the old global 500-asset ceiling without
+                        # building one enormous in-memory extraction batch.
+                        for pattern in patterns:
+                            occurrences = pattern.get("occurrences") or []
+                            for offset in range(0, len(occurrences), 10000):
+                                if self._cancel_event.is_set():
+                                    raise RuntimeError("Извлечение Pattern остановлено.")
+                                chunk_pattern = {
+                                    **pattern,
+                                    "occurrences": occurrences[offset:offset + 10000],
+                                }
+                                chunk_analysis = {"patterns": [chunk_pattern]}
+                                clips = extract_pattern_occurrences({
+                                    **source_report,
+                                    "pattern_analysis": chunk_analysis,
+                                }, STAGING_ROOT, max_clips=10000,
+                                    cancel_event=self._cancel_event)
+                                extracted_pattern += len(clips)
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "PATTERN_EXTRACTION",
                             "error": f"{type(exc).__name__}: {exc}",
                         })
-                    if extracted_region + extracted_pattern >= max_total_assets:
-                        break
 
-                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV для SAMPLE MODE / Chord / Auto Chords.")
+                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV-кандидатов для категории SAMPLE MODE библиотеки VST3 и AutoChords внутри PATTERN.")
                 from chord_clip_extractor import extract_chord_samples
                 for record in records:
                     if self._cancel_event.is_set():
@@ -712,40 +996,49 @@ class LibraryManagerApp:
                     chord_data = record.get("chord_analysis") or {}
                     if not chord_data.get("chord_candidates"):
                         continue
-                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord
-                    if remaining <= 0:
-                        break
                     try:
-                        clips = extract_chord_samples(
-                            chord_data, STAGING_ROOT, max_clips=min(100, remaining),
-                        )
-                        extracted_chord += len(clips)
+                        candidates = chord_data.get("chord_candidates") or []
+                        for offset in range(0, len(candidates), 5000):
+                            if self._cancel_event.is_set():
+                                raise RuntimeError("Извлечение Chord остановлено.")
+                            chunk_report = {
+                                **chord_data,
+                                "chord_candidates": candidates[offset:offset + 5000],
+                            }
+                            clips = extract_chord_samples(
+                                chunk_report, STAGING_ROOT, max_clips=5000,
+                                cancel_event=self._cancel_event,
+                            )
+                            extracted_chord += len(clips)
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "CHORD_SAMPLE_EXTRACTION",
                             "error": f"{type(exc).__name__}: {exc}",
                         })
 
-                report_progress("ЭТАП 6/8: извлечение одиночных нот для SAMPLE MODE + MELODY MODE и дополнительных фраз MELODY MODE.")
+                report_progress("ЭТАП 6/8: извлечение одиночных нот для категорий SAMPLE MODE и MELODY MODE библиотеки VST3; дополнительные фразы для категории MELODY MODE.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
-                    remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord - extracted_sample - extracted_melody
-                    if remaining <= 0:
-                        break
                     source = Path(record.get("source_path", ""))
                     if source.suffix.lower() not in AUDIO_EXT:
                         continue
                     try:
-                        remaining = max_total_assets - extracted_region - extracted_pattern - extracted_chord - extracted_sample - extracted_melody
+                        pitch_events = record.get("pitch_candidates") or []
+                        # This engine processes the full per-source event list;
+                        # note WAVs are shared by Sample and Melody assignments.
+                        source_asset_budget = max(1, len(pitch_events) * 2)
                         result = prepare_sample_and_melody(
                             source, STAGING_ROOT,
-                            max_note_events=min(100, remaining),
-                            max_assets=remaining,
+                            max_note_events=max(1, len(pitch_events) or 500),
+                            max_assets=source_asset_budget,
                             pitch_candidates=record.get("pitch_candidates"),
                             expected_source_sha256=record.get("source_sha256"),
                             source_metadata=record.get("filename_metadata"),
+                            cancel_event=self._cancel_event,
                         )
                         extracted_sample += result["sample_mode_count"]
                         extracted_melody_notes += result.get("melody_note_mode_count", 0)
@@ -757,6 +1050,8 @@ class LibraryManagerApp:
                                 "error": "Не обнаружены надёжные кандидаты pitch-events; WAV не создан.",
                             })
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": str(source),
                             "stage": "SAMPLE_MELODY_EXTRACTION",
@@ -768,13 +1063,19 @@ class LibraryManagerApp:
                     "error": "Физическое извлечение пропущено: оператор не подтвердил гитарный источник.",
                 })
 
+            if self._cancel_event.is_set():
+                raise RuntimeError("Полный цикл остановлен до финализации; исходные файлы не изменены.")
+
             report_progress("ЭТАП 7/8: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
             finalization_result = finalize_library_audit(
                 samples, STAGING_ROOT,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
-            report_progress("ЭТАП 8/8: проверка и сборка plugin_asset_catalog для всех 10 режимов VST3.")
+            if self._cancel_event.is_set():
+                raise RuntimeError("Полный цикл остановлен до сборки каталога; исходные файлы не изменены.")
+
+            report_progress("ЭТАП 8/8: проверка и сборка каталога по 10 категориям подготовленной библиотеки для VST3.")
             catalog_path = Path(analysis_result["report_directory"]) / "plugin_asset_catalog.json"
             catalog_result = build_plugin_asset_catalog(
                 STAGING_ROOT,
@@ -799,13 +1100,13 @@ class LibraryManagerApp:
                 "deep_analysis": analysis_result,
                 "physical_extraction": {
                     "long_recording_region_wav_count": extracted_region,
-                    "pattern_mode_wav_count": extracted_pattern,
+                    "pattern_instrument_wav_count": extracted_pattern,
                     "chord_and_power_chord_wav_count": extracted_chord,
                     "sample_mode_wav_count": extracted_sample,
                     "melody_mode_single_note_bindings": extracted_melody_notes,
                     "melody_mode_phrase_wav_count": extracted_melody,
                     "total_new_wav_candidates": extracted_region + extracted_pattern + extracted_chord + extracted_sample + extracted_melody,
-                    "global_asset_limit": max_total_assets,
+                    "extraction_batching": "CHUNKED_PER_ENGINE_NO_GLOBAL_500_ASSET_CAP",
                     "manifest_count_in_staging": finalization_result["staging"]["manifests_checked"],
                     "failures": extraction_failures,
                     "review_status": "NEEDS_MUSICAL_REVIEW",
@@ -914,7 +1215,7 @@ class LibraryManagerApp:
                 "plugin_asset_catalog", "plugin_library_coverage"
             ) + ".json")
             structure_result = write_library_structure(output, structure_output, coverage_output)
-            chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+            chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             return {
                 "plugin_asset_catalog": catalog_result,
                 "performance_manifest": performance_result,
@@ -931,20 +1232,20 @@ class LibraryManagerApp:
             }
 
         self._write("=== СБОРКА КАТАЛОГА ДЛЯ VST3 ===")
-        self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и все 10 режимов. Непроверенные WAV не становятся playable.")
+        self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и 10 категорий назначения ассетов для VST3. Непроверенные WAV не становятся playable.")
         self._background("Сборка каталога VST3", work)
 
     def open_chromatic_pitch_map(self) -> None:
-        """Show the shared 12-tone map and explain Auto Chords enharmonic aliases."""
+        """Show the 12-tone data map used by AutoChords inside the VST3 PATTERN mode."""
         sharp = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="sharp"))
         flat = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="flat"))
         messagebox.showinfo(
-            "PPGU — 12 нот / Auto Chords",
-            "Все 12 хроматических высот сохраняются и доступны для исполнения.\\n\\n"
-            f"Диезы: {sharp}\\n\\nБемоли: {flat}\\n\\n"
-            "Энгармонические названия объединяются в один pitch class: C# = Db, D# = Eb, F# = Gb и т. д.\\n"
-            "E и F — разные ноты.\\n\\n"
-            "Auto Chords использует ту же карту высот. Названия-дубликаты объединяются, "
+            "PPGU — 12-нотная карта для AutoChords внутри PATTERN",
+            "Все 12 хроматических высот сохраняются и доступны для исполнения.\n\n"
+            f"Диезы: {sharp}\n\nБемоли: {flat}\n\n"
+            "Энгармонические названия объединяются в один pitch class: C# = Db, D# = Eb, F# = Gb и т. д.\n"
+            "E и F — разные ноты.\n\n"
+             "В VST3 AutoChords открывается внутри PATTERN и использует ту же карту высот. Названия-дубликаты объединяются, "
             "но хроматические ноты не удаляются. Непроверенные WAV и fallback не допускаются автоматически."
         )
 
@@ -964,8 +1265,8 @@ class LibraryManagerApp:
         if not catalogs:
             messagebox.showinfo(
                 "Sample Browser",
-                "Каталог VST3 ещё не создан. Сначала выполните полный цикл подготовки "
-                "или нажмите «Сформировать каталог VST3».",
+                "Каталог ассетов для VST3 ещё не создан. Сначала выполните START HUNTING "
+                "или выберите «Собрать каталог ассетов PPGU» в меню BUILD LIBRARY.",
             )
             return
         catalog_path = catalogs[0]
@@ -976,15 +1277,16 @@ class LibraryManagerApp:
             return
 
         window = tk.Toplevel(self.root)
-        window.title("POP PUNK GUITAR ULTIMATE — Sample Browser / VST3 Modes")
+        window.title("POP PUNK GUITAR ULTIMATE — Sample Browser / подготовленные категории библиотеки")
         window.geometry("1120x650")
+        window.configure(bg=NEON_STAGE_THEME["palette"]["window_bg"])
         window.transient(self.root)
         frame = ttk.Frame(window, padding=10)
         frame.pack(fill="both", expand=True)
 
         top = ttk.Frame(frame)
         top.pack(fill="x")
-        ttk.Label(top, text="Режим VST3:").pack(side="left")
+        ttk.Label(top, text="Категория назначения для VST3:").pack(side="left")
         mode_var = tk.StringVar(value=MODE_ORDER[0])
         mode_box = ttk.Combobox(
             top, textvariable=mode_var, values=list(MODE_ORDER),
@@ -1008,8 +1310,20 @@ class LibraryManagerApp:
             tree.heading(column, text=label)
             tree.column(column, width=width, anchor="w")
         tree.pack(fill="both", expand=True, pady=(8, 6))
+        tree.tag_configure("candidate", foreground=NEON_STAGE_THEME["palette"]["warning"])
+        tree.tag_configure("staged", foreground=NEON_STAGE_THEME["palette"]["accent"])
+        tree.tag_configure("playable", foreground=NEON_STAGE_THEME["palette"]["success"])
+        tree.tag_configure("pattern_instrument", foreground=NEON_STAGE_THEME["palette"]["accent_purple"])
 
-        details = tk.Text(frame, height=7, wrap="word", font=("Consolas", 9))
+        details = tk.Text(
+            frame, height=7, wrap="word", font=("Consolas", 9),
+            bg=NEON_STAGE_THEME["palette"]["lowlight"],
+            fg=NEON_STAGE_THEME["palette"]["lcd_text"],
+            insertbackground=NEON_STAGE_THEME["palette"]["accent_glow"],
+            selectbackground=NEON_STAGE_THEME["palette"]["control_face"],
+            relief="flat", highlightthickness=1,
+            highlightbackground=NEON_STAGE_THEME["palette"]["control_border"],
+        )
         details.pack(fill="x")
         item_records = {}
 
@@ -1030,24 +1344,33 @@ class LibraryManagerApp:
                 )
                 row_id = tree.insert("", "end", values=values, tags=("candidate",))
                 item_records[row_id] = candidate
-            for asset in selected_mode.get("assets", []):
+            for asset in browser_assets_for_mode(catalog, mode_var.get()):
+                is_pattern_instrument = asset.get("playable_in_pattern_instrument") is not None
+                asset_kind = "PATTERN INSTRUMENT" if is_pattern_instrument else asset.get("kind", "STAGED_WAV")
                 values = (
-                    asset.get("kind", "STAGED_WAV"),
+                    asset_kind,
                     asset.get("review_status", "NEEDS_MUSICAL_REVIEW"),
                     asset.get("license_status", "UNREVIEWED"),
                     asset.get("duration_seconds", ""),
                     asset.get("asset_id", ""),
                 )
-                row_id = tree.insert("", "end", values=values,
-                                     tags=("playable" if asset.get("playable") else "staged",))
+                if is_pattern_instrument:
+                    row_tag = "pattern_instrument"
+                else:
+                    row_tag = "playable" if asset.get("playable") else "staged"
+                row_id = tree.insert("", "end", values=values, tags=(row_tag,))
                 item_records[row_id] = asset
             details.delete("1.0", "end")
             details.insert("end", json.dumps({
-                "mode": selected_mode.get("mode"),
+                "plugin_target_category": selected_mode.get("mode"),
                 "status": selected_mode.get("status"),
                 "assets": selected_mode.get("asset_count", 0),
                 "playable_assets": selected_mode.get("playable_asset_count", 0),
                 "analysis_candidates": selected_mode.get("candidate_count", 0),
+                "pattern_instrument_assets": (
+                    len(catalog.get("pattern_instrument_assets", []))
+                    if mode_var.get() == "PATTERN MODE" else 0
+                ),
                 "description": selected_mode.get("description", ""),
             }, ensure_ascii=False, indent=2))
 
@@ -1223,6 +1546,7 @@ class LibraryManagerApp:
         window = tk.Toplevel(self.root)
         window.title("Очередь ручной проверки — Staging")
         window.geometry("960x460")
+        window.configure(bg=NEON_STAGE_THEME["palette"]["window_bg"])
         window.transient(self.root)
         frame = ttk.Frame(window, padding=10)
         frame.pack(fill="both", expand=True)
@@ -1347,8 +1671,9 @@ class LibraryManagerApp:
         if evidence is None:
             return
         mode_text = simpledialog.askstring(
-            "Назначение режимов Manager / VST3",
-            "Укажите только подтверждённые вами разделы через запятую. "
+            "Категории назначения библиотеки для VST3",
+            "Укажите только подтверждённые категории подготовленной библиотеки через запятую. "
+            "Это не режимы Manager; музыкальные режимы плагина — MELODY и PATTERN. "
             "Можно оставить пустым, если назначение пока неизвестно.\n\n"
             + ", ".join(MODE_ORDER),
             parent=self.root,
@@ -1359,7 +1684,7 @@ class LibraryManagerApp:
         invalid_modes = [item for item in selected_modes if item not in MODE_ORDER]
         if invalid_modes:
             messagebox.showerror(
-                "Назначение режимов",
+                "Категории библиотеки VST3",
                 "Неизвестные разделы: " + ", ".join(invalid_modes)
                 + "\nДопустимые значения: " + ", ".join(MODE_ORDER),
                 parent=self.root,
@@ -1368,7 +1693,7 @@ class LibraryManagerApp:
         if not messagebox.askyesno(
             "Подтверждение REVIEWED",
             "Подтверждаете, что лично прослушали WAV, проверили музыкальное содержимое и границы, "
-            "а также корректность выбранных назначений режимов?",
+            "а также корректность выбранных категорий назначения для библиотеки VST3?",
             parent=self.root,
         ):
             return
@@ -1490,7 +1815,7 @@ class LibraryManagerApp:
             messagebox.showerror("Папка Samples", str(exc))
             return
         def progress(message: str) -> None:
-            self._worker_events.put(("progress", message))
+            self._queue_progress(message)
         self._background(
             "Финализация библиотеки",
             lambda: finalize_library_audit(
@@ -1501,42 +1826,38 @@ class LibraryManagerApp:
         )
 
     def distribute(self) -> None:
+        """Automatically distribute all independently verified approved assets."""
         try:
             samples = self._samples()
         except Exception as exc:
             messagebox.showerror("Папка Samples", str(exc))
             return
-        selected = filedialog.askopenfilenames(
-            title="Выберите проверенные JSON-манифесты из LibraryManager/staging",
-            initialdir=str(STAGING_ROOT),
-            filetypes=[("JSON manifests", "*.json")],
-        )
-        if not selected:
+        manifests_dir = STAGING_ROOT / "manifests"
+        manifest_count = len(list(manifests_dir.glob("*.json"))) if manifests_dir.is_dir() else 0
+        if manifest_count == 0:
+            messagebox.showinfo("FACTORY", "В staging пока нет манифестов для распределения.")
             return
-        manifests = [Path(item) for item in selected]
-        try:
-            plan = distribution_plan(manifests, samples, STAGING_ROOT)
-        except Exception as exc:
-            messagebox.showerror("План распределения", str(exc))
-            return
-        preview = "\n".join(
-            f'{entry["category_path"]}\n  {entry["source_path"]}\n  → {entry["destination_path"]}'
-            for entry in plan["entries"]
-        )
-        self._write("ПЛАН РАСПРЕДЕЛЕНИЯ (пока без изменений):\n" + preview)
         if not messagebox.askyesno(
-            "Подтверждение копирования",
-            f"Будет скопировано файлов: {len(plan['entries'])}.\n"
-            "Каждый файл и манифест прошёл проверку review/license/SHA-256.\n"
-            "Оригиналы останутся на месте.\n\nВыполнить копирование в FACTORY?"
+            "Автоматическое распределение FACTORY",
+            f"Менеджер автоматически проверит все {manifest_count} манифестов.\n"
+            "Будут скопированы только кандидаты с подтверждённой музыкальной проверкой, "
+            "разрешённой лицензией, целыми SHA-256 и корректными PCM WAV/границами.\n"
+            "Повреждённые, недоступные и неподтверждённые записи будут внесены в отчёт, "
+            "а обработка продолжится со следующими. Каждый WAV копируется отдельной транзакцией.\n"
+            "Оригиналы не перемещаются и не удаляются. Продолжить?",
         ):
-            self.status.set("Распределение отменено пользователем")
+            self.status.set("Автоматическое распределение отменено")
             return
-        self._background("Распределение FACTORY (транзакция)", lambda: distribute_assets_transactional(
-            plan, staging_root=STAGING_ROOT, approve=True,
-            journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
-            cancel_event=self._cancel_event,
-        ))
+
+        def work():
+            return auto_distribute_approved(
+                samples, STAGING_ROOT, approve=True,
+                journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
+                cancel_event=self._cancel_event,
+                progress=self._queue_progress,
+            )
+
+        self._background("Автоматическое распределение FACTORY", work)
 
     def audit_cleanup(self) -> None:
         try:
@@ -1593,7 +1914,9 @@ class LibraryManagerApp:
 
     def open_user_guide(self) -> None:
         """Open the numbered Russian quick-start guide in the default browser."""
-        guide = MANAGER_DIR / "PORTABLE_USER_GUIDE_RU.md"
+        guide = resource_file(
+            "PORTABLE_USER_GUIDE_RU.md", module_file=__file__, bundle_dir=BUNDLE_DIR
+        )
         if not guide.is_file():
             messagebox.showinfo("Инструкция", "Файл PORTABLE_USER_GUIDE_RU.md не найден рядом с приложением.")
             return

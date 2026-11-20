@@ -75,7 +75,7 @@ def review_manifest(
         raise ValueError("License approval requires a source, license name or evidence note")
     selected_modes = list(mode_assignments or [])
     if len(selected_modes) != len(set(selected_modes)) or any(mode not in MODE_ORDER for mode in selected_modes):
-        raise ValueError("mode_assignments must contain unique names from the ten approved Manager modes")
+        raise ValueError("mode_assignments must contain unique approved VST3 library target categories")
     if confirmed_midi_note is not None and (
         type(confirmed_midi_note) is not int or not 0 <= confirmed_midi_note <= 127
     ):

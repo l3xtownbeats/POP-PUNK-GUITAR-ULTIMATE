@@ -61,6 +61,71 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(self.wav.read_bytes()).hexdigest().upper(),
                          self.original_hash)
 
+
+    def test_quick_and_deep_scan_ignore_interrupted_import_temp_directories(self) -> None:
+        temp_dir = self.incoming / ".manager-import-tmp-interrupted"
+        temp_dir.mkdir()
+        partial = temp_dir / "partial.wav"
+        make_test_wav(partial)
+
+        quick = quick_scan(self.samples, reports_root=self.reports)
+        quick_csv = (
+            Path(quick["report_directory"]) / "quick_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertEqual(quick["files_found"], 1)
+        self.assertIn("guitar.wav", quick_csv)
+        self.assertNotIn("partial.wav", quick_csv)
+        self.assertTrue(partial.is_file())
+
+        deep = run_manager(
+            self.samples, reports_root=self.reports,
+            analyze_audio=False, guitar_source_confirmed=False,
+            write_virtual=False, workers=1,
+        )
+        deep_csv = (
+            Path(deep["report_directory"]) / "unified_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertIn("guitar.wav", deep_csv)
+        self.assertNotIn("partial.wav", deep_csv)
+        self.assertTrue(partial.is_file())
+
+    def test_quick_scan_default_reports_to_runtime_data_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data_root = Path(tmp) / "UserData"
+            module_root = Path(tmp) / "bundle"
+            with patch(
+                "unified_manager.resolve_runtime_paths",
+                return_value=(module_root, data_root, True),
+            ):
+                result = quick_scan(self.samples)
+            report_dir = Path(result["report_directory"])
+            self.assertEqual(report_dir.parent, data_root / "reports")
+            self.assertTrue((data_root / "reports").is_dir())
+
+    def test_deep_scan_uses_runtime_reports_cache_and_staging_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data_root = Path(tmp) / "UserData"
+            module_root = Path(tmp) / "bundle"
+            expected_staging = data_root / "staging"
+            expected_staging.mkdir(parents=True)
+            index_result = {"assignment_count": 0, "status": "NO_REVIEWED_ASSETS", "assignments": []}
+            with patch(
+                "unified_manager.resolve_runtime_paths",
+                return_value=(module_root, data_root, True),
+            ), patch(
+                "unified_manager.runtime_staging_root",
+                return_value=expected_staging,
+            ) as staging_root, patch(
+                "unified_manager.build_mode_assignment_index",
+                return_value=index_result,
+            ) as build_index:
+                result = run_manager(self.samples)
+            report_dir = Path(result["report_directory"])
+            self.assertEqual(report_dir.parent, data_root / "reports")
+            self.assertTrue((data_root / "reports" / "scan_cache.sqlite3").is_file())
+            staging_root.assert_called_once()
+            build_index.assert_called_once_with(expected_staging)
+
     def test_quick_scan_reports_empty_import_folder_as_completed(self) -> None:
         self.wav.unlink()
         messages = []
@@ -71,6 +136,35 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertEqual(summary["directory_errors"], 0)
         self.assertEqual(summary["directories_scanned"], 1)
         self.assertTrue(any("БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО" in item for item in messages))
+
+    def test_quick_scan_skips_unreadable_nested_folder_and_finishes(self) -> None:
+        locked = self.incoming / "locked"
+        locked.mkdir()
+        make_test_wav(locked / "hidden.wav")
+        healthy = self.incoming / "healthy.wav"
+        make_test_wav(healthy)
+        import os
+        real_scandir = os.scandir
+
+        def guarded_scandir(path):
+            if Path(path) == locked:
+                raise PermissionError("simulated nested folder access denied")
+            return real_scandir(path)
+
+        with patch("unified_manager.os.scandir", side_effect=guarded_scandir):
+            summary = quick_scan(
+                self.samples, reports_root=self.reports,
+            )
+
+        self.assertEqual(summary["files_found"], 1)
+        self.assertEqual(summary["directory_errors"], 1)
+        self.assertEqual(summary["directory_error_details"][0]["path"], str(locked))
+        report_dir = Path(summary["report_directory"])
+        errors = json.loads((report_dir / "quick_errors.json").read_text(encoding="utf-8"))
+        self.assertEqual(errors["directory_errors"][0]["stage"], "QUICK_DIRECTORY_SCAN")
+        inventory = (report_dir / "quick_inventory.csv").read_text(encoding="utf-8-sig")
+        self.assertIn("healthy.wav", inventory)
+        self.assertNotIn("hidden.wav", inventory)
 
     def test_quick_scan_fails_clearly_when_import_root_is_unreadable(self) -> None:
         import os
@@ -85,6 +179,55 @@ class UnifiedManagerTests(unittest.TestCase):
         with patch("unified_manager.os.scandir", side_effect=guarded_scandir):
             with self.assertRaisesRegex(OSError, "Не удаётся прочитать входную папку"):
                 quick_scan(self.samples, reports_root=self.reports)
+
+    def test_unreadable_file_is_recorded_and_scan_continues_to_next_file(self) -> None:
+        broken = self.incoming / "locked.wav"
+        shutil.copyfile(self.wav, broken)
+        healthy = self.incoming / "healthy.wav"
+        shutil.copyfile(self.wav, healthy)
+        real_open = Path.open
+
+        def guarded_open(path, *args, **kwargs):
+            if path.name == "locked.wav" and args and args[0] == "rb":
+                raise PermissionError("simulated locked source")
+            return real_open(path, *args, **kwargs)
+
+        with patch.object(Path, "open", guarded_open):
+            summary = run_manager(self.samples, reports_root=self.reports)
+
+        report_dir = Path(summary["report_directory"])
+        inventory = (report_dir / "unified_inventory.csv").read_text(encoding="utf-8-sig")
+        errors = json.loads((report_dir / "unified_errors.json").read_text(encoding="utf-8"))
+        self.assertIn("locked.wav", inventory)
+        self.assertIn("FILE_READ_ERROR", inventory)
+        self.assertIn("healthy.wav", inventory)
+        self.assertTrue(any(item.get("path") == "locked.wav" for item in errors))
+        self.assertEqual(summary["files_scanned"], 3)
+        self.assertTrue(broken.exists())
+        self.assertTrue(healthy.exists())
+
+    def test_deep_scan_path_key_does_not_resolve_offline_files(self) -> None:
+        locked = self.incoming / "offline.wav"
+        shutil.copyfile(self.wav, locked)
+        healthy = self.incoming / "healthy.wav"
+        shutil.copyfile(self.wav, healthy)
+        real_resolve = Path.resolve
+
+        def guarded_resolve(path, *args, **kwargs):
+            if path.name == "offline.wav":
+                raise OSError("simulated offline path resolution failure")
+            return real_resolve(path, *args, **kwargs)
+
+        with patch.object(Path, "resolve", guarded_resolve):
+            summary = run_manager(self.samples, reports_root=self.reports)
+
+        inventory = (
+            Path(summary["report_directory"]) / "unified_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertIn("offline.wav", inventory)
+        self.assertIn("FILE_READ_ERROR", inventory)
+        self.assertIn("healthy.wav", inventory)
+        self.assertEqual(summary["files_scanned"], 3)
 
     def test_inventory_sfz_and_exact_duplicates(self) -> None:
         duplicate = self.incoming / "copy.wav"

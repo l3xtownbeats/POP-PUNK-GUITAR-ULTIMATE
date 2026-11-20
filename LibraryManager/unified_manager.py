@@ -3,7 +3,7 @@
 
 Combines inventory/SHA-256/WAV metadata/SFZ audit with the existing acoustic,
 rhythm, repeated-pattern and optional virtual-range analyzers. Original assets
-are read-only. Derived reports live under LibraryManager/reports; virtual
+are read-only. Derived reports live under the resolved persistent runtime data directory; virtual
 sidecars are opt-in and live under Import Sample Guitar.
 """
 from __future__ import annotations
@@ -30,8 +30,9 @@ from other_audit import audit_other_library
 from pattern_engine_schema import build_pattern_engine_manifest, validate_pattern_engine_manifest
 from mode_sorter import build_mode_sorting_report
 from mode_assignment_index import build_mode_assignment_index
+from app_paths import resolve_runtime_paths, runtime_staging_root
 
-VERSION = "3.0.0-dev6"
+VERSION = "3.0.0-dev9"
 SUPPORTED = AUDIO_EXT | {".sfz"} | ARCHIVE_EXT
 # Non-audio production assets are excluded immediately from all scan/analyze queues.
 # Source files are never deleted or moved; this is an analysis-only filter.
@@ -86,6 +87,13 @@ def resolve_samples_root(selected_path: Path) -> Path:
 def _is_excluded(path: Path) -> bool:
     return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
 
+def _absolute_path_key(path: Path | str) -> str:
+    """Create a stable lexical path key without touching a possibly offline file."""
+    try:
+        return os.path.normcase(os.path.abspath(os.fspath(path)))
+    except (OSError, TypeError, ValueError):
+        return str(path).casefold()
+
 
 def _is_manager_virtual_metadata(path: Path) -> bool:
     """Recognize sidecars created by the manager, not importable audio assets."""
@@ -138,7 +146,8 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
     )
     if incoming is None:
         raise FileNotFoundError(f"Не найдена папка Import Sample Guitar внутри {samples_root}")
-    report_base = (reports_root or (Path(__file__).resolve().parent / "reports")).expanduser().resolve()
+    report_data_root = resolve_runtime_paths(__file__)[1]
+    report_base = (reports_root or (report_data_root / "reports")).expanduser().resolve()
     report_base.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     report_dir = report_base / f"quick_scan_{run_id}"
@@ -159,6 +168,7 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
     files_found = 0
     stat_errors = 0
     directory_errors = 0
+    directory_error_details: list[dict[str, str]] = []
     directories_scanned = 0
     stack = [incoming]
     csv_path = report_dir / "quick_inventory.csv"
@@ -176,6 +186,8 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
                             raise RuntimeError("Быстрое сканирование остановлено пользователем.")
                         try:
                             if entry.is_dir(follow_symlinks=False):
+                                if entry.name.startswith(".manager-import-tmp-"):
+                                    continue
                                 stack.append(Path(entry.path))
                                 continue
                             if not entry.is_file(follow_symlinks=False):
@@ -227,6 +239,11 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
             except OSError as exc:
                 directory_errors += 1
                 directories_scanned += 1
+                directory_error_details.append({
+                    "path": str(folder),
+                    "stage": "QUICK_DIRECTORY_SCAN",
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
                 emit(f"[ОШИБКА ПАПКИ] Не удалось прочитать {folder}: {type(exc).__name__}: {exc}")
                 if folder.resolve() == incoming.resolve():
                     raise OSError(
@@ -243,6 +260,7 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "directories_scanned": directories_scanned,
         "stat_errors": stat_errors,
         "directory_errors": directory_errors,
+        "directory_error_details": directory_error_details,
         "total_bytes": total_bytes,
         "formats": dict(sorted(counts.items())),
         "excluded_non_audio_files": sum(excluded_counts.values()),
@@ -257,6 +275,10 @@ def quick_scan(samples_root: Path, *, reports_root: Path | None = None,
         "next_stage": "DEEP_INVENTORY_AND_ANALYSIS",
     }
     _write_json(report_dir / "quick_summary.json", summary)
+    _write_json(report_dir / "quick_errors.json", {
+        "directory_errors": directory_error_details,
+        "stat_error_count": stat_errors,
+    })
     emit(
         f"БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО: {files_found:,} файлов за {elapsed:.2f} сек.; "
         f"ошибок метаданных: {stat_errors}. Отчёт: {report_dir}"
@@ -290,8 +312,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     if write_virtual and not (analyze_audio and guitar_source_confirmed):
         raise ValueError("--write-virtual-index requires --analyze-audio and --guitar-source-confirmed")
 
-    manager_root = Path(__file__).resolve().parent
-    report_base = (reports_root or (manager_root / "reports")).expanduser().resolve()
+    report_data_root = resolve_runtime_paths(__file__)[1]
+    report_base = (reports_root or (report_data_root / "reports")).expanduser().resolve()
     report_base.mkdir(parents=True, exist_ok=True)
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     reports = report_base / f"run_{run_id}"
@@ -320,6 +342,8 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                         raise RuntimeError("Глубокая инвентаризация остановлена пользователем при обходе папок.")
                     try:
                         if entry.is_dir(follow_symlinks=False):
+                            if entry.name.startswith(".manager-import-tmp-"):
+                                continue
                             directory_stack.append(Path(entry.path))
                         elif entry.is_file(follow_symlinks=False):
                             candidate = Path(entry.path)
@@ -595,12 +619,23 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
                 size = stat.st_size
             except OSError:
                 size = ""
-            relative = str(path.relative_to(incoming))
+            # Avoid resolving/stat'ing the failed path again while building
+            # its error row: network drives and ACL failures can make even a
+            # second metadata lookup fail. The lexical absolute path is enough
+            # for an auditable per-file failure record.
+            try:
+                relative = str(path.relative_to(incoming))
+            except (ValueError, OSError):
+                relative = path.name
+            try:
+                source_path = str(path.absolute())
+            except OSError:
+                source_path = str(path)
             return {
                 "row": {
                     "relative_path": relative, "filename": path.name,
                     "extension": path.suffix.lower(), "bytes": size, "sha256": "",
-                    "source_path": str(path.resolve()), "source_modified_by_manager": False,
+                    "source_path": source_path, "source_modified_by_manager": False,
                     "hash_source": "ERROR", "category_suggestion": "MANUAL_REVIEW_REQUIRED",
                     "audio_analysis_status": "FILE_READ_ERROR",
                     "classification_status": "MANUAL_REVIEW_REQUIRED",
@@ -631,14 +666,14 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         if index % 25 == 0:
             emit(f"Приоритетный разбор SFZ: {index}/{len(sfz_files)}…")
     sfz_referenced = {
-        str(Path(str(row.get("resolved_sample") or "")).resolve()).casefold()
+        _absolute_path_key(str(row.get("resolved_sample") or ""))
         for row in sfz_rows if row.get("status") == "FOUND" and row.get("resolved_sample")
     }
     supported_files = sorted(
         included,
         key=lambda p: (
             0 if p.suffix.lower() == ".sfz" else
-            1 if str(p.resolve()).casefold() in sfz_referenced else
+            1 if _absolute_path_key(p) in sfz_referenced else
             2 if p.suffix.lower() in AUDIO_EXT else 3,
             str(p).casefold(),
         ),
@@ -762,7 +797,7 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
     mode_sorting = build_mode_sorting_report(audio_reports)
     # Separate index of explicitly human-reviewed staged assets. This connects
     # manual mode assignments to the same ten queues without trusting hypotheses.
-    mode_assignment_index = build_mode_assignment_index(manager_root / "staging")
+    mode_assignment_index = build_mode_assignment_index(runtime_staging_root(__file__))
     mode_candidate_counts = {
         item["mode"]: item["candidate_count"] for item in mode_sorting["modes"]
     }

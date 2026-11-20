@@ -29,6 +29,15 @@ class TaskJournalTests(unittest.TestCase):
             self.assertEqual(state["last_event"], "FAILED")
             self.assertIn("decoder failed", state["details"]["error"])
 
+    def test_cancelled_task_is_not_recorded_as_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = TaskJournal(Path(directory) / "tasks.jsonl")
+            task_id = journal.start("Deep Analysis")
+            journal.cancel(task_id, "Deep Analysis", "user requested stop")
+            state = journal.latest_states()[task_id]
+            self.assertEqual(state["last_event"], "CANCELLED")
+            self.assertEqual(state["details"]["reason"], "user requested stop")
+
     def test_malformed_trailing_record_does_not_hide_previous_history(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "tasks.jsonl"
@@ -38,6 +47,16 @@ class TaskJournalTests(unittest.TestCase):
                 stream.write('{"schema_version":')
             self.assertEqual(len(journal.history()), 1)
             self.assertEqual(journal.latest_states()[task_id]["last_event"], "STARTED")
+
+    def test_progress_is_flushed_without_forcing_a_disk_sync(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            journal = TaskJournal(Path(directory) / "tasks.jsonl")
+            task_id = journal.start("Scan")
+            with patch("task_journal.os.fsync") as sync:
+                journal.progress(task_id, "Scan", "100 files")
+                sync.assert_not_called()
+            self.assertEqual(journal.history()[-1]["details"]["message"], "100 files")
 
     def test_history_limit_returns_newest_records(self):
         with tempfile.TemporaryDirectory() as directory:

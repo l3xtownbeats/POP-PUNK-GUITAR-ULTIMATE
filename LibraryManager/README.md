@@ -1,8 +1,23 @@
-# POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
+# AUTO SOUND HUNTER MANAGER 3.0
 
-## Library Manager 3.0.0-dev5 — integrated multi-mode library preparation
+## PROJECT BASELINE STATUS — ONE EQUIVALENT MEANING
 
-This is a read-only inventory and SFZ audit stage. It never moves, renames, deletes, rewrites, or overwrites source audio or SFZ files.
+Throughout this project, **BASE / БАЗА**, **APPROVED / УТВЕРЖДЕНО**, **FIXED / ЗАФИКСИРОВАНО**, **CONFIRMED / ПОДТВЕРЖДЕНО**, **ACCEPTED / ПРИНЯТО**, **FINAL**, and **LOCKED** all mean the same thing: the user has approved and frozen the decision as part of the binding project baseline. Explicit user statements such as “I approve this”, “оставляем так”, and “это окончательный вариант” have the same force.
+
+Do not reinterpret, redesign, replace, or remove a baseline decision without the user's explicit authorization. New approved decisions are added to the baseline. If a new request appears to conflict with an existing baseline decision, pause and ask the user to resolve the conflict before changing it.
+
+
+> **PRODUCT BOUNDARY — APPROVED / FINAL / LOCKED**
+>
+> AUTO SOUND HUNTER MANAGER 3.0 is a standalone Windows application that imports, scans, analyzes, sorts and processes guitar sample sources, then builds a structured sample library for the separate POP PUNK GUITAR ULTIMATE VST3 instrument.
+>
+> The VST3 plugin consumes the prepared library and performs guitar playback. MELODY and PATTERN are the plugin's two main modes; AutoChords is an auxiliary window inside PATTERN. These are **plugin features only**. They are not Manager modes, tabs or dashboard actions. Manager only prepares the library data needed by the plugin.
+>
+> This boundary must not be changed without the user's explicit approval.
+
+## Manager 3.0.0-dev9 — six primary dashboard actions and supporting tools
+
+This release line contains the six-stage Manager workflow: IMPORT GUITAR, SCAN LIBRARY, START HUNTING, REVIEW QUEUE, BUILD LIBRARY and VERIFY / RECOVERY. Source audio remains read-only during import, scan and analysis; approved Factory distribution is a separate, explicit, verified copy operation.
 
 ### Required library layout
 
@@ -22,9 +37,19 @@ Keep this as the single approved Samples root. Put new incoming WAV, SFZ and arc
 3. Put incoming WAV, SFZ and archive files inside `Samples/Import Sample Guitar`.
 4. Double-click `RUN_LIBRARY_MANAGER.bat`.
 
-Python 3.10+ is required. The scanner uses only the Python standard library.
+Windows 10 x64 is the target platform. For source development, use Python 3.11 and install `requirements.txt`; the Windows packaging workflow also installs `requirements-build.txt`. The packaged application is intended to include its runtime and must not require a separate Python installation.
 
-### Reports
+### Build the Windows x64 Portable package
+
+On a Windows 10/11 x64 build machine with Python 3.11 installed, open this folder and run `BUILD_PORTABLE_WINDOWS.bat`. The script installs the pinned project/runtime build requirements, compiles the modules, runs the Manager regression suite, builds the self-contained PyInstaller onedir application, performs a Portable-mode startup smoke test, and creates:
+
+`dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip`
+
+The ZIP is the Portable deliverable. Extract the complete folder before launching `POP_PUNK_GUITAR_LIBRARY_MANAGER.exe`; do not run the EXE from inside the ZIP. The first launch creates `UserData` next to the application when writable, or uses the documented LocalAppData fallback when the application directory is read-only. Keep the whole extracted folder together when moving it to another drive or PC.
+
+The script also builds the Inno Setup installer when Inno Setup 6 is installed. A package is considered verified only after the script exits successfully and the resulting ZIP is tested on Windows 10 x64. Source checkout or a successful documentation commit is not a Portable build.
+
+## Reports
 
 Reports are written beside the tool in `reports/`:
 - `inventory.csv` — file inventory, SHA-256, WAV header metadata and conservative filename hints.
@@ -45,15 +70,20 @@ Reports are written beside the tool in `reports/`:
 
 ### Tests
 
-The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compiles the Python modules and runs SFZ regression tests on Windows with Python 3.11.
+The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compiles the Manager Python modules and runs the full `unittest` regression suite on Ubuntu with Python 3.11. The separate Windows workflow builds and smoke-tests Portable ZIP and Installer EXE. A workflow definition is not proof of a successful run; check the latest CI result before calling a build verified.
 
-### Safety
+### IMPORT GUITAR — verified, non-destructive ingest
 
-- Original files are never changed.
+IMPORT GUITAR copies selected files/folders into a unique `IMPORT_BATCH_...` directory under the active `Samples/Import Sample Guitar` root. Each copied file is checked against its source with SHA-256 and original metadata/provenance are registered. Original files are never modified, moved, renamed or deleted. A failed batch is rolled back. Re-importing an unchanged registered folder reuses its verified copy; when any file in that folder changes or is added, a new complete folder package is copied so SFZ relative dependencies remain together. Previous import batches are retained for comparison/recovery and both versions remain visible to SCAN LIBRARY until reviewed. Archives remain opaque files and are not automatically extracted. The resulting copies are the inputs consumed by SCAN LIBRARY and START HUNTING.
+
+### Safety and controlled distribution
+
+- Import, registration, scanning, analysis, extraction, audition and FACTORY distribution do not modify, rename, move or delete original source files.
 - Automatic filename hints are not treated as final musical classification.
-- Archives are inventoried only; they are not extracted.
-- Unsupported files are skipped, not deleted.
-- Copy/sort mode remains a separate future stage requiring preview, collision checks, checksum verification, a transaction journal and rollback.
+- Archives are registered/inventoried only; they are not automatically extracted.
+- Unsupported files are skipped and reported, not deleted.
+- FACTORY distribution is implemented as a separate explicit operation. It validates review and license approval, provenance, source/derived hashes, WAV format and sample boundaries; it rejects destination collisions, copies transactionally, journals each operation and rolls back files created by a failed batch.
+- Distribution remains confirmation-gated; unreviewed or unlicensed candidates stay in staging. Original-source cleanup is a separate destructive operation that requires a completed dependency audit and two explicit user confirmations. It is not part of ordinary import, scan, analysis or distribution.
 
 
 ## Critical rule: duplicates are not the same as similar sounds
@@ -62,7 +92,7 @@ The Library Manager must distinguish exact file duplicates from similar guitar t
 
 The current exact-duplicate report uses SHA-256 identity and reports identical bytes; it does not delete anything. Any future perceptual near-duplicate detector must produce review-only candidates and must not perform automatic cleanup. Timbre similarity, rhythmic similarity, melodic/interval similarity, chord-sequence similarity and performance similarity must be represented as separate relationship dimensions. See [DUPLICATE_AND_SIMILARITY_POLICY.md](../docs/DUPLICATE_AND_SIMILARITY_POLICY.md) for the mandatory rules.
 
-## Required preparation for MELODY MODE and PATTERN MODE
+## Preparing the library consumed by the VST3 plugin
 
 The Library Manager is responsible for preparing pitch-specific playable note material for the plugin; it must not merely catalogue a long source recording or assign one identical clip to every MIDI key.
 
@@ -78,7 +108,7 @@ The planned extraction/mapping stage must:
 
 The Manager's output is consumed by the plugin's per-key playback engine: MIDI key → pitch-specific approved note clip → independent voice playback. The plugin handles real-time note-on/note-off, polyphony and release; the Manager handles source analysis, extraction, metadata, review and mapping preparation.
 
-**Current implementation (2.4.0):** the optional full cycle now runs the physical extraction paths for pitch-specific Sample/Melody assets, repeated Pattern occurrences, and review-only chord/Power Chord sample candidates. Derived PCM WAVs and manifests are written only under LibraryManager/staging, then audited and indexed into the VST3 plugin asset catalog. Riff/Phrase remain review candidates unless the source evidence and musical review establish their identity. Chord analysis also feeds ARPEGGIO with bounded fretboard voicing hypotheses under an explicitly unconfirmed standard-tuning assumption. During explicit staged-asset review, the operator can assign one or more of the ten approved modes; this is how evidence-backed Strumming, Articulations and Ending material enters those queues without automatic guessing. Original source files remain read-only and are never moved or deleted by this workflow.
+**Current preparation pipeline (Manager 3.0):** the optional full cycle now runs the physical extraction paths for pitch-specific Sample/Melody assets, repeated Pattern occurrences, and review-only chord/Power Chord sample candidates. Derived PCM WAVs and manifests are written only under LibraryManager/staging, then audited and indexed into the VST3 plugin asset catalog. Riff/Phrase remain review candidates unless the source evidence and musical review establish their identity. Chord analysis also feeds ARPEGGIO with bounded fretboard voicing hypotheses under an explicitly unconfirmed standard-tuning assumption. During explicit staged-asset review, the operator can assign one or more of the ten prepared-library target categories for the separate VST3; this is how evidence-backed Strumming, Articulations and Ending material enters those queues without automatic guessing. These categories are library destinations, not Manager operating modes. Original source files remain read-only and are never moved or deleted by this workflow.
 
 
 ## Extract meaningful guitar patterns; keep full recordings optional
@@ -95,6 +125,10 @@ The Manager must not simply add every full WAV as the default asset. It must ins
 
 This does not make a full pattern or whole WAV the payload for ordinary MELODY MODE/PATTERN MODE key presses: those modes continue to use their individual pitch-specific note mappings. Full rhythm excerpts and whole takes remain separately selectable library assets for preview or other explicitly supported uses.
 
+
+
+**PATTERN is one main UI mode, not two tabs:** the PATTERN tab contains the chord-driven Pattern Instrument performance path, its pattern assets, and the AutoChords auxiliary window. The Manager also retains pitch-specific note clips for the approved one-key/one-note playback path within PATTERN. These are internal performance paths inside the single PATTERN mode, not additional main modes. Whole rhythm recordings are stored as PATTERN_INSTRUMENT assets; they are not confused with pitch-specific note clips.
+
 ## Approved instrument architecture reference
 
 The approved product direction follows the broad player-facing workflow of Native Instruments SESSION GUITARIST — ELECTRIC SUNBURST DELUXE, implemented with original code and legally distributable source material. The architecture has two complementary engines:
@@ -107,6 +141,12 @@ Do not create a third standalone CHORD/PERFORMANCE instrument: chord-driven patt
 The Manager must prepare both kinds of content: pitch-specific note assets/mappings for MELODY INSTRUMENT and note-playable PATTERN MODE; coherent rhythm/pattern/phrase assets plus reviewed chord/performance mapping candidates for PATTERN INSTRUMENT. It must preserve provenance, confidence and license/review state, and keep derived audio in staging until approval.
 
 **This is an approved target architecture, not a statement that the chord-performance engine, chord recognition, Pattern Browser, Key Switches or extraction pipeline are implemented.** See docs/KEYBOARD_PLAYBACK_SPEC.md, section 14, for the full requirements and acceptance criteria.
+
+
+
+### VST3 consumer contract — reference only, not Manager UI
+
+The PPGU instrument has exactly two main player-facing mode selectors: **MELODY** and **PATTERN**. **AutoChords is a supporting panel inside PATTERN**, opened from PATTERN with its additional-window button; it is not a third mode and must not appear as a standalone CHORD mode. The Manager's ten library-preparation categories remain unchanged and are not the plugin's main mode selector.
 
 ## 15. Two distinct playable content sets — PATTERN INSTRUMENT and MELODY INSTRUMENT
 
@@ -394,9 +434,9 @@ See [V1_8_RELEASE_NOTES_RU.md](V1_8_RELEASE_NOTES_RU.md) for implemented behavio
 История фоновых задач, этапов, успешных завершений и ошибок описана в [TASK_JOURNAL_RU.md](TASK_JOURNAL_RU.md). Журнал расположен в `LibraryManager/reports/task_history.jsonl` и не возобновляет прерванные операции автоматически.
 
 
-## VST3 integration catalog — Library Manager 2.4.0
+## VST3 integration catalog — Manager 3.0
 
-The full preparation cycle now produces a versioned `plugin_asset_catalog.json` after extraction and staging audit. The catalog contains all ten approved Manager/VST3 mode sections, analysis-only candidates, staged WAV references, source hashes, exact source sample offsets, pitch/chord hypotheses, articulation and velocity metadata where available, and explicit review/license/integrity states.
+The full preparation cycle now produces a versioned `plugin_asset_catalog.json` after extraction and staging audit. The catalog contains ten VST3 library target-category sections, analysis-only candidates, staged WAV references, source hashes, exact source sample offsets, pitch/chord hypotheses, articulation and velocity metadata where available, and explicit review/license/integrity states. The ten categories are not Manager performance modes.
 
 - SAMPLE MODE receives pitch-specific note clips plus review-only chord and Power Chord sample clips.
 - PATTERN MODE receives repeated-rhythm pattern clips and note-event zones that are explicitly marked for this note-playable mode.
@@ -407,17 +447,17 @@ The full preparation cycle now produces a versioned `plugin_asset_catalog.json` 
 
 The catalog's WAV paths are relative to the catalog file and resolve into `LibraryManager/staging`. It is a bridge contract for the future VST3 loader, not a compiled plugin or a packaged factory sound bank. A staged asset becomes runtime-playable only after its derived/source hashes and sample boundaries validate and its manifest contains explicit `REVIEWED` + `LICENSE_APPROVED` evidence. No automatic FACTORY promotion occurs.
 
-The GUI adds **Сформировать каталог VST3** and **Sample Browser / режимы VST3**. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
+The Manager adds the **Собрать каталог ассетов PPGU** action and the **Браузер подготовленных ассетов для VST3**. The browser filters library-preparation categories; it is not a Manager operating-mode selector. A full cycle also generates the catalog and a versioned `performance_manifest.json` automatically; the Performance Manifest contains asset bindings and a strict event contract, while its event timeline stays empty until reviewed musical timing data exists. See `docs/PPGU_PLUGIN_ASSET_CATALOG_RU.md` for the contract and mode mapping.
 
 
 ## Единая карта всех 12 нот и Auto Chords
 
-Manager 2.5.0 формирует единую хроматическую карту для будущего VST3:
+Manager 3.0 формирует единую хроматическую карту как часть подготовленной библиотеки и контракта для отдельного VST3:
 - все 12 pitch classes представлены отдельно и доступны в объявленном MIDI-диапазоне;
 - Sharp/Flat — два способа подписать одну высоту, а не разные ноты;
 - C# = Db, D# = Eb, F# = Gb, G# = Ab, A# = Bb;
 - E и F остаются двумя разными нотами;
-- Auto Chords использует ту же карту pitch class и объединяет только энгармонические дубликаты;
+- AutoChords внутри PATTERN отдельного VST3 использует эту карту pitch class и объединяет только энгармонические дубликаты;
 - хроматические ноты не удаляются из клавиатурного диапазона из-за выбранной тональности или текущего аккорда.
 
 При сборке каталога Manager экспортирует chromatic_pitch_map JSON и включает эту же карту в Performance Manifest для VST3. Точные sample mappings требуют подтверждённых MIDI-нот, лицензии и integrity status. Fallback для отсутствующего WAV записывается как предложение QA, а не как готовый runtime asset.
@@ -425,25 +465,25 @@ Manager 2.5.0 формирует единую хроматическую кар�
 **Граница реализации:** текущий репозиторий содержит Manager и manifests, но отдельного C++/JUCE VST3 playback source tree здесь пока нет. Поэтому карта и контракт подготовлены для плагина; реальное звучание каждой клавиши требует реализации VST3 playback/fallback engine и аудио-QA.
 
 
-## 3.0 development: reviewed multi-mode assignment index
+## 3.0 development: reviewed VST3 library-category assignment index
 
 The unified run now emits `reviewed_mode_assignment_index.json` beside the analysis-only `mode_sorting_report.json`. These are intentionally separate:
 - analysis report = evidence-backed hypotheses requiring listening review;
-- reviewed assignment index = explicit `mode_assignments` saved by the human review workflow, with WAV hash validation and per-mode runtime blockers.
+- reviewed assignment index = explicit `mode_assignments` saved by the human review workflow, with WAV hash validation and per-category VST3 runtime blockers.
 
-All ten approved modes are always represented. One staged WAV can be logically assigned to several modes without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
+All ten approved VST3 library target categories are always represented in the catalog. These categories are asset-preparation destinations, not Manager operating modes. One staged WAV can be logically assigned to several categories without physical duplication. An assignment is not automatically runtime-ready: the index checks musical review, license approval, derived WAV integrity, and mode-specific mapping gates. Unknown or missing evidence remains a blocker, never a fabricated note or articulation.
 
 Version 3.0 remains a development build until the complete Windows regression suite, portable package smoke test, real-library validation, and user-side workflow checks are successful.
 
-## Manager 3.0 — plugin library structure and coverage
+## Manager 3.0 — prepared VST3 library structure and coverage
 
-The **Сформировать каталог VST3** action now produces four coordinated artifacts beside the catalog:
-- `plugin_asset_catalog_*.json` — validated asset and ten-mode queues;
-- `plugin_library_structure_*.json` — logical library layout for SAMPLE, PATTERN and MELODY engines, with all ten Manager mode sections and provenance-linked asset references;
+The **Собрать каталог ассетов PPGU** action produces four coordinated artifacts beside the catalog:
+- `plugin_asset_catalog_*.json` — validated assets and ten VST3 library-category queues;
+- `plugin_library_structure_*.json` — logical library layout for the separate VST3's SAMPLE, PATTERN and MELODY engines, with ten prepared asset-category sections and provenance-linked asset references;
 - `plugin_library_coverage_*.json` — explicit coverage/gap report for 12 pitch classes, LOW/MEDIUM/HIGH velocity layers, confirmed techniques, Pattern event structure and Melody note/event timing;
 - `chromatic_pitch_map_*.json` and `performance_manifest_*.json` — shared chromatic mapping and runtime contract.
 
-The structure builder does not copy WAV files. One physical staged asset may be referenced from several modes by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
+The structure builder does not copy WAV files. One physical staged asset may be referenced from several VST3 library categories by stable asset ID. Techniques count as covered only when explicitly confirmed in reviewed metadata. Unknown velocity zones, note pitches, articulation labels, Pattern loop/grid fields and Melody event timing remain visible gaps. A runtime-ready row must pass musical review, license approval, integrity validation and the existing mode-specific playback gate. A structurally complete JSON does not mean the underlying mode is already playable in the VST3.
 
 
 ### 3.0-dev3 — review metadata for real library structure
@@ -460,3 +500,15 @@ The manual review dialog now records explicit technique tags (Downstroke, Upstro
 - Добавлен regression test для отката частично скопированного пакета и защиты уже существующего файла.
 
 Это development build. Скорость зависит от диска, числа файлов и размера библиотеки; числовые гарантии производительности без измерения на конкретном компьютере не заявляются. Windows Portable smoke test и полный прогон тестов должны быть подтверждены отдельным успешным CI/локальным запуском.
+
+
+## Manager 3.0 dev8 — устойчивый цикл и Windows delivery
+
+- Portable and installed Windows package definitions are maintained from the same PyInstaller onedir build.
+- Portable mode stores mutable reports, staging, task history and caches in `UserData` beside the executable. Installed mode stores them in `%LOCALAPPDATA%\POP PUNK GUITAR Library Manager`, not in the application bundle or Program Files.
+- START HUNTING enables full audio analysis by default and asks once whether the selected import library is guitar-only before running guitar-specific extraction. If the answer is no, filesystem/deep inventory and acoustic analysis still run; guitar-specific extraction is skipped.
+- Extraction no longer has the old global 500-WAV ceiling. Candidate sets are processed in bounded per-engine chunks; a failure in one source is recorded and the next source is attempted.
+- BUILD LIBRARY can process all staging manifests automatically. Only independently reviewed, license-approved and integrity-verified candidates enter FACTORY. Each asset is copied in its own transaction; a failed asset does not roll back earlier verified copies. A final staging/FACTORY audit report is generated after distribution.
+- Inaccessible nested folders, locked files and unreadable Factory directories are recorded and do not silently turn a partial scan into a successful complete scan.
+
+The two Windows package types are defined in the workflow: Portable ZIP and Inno Setup installer EXE. They are **not considered release artifacts until the latest workflow succeeds and both packages pass startup and functional acceptance**. Manager 3.0 remains a development build while that verification is blocked.

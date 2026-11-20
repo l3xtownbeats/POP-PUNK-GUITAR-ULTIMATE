@@ -16,7 +16,9 @@ from typing import Any
 
 from pitch_events import analyze_pitch_events
 
-STAGING_BASE = (Path(__file__).resolve().parent / "staging").resolve()
+from app_paths import runtime_staging_root
+
+STAGING_BASE = runtime_staging_root(__file__)
 SEGMENTER_VERSION = "0.1.0"
 
 

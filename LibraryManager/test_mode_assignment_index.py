@@ -43,6 +43,65 @@ class ModeAssignmentIndexTests(unittest.TestCase):
             self.assertEqual(modes["MELODY MODE"]["assignment_count"], 1)
             self.assertFalse(modes["MELODY MODE"]["assets"][0]["source_modified"])
 
+    def test_sample_mode_requires_complete_review_evidence_for_runtime(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self._asset(
+                root, modes=["SAMPLE MODE"], metadata={"confirmed_midi_note": 60},
+                validation={
+                    "source_sha256_verified": True,
+                    "derived_sha256_verified": True,
+                    "sample_boundaries_verified": True,
+                    "explicit_musical_approval": True,
+                    "explicit_license_approval": True,
+                    "musical_mapping_verified": True,
+                },
+            )
+            report = build_mode_assignment_index(root)
+            asset = next(x for x in report["modes"] if x["mode"] == "SAMPLE MODE")["assets"][0]
+            self.assertEqual(asset["runtime_status"], "RUNTIME_READY")
+            self.assertEqual(asset["runtime_blockers"], [])
+
+    def test_sample_mode_blocks_when_source_integrity_confirmation_is_missing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self._asset(
+                root, modes=["SAMPLE MODE"], metadata={"confirmed_midi_note": 60},
+                validation={
+                    "derived_sha256_verified": True,
+                    "sample_boundaries_verified": True,
+                    "explicit_musical_approval": True,
+                    "explicit_license_approval": True,
+                    "musical_mapping_verified": True,
+                },
+            )
+            report = build_mode_assignment_index(root)
+            asset = next(x for x in report["modes"] if x["mode"] == "SAMPLE MODE")["assets"][0]
+            self.assertEqual(asset["runtime_status"], "NOT_RUNTIME_READY")
+            self.assertIn(
+                "REVIEW_VALIDATION_SOURCE_SHA256_VERIFIED_NOT_CONFIRMED",
+                asset["runtime_blockers"],
+            )
+
+    def test_sample_mode_rejects_out_of_range_confirmed_midi_note(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self._asset(
+                root, modes=["SAMPLE MODE"], metadata={"confirmed_midi_note": 128},
+                validation={
+                    "source_sha256_verified": True,
+                    "derived_sha256_verified": True,
+                    "sample_boundaries_verified": True,
+                    "explicit_musical_approval": True,
+                    "explicit_license_approval": True,
+                    "musical_mapping_verified": True,
+                },
+            )
+            report = build_mode_assignment_index(root)
+            asset = next(x for x in report["modes"] if x["mode"] == "SAMPLE MODE")["assets"][0]
+            self.assertEqual(asset["runtime_status"], "NOT_RUNTIME_READY")
+            self.assertIn("SAMPLE_NOTE_OR_CHORD_MAPPING_NOT_CONFIRMED", asset["runtime_blockers"])
+
     def test_unapproved_license_blocks_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -79,6 +138,20 @@ class ModeAssignmentIndexTests(unittest.TestCase):
             report = build_mode_assignment_index(root)
             self.assertEqual(len(report["rejected_manifests"]), 1)
             self.assertEqual(report["assignment_count"], 0)
+
+    def test_unreadable_derived_wav_blocks_only_its_asset(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self._asset(root, modes=["SAMPLE MODE"],
+                        metadata={"confirmed_midi_note": 60})
+            with patch("mode_assignment_index._sha256", side_effect=PermissionError("access denied")):
+                report = build_mode_assignment_index(root)
+            asset = next(item for item in report["modes"]
+                         if item["mode"] == "SAMPLE MODE")["assets"][0]
+            self.assertEqual(asset["runtime_status"], "NOT_RUNTIME_READY")
+            self.assertIn("DERIVED_WAV_MISSING_OR_HASH_MISMATCH", asset["runtime_blockers"])
+            self.assertEqual(report["assignment_count"], 1)
 
 
 if __name__ == "__main__":
