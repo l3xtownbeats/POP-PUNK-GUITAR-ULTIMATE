@@ -44,6 +44,7 @@ class SfzParserTests(unittest.TestCase):
             self.assertEqual(rows[0]["status"],"INCLUDE_OUTSIDE_LIBRARY")
             self.assertEqual(rows[0]["sample_opcode"],"")
 
+
     def test_multiple_regions_keep_individual_ranges(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
