@@ -86,6 +86,13 @@ def resolve_samples_root(selected_path: Path) -> Path:
 def _is_excluded(path: Path) -> bool:
     return any(EXCLUDED_LABEL_RE.search(part) for part in path.parts)
 
+def _absolute_path_key(path: Path | str) -> str:
+    """Create a stable lexical path key without touching a possibly offline file."""
+    try:
+        return os.path.normcase(os.path.abspath(os.fspath(path)))
+    except (OSError, TypeError, ValueError):
+        return str(path).casefold()
+
 
 def _is_manager_virtual_metadata(path: Path) -> bool:
     """Recognize sidecars created by the manager, not importable audio assets."""
@@ -653,14 +660,14 @@ def run_manager(samples_root: Path, *, analyze_audio: bool = False,
         if index % 25 == 0:
             emit(f"Приоритетный разбор SFZ: {index}/{len(sfz_files)}…")
     sfz_referenced = {
-        str(Path(str(row.get("resolved_sample") or "")).resolve()).casefold()
+        _absolute_path_key(str(row.get("resolved_sample") or ""))
         for row in sfz_rows if row.get("status") == "FOUND" and row.get("resolved_sample")
     }
     supported_files = sorted(
         included,
         key=lambda p: (
             0 if p.suffix.lower() == ".sfz" else
-            1 if str(p.resolve()).casefold() in sfz_referenced else
+            1 if _absolute_path_key(p) in sfz_referenced else
             2 if p.suffix.lower() in AUDIO_EXT else 3,
             str(p).casefold(),
         ),
