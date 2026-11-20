@@ -157,6 +157,55 @@ class PluginAssetCatalogTests(unittest.TestCase):
             self.assertEqual(pattern_mode["asset_count"], 1)
             self.assertFalse(pattern_mode["assets"][0]["playable_in_mode"])
 
+
+    def test_whole_rhythm_pattern_is_not_assigned_to_note_playable_pattern_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            staging = base / "staging"
+            (staging / "manifests").mkdir(parents=True)
+            (staging / "clips").mkdir()
+            source = base / "source.wav"
+            derived = staging / "clips" / "rhythm-pattern.wav"
+            write_wav(source)
+            write_wav(derived)
+            record = {
+                "asset_id": "WHOLE-PATTERN",
+                "kind": "rhythm_pattern",
+                "source_path": str(source),
+                "source_sha256": digest(source),
+                "source_start_sample": 0,
+                "source_end_sample": 800,
+                "sample_rate": 8000,
+                "channels": 1,
+                "frame_count": 800,
+                "duration_seconds": 0.1,
+                "derived_path": str(derived),
+                "derived_sha256": digest(derived),
+                # PATTERN_MODE is included to simulate legacy manifests. The
+                # Pattern Instrument target must take precedence for whole clips.
+                "engine_targets": ["PATTERN_INSTRUMENT", "PATTERN_MODE"],
+                "review_status": "NEEDS_MUSICAL_REVIEW",
+                "license_status": "UNREVIEWED",
+                "musical_metadata": {},
+            }
+            (staging / "manifests" / "whole-pattern.json").write_text(
+                json.dumps(record), encoding="utf-8"
+            )
+            output = base / "catalog.json"
+            with patch.object(catalog_module, "STAGING_BASE", staging.resolve()):
+                result = build_plugin_asset_catalog(staging, output)
+            catalog = json.loads(output.read_text(encoding="utf-8"))
+            pattern_mode = next(item for item in catalog["modes"] if item["mode"] == "PATTERN MODE")
+            self.assertEqual(pattern_mode["asset_count"], 0)
+            self.assertEqual(len(catalog["pattern_instrument_assets"]), 1)
+            asset = catalog["pattern_instrument_assets"][0]
+            self.assertEqual(asset["asset_id"], "WHOLE-PATTERN")
+            self.assertFalse(asset["playable"])
+            self.assertFalse(asset["playable_in_pattern_instrument"])
+            self.assertIn("PATTERN_INSTRUMENT", asset["engine_targets"])
+            self.assertEqual(result["pattern_instrument_asset_count"], 1)
+            self.assertEqual(result["playable_asset_count"], 0)
+
     def test_rejects_derived_asset_outside_staging_and_hash_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
