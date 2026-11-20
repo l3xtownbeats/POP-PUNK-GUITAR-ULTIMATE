@@ -42,7 +42,14 @@ def _walk(path: Path, errors: list[dict] | None = None):
             with os.scandir(folder) as entries:
                 for entry in entries:
                     try:
-                        if entry.is_dir(follow_symlinks=False):
+                        if entry.is_symlink():
+                            if errors is not None:
+                                errors.append({
+                                    "path": entry.path,
+                                    "stage": "IMPORT_SYMLINK_SKIPPED",
+                                    "error": "Symbolic links are not followed during import; select the real source folder or file.",
+                                })
+                        elif entry.is_dir(follow_symlinks=False):
                             stack.append(Path(entry.path))
                         elif entry.is_file(follow_symlinks=False):
                             yield Path(entry.path)
