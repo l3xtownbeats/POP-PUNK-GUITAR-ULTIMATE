@@ -160,6 +160,27 @@ class SourceImportTests(unittest.TestCase):
             self.before[str(self.sfz)],
         )
 
+    def test_individual_sfz_and_sample_selections_keep_relative_dependency_paths(self):
+        incoming = self.root / "Samples" / "Import Sample Guitar"
+        incoming.mkdir(parents=True)
+        result = import_sources_to_library([self.sfz, self.wav], incoming, self.registry)
+        batch = Path(result["import_batch"])
+        copied_sfz = batch / "Selected_Files"
+        sfz_files = list(copied_sfz.rglob("instrument.sfz"))
+        self.assertEqual(len(sfz_files), 1)
+        copied_root = sfz_files[0].parent
+        copied_sample = copied_root / "Nested" / "clean.wav"
+        self.assertTrue(copied_sample.is_file())
+        self.assertEqual(
+            copied_sample.read_bytes(),
+            self.wav.read_bytes(),
+        )
+        self.assertEqual(
+            sfz_files[0].read_text(encoding="utf-8"),
+            self.sfz.read_text(encoding="utf-8"),
+        )
+        self.assertEqual(result["copied_files"], 2)
+
     def test_reimport_reuses_verified_imported_copies(self):
         incoming = self.root / "Samples" / "Import Sample Guitar"
         incoming.mkdir(parents=True)
