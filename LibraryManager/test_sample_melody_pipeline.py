@@ -71,7 +71,7 @@ class SampleMelodyPipelineTests(unittest.TestCase):
                     [item["asset_id"] for item in result["melody_note_mode"]],
                 )
                 for asset in result["melody_note_mode"]:
-                    self.assertEqual(asset["musical_metadata"]["melody_asset_role"], "SINGLE_GUITAR_NOTE")
+                    self.assertEqual(asset["musical_metadata"]["asset_role"], "SINGLE_GUITAR_NOTE")
                     self.assertTrue(asset["musical_metadata"]["one_sound_one_note"])
                     self.assertIn("MELODY_MODE", asset["engine_targets"])
                 self.assertTrue(all(item.get("reused_existing") is False
