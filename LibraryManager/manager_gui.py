@@ -740,6 +740,8 @@ class LibraryManagerApp:
                         )
                         extracted_region += len(clips)
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "LONG_RECORDING_RANGE_EXTRACTION",
@@ -765,6 +767,8 @@ class LibraryManagerApp:
                             cancel_event=self._cancel_event)
                         extracted_pattern += len(clips)
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "PATTERN_EXTRACTION",
@@ -791,6 +795,10 @@ class LibraryManagerApp:
                         )
                         extracted_chord += len(clips)
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "CHORD_SAMPLE_EXTRACTION",
@@ -839,12 +847,18 @@ class LibraryManagerApp:
                     "error": "Физическое извлечение пропущено: оператор не подтвердил гитарный источник.",
                 })
 
+            if self._cancel_event.is_set():
+                raise RuntimeError("Полный цикл остановлен до финализации; исходные файлы не изменены.")
+
             report_progress("ЭТАП 7/8: финальная проверка SHA-256, границ, PCM WAV, музыкального статуса и лицензии.")
             finalization_result = finalize_library_audit(
                 samples, STAGING_ROOT,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
             )
+            if self._cancel_event.is_set():
+                raise RuntimeError("Полный цикл остановлен до сборки каталога; исходные файлы не изменены.")
+
             report_progress("ЭТАП 8/8: проверка и сборка plugin_asset_catalog для всех 10 режимов VST3.")
             catalog_path = Path(analysis_result["report_directory"]) / "plugin_asset_catalog.json"
             catalog_result = build_plugin_asset_catalog(
