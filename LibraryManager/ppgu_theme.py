@@ -2,7 +2,7 @@
 
 Logical PPGU gallery slot: SKIN-1.
 Canonical source manifest: skin-053 / SKIN/Skin_053/theme.json.
-The palette values are read from the bundled, unmodified PPGU manifest.
+The color tokens follow the user's approved NEON STAGE reference mockups; the skin identity and supporting art remain canonical.
 """
 from __future__ import annotations
 
