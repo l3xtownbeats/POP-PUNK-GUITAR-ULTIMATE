@@ -84,6 +84,20 @@ class RuntimePathTests(unittest.TestCase):
             self.assertTrue(portable)
             self.assertEqual(calls[0], exe.parent / "UserData")
 
+    def test_portable_reports_error_when_both_data_locations_are_unwritable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            exe = base / "ReadOnly" / "Manager.exe"
+            exe.parent.mkdir()
+            exe.touch()
+            (exe.parent / "portable.mode").write_text("blocked-profile", encoding="utf-8")
+            with self.assertRaisesRegex(PermissionError, "LocalAppData"):
+                resolve_runtime_paths(
+                    exe, executable=exe, frozen=True,
+                    environ={"LOCALAPPDATA": str(base / "LocalAppData")},
+                    writable_probe=lambda _path: False,
+                )
+
     def test_portable_can_run_from_arbitrary_parent_folder(self):
         with tempfile.TemporaryDirectory() as directory:
             exe = Path(directory) / "D" / "Audio" / "Tools" / "Manager.exe"
