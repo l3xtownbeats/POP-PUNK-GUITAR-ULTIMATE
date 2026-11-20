@@ -946,3 +946,15 @@ PPGU использует собственный визуальный язык �
 - Проверка: изменения закоммичены; автоматический CI всё ещё не предоставил исполняемые steps/logs, поэтому прохождение тестов не подтверждено.
 
 **Физический корневой каталог, который полностью недоступен ОС, нельзя обработать или обойти другим движком. В таком случае Manager должен завершить запуск с явной root-access ошибкой, а не сообщать о ложном полном сканировании.**
+
+
+## Запись TJ-2026-11-20-MANAGER-PATHS-021 — единый staging path для Portable и Installer
+
+- Дата: 2026-11-20
+- Тип: **КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ПУТЕЙ РАНТАЙМА**
+- Связанные файлы: `app_paths.py`, `audio_segmenter.py`, `virtual_sample_extractor.py`, `plugin_asset_catalog.py`, `test_app_paths.py`.
+- Обнаружена потенциальная блокирующая ошибка: GUI уже направлял staging в `UserData/staging` или LocalAppData, но часть extractors/catalog по-прежнему проверяла staging относительно каталога сборки `_MEIPASS/staging`. В frozen Portable/Installer это могло блокировать запись кандидатов и сборку каталога.
+- Добавлен единый `runtime_staging_root()`; audio segmenter, long-region extractor и plugin catalog теперь вычисляют тот же staging path, что и GUI.
+- Добавлен regression test на portable-mode staging path.
+- Статус: исправление внесено в ветку. Windows CI и runtime smoke tests всё ещё должны подтвердить фактическое поведение.
+
