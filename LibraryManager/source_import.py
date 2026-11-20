@@ -25,8 +25,8 @@ def _identity(path: Path) -> str:
     return os.path.normcase(str(path.resolve()))
 
 
-def _walk(path: Path):
-    """Yield files recursively without following directory symlinks."""
+def _walk(path: Path, errors: list[dict] | None = None):
+    """Yield files recursively without following symlinks; report inaccessible paths."""
     if path.is_file():
         yield path
         return
@@ -41,10 +41,20 @@ def _walk(path: Path):
                             stack.append(Path(entry.path))
                         elif entry.is_file(follow_symlinks=False):
                             yield Path(entry.path)
-                    except OSError:
-                        continue
-        except OSError:
-            continue
+                    except OSError as exc:
+                        if errors is not None:
+                            errors.append({
+                                "path": entry.path,
+                                "stage": "IMPORT_DIRECTORY_ENTRY",
+                                "error": f"{type(exc).__name__}: {exc}",
+                            })
+        except OSError as exc:
+            if errors is not None:
+                errors.append({
+                    "path": str(folder),
+                    "stage": "IMPORT_DIRECTORY_SCAN",
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
 
 
 def register_sources(
@@ -76,7 +86,7 @@ def register_sources(
     sfz_roots: dict[str, Path] = {}
     for selected in selections:
         root = selected if selected.is_dir() else selected.parent
-        for file_path in _walk(selected):
+        for file_path in _walk(selected, errors):
             try:
                 resolved = file_path.resolve()
                 stat = resolved.stat()
