@@ -1,6 +1,8 @@
 name: Library Manager Tests
 on:
   push:
+    branches:
+      - "release/3.0-final"
     paths:
       - "LibraryManager/**"
       - ".github/workflows/library-manager-tests.yml"
