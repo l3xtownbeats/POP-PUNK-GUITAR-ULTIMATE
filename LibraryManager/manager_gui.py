@@ -37,7 +37,7 @@ from library_operations import (
 )
 from ppgu_theme import NEON_STAGE_THEME, resource_path
 
-APP_VERSION = "3.0.0-dev8"
+APP_VERSION = "3.0.0-dev9"
 BUNDLE_DIR, MANAGER_DIR, PORTABLE_MODE = resolve_runtime_paths(__file__)
 # The application can live anywhere. The input library is selected independently.
 DEFAULT_SAMPLES = ""
