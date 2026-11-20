@@ -10,7 +10,7 @@ from pathlib import Path
 
 from plugin_asset_catalog import (
     CATALOG_SCHEMA, MODE_ORDER, build_plugin_asset_catalog,
-    validate_plugin_asset_catalog,
+    validate_plugin_asset_catalog, browser_assets_for_mode,
 )
 
 
@@ -205,6 +205,28 @@ class PluginAssetCatalogTests(unittest.TestCase):
             self.assertIn("PATTERN_INSTRUMENT", asset["engine_targets"])
             self.assertEqual(result["pattern_instrument_asset_count"], 1)
             self.assertEqual(result["playable_asset_count"], 0)
+
+    def test_pattern_browser_shows_pattern_instrument_assets_inside_pattern_tab(self):
+        catalog = {
+            "modes": [
+                {"mode": "MELODY MODE", "assets": [{"asset_id": "MELODY-NOTE"}]},
+                {"mode": "PATTERN MODE", "assets": [{"asset_id": "PATTERN-NOTE"}]},
+            ],
+            "pattern_instrument_assets": [
+                {"asset_id": "PATTERN-PERFORMANCE", "playable": False}
+            ],
+        }
+        pattern_assets = browser_assets_for_mode(catalog, "PATTERN MODE")
+        melody_assets = browser_assets_for_mode(catalog, "MELODY MODE")
+        self.assertEqual(
+            [item["asset_id"] for item in pattern_assets],
+            ["PATTERN-NOTE", "PATTERN-PERFORMANCE"],
+        )
+        self.assertEqual([item["asset_id"] for item in melody_assets], ["MELODY-NOTE"])
+        self.assertEqual(
+            [item["mode"] for item in catalog["modes"]],
+            ["MELODY MODE", "PATTERN MODE"],
+        )
 
     def test_rejects_derived_asset_outside_staging_and_hash_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
