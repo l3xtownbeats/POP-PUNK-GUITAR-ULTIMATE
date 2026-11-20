@@ -57,7 +57,7 @@ class PatternClipExtractorTests(unittest.TestCase):
                     self.assertEqual(sha256_file(clip), record["derived_sha256"])
                     self.assertEqual(record["source_sha256"], digest)
                     self.assertEqual(record["engine_targets"], ["PATTERN_INSTRUMENT"])
-                self.assertEqual(record["review_status"], "NEEDS_MUSICAL_REVIEW")
+                    self.assertEqual(record["review_status"], "NEEDS_MUSICAL_REVIEW")
                     self.assertEqual(record["license_status"], "UNREVIEWED")
                     with wave.open(str(clip), "rb") as wav:
                         self.assertEqual(wav.getframerate(), 8000)
