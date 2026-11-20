@@ -419,14 +419,34 @@ def cleanup_original_sources(distributed_manifest_paths: list[Path], *,
         record = json.loads(path.read_text(encoding="utf-8"))
         if record.get("distribution_status") != "VERIFIED_COPIED":
             raise ValueError(f"Dependent asset is not successfully distributed: {path}")
-        destination = Path(record.get("distributed_path", ""))
+        factory_root = (samples_root / "FACTORY").resolve()
+        destination = Path(record.get("distributed_path", "")).resolve()
         expected_derived = str(record.get("distributed_sha256", "")).upper()
-        if not destination.is_file() or not expected_derived:
-            raise ValueError(f"Distributed asset missing: {destination}")
+        if not _inside(destination, factory_root) or not destination.is_file() or not expected_derived:
+            raise ValueError(
+                f"Verified dependent must be an existing file inside FACTORY: {destination}"
+            )
         if sha256_file(destination) != expected_derived:
             raise ValueError(f"Distributed asset integrity check failed: {destination}")
+        # Never trust the staging manifest alone: the installed FACTORY sidecar
+        # must independently attest to the exact source and copied destination.
+        sidecar = destination.with_suffix(destination.suffix + ".json")
+        if not sidecar.is_file():
+            raise ValueError(f"Verified FACTORY sidecar is missing: {sidecar}")
+        distributed_record = json.loads(sidecar.read_text(encoding="utf-8"))
+        if (
+            distributed_record.get("distribution_status") != "VERIFIED_COPIED"
+            or Path(distributed_record.get("distributed_path", "")).resolve() != destination
+            or str(distributed_record.get("distributed_sha256", "")).upper() != expected_derived
+        ):
+            raise ValueError(f"FACTORY sidecar does not verify this distributed asset: {sidecar}")
         source = Path(record.get("source_path", "")).resolve()
         source_hash = str(record.get("source_sha256", "")).upper()
+        if (
+            Path(distributed_record.get("source_path", "")).resolve() != source
+            or str(distributed_record.get("source_sha256", "")).upper() != source_hash
+        ):
+            raise ValueError(f"FACTORY sidecar source provenance mismatch: {sidecar}")
         if not _inside(source, incoming_root) or not source.is_file():
             raise ValueError(f"Original must be an existing file inside Import Sample Guitar: {source}")
         if not source_hash or sha256_file(source) != source_hash:
