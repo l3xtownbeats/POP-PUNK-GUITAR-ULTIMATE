@@ -29,7 +29,7 @@ MODE_DESCRIPTIONS = {
     "SAMPLE MODE": "Pitch-specific note attacks, reviewed chord samples and Power Chords.",
     "STRUMMING": "Reviewed Downstroke, Upstroke and chord-strumming performances.",
     "ARPEGGIO": "Chord voicing hypotheses plus reviewed string-by-string arpeggio events.",
-    "PATTERN MODE": "Repeated rhythmic patterns plus pitch-specific note zones.",
+    "PATTERN MODE": "Pitch-specific single-note clips derived from rhythm-oriented guitar sources, preserving playing character.",
     "RIFF MODE": "Musically reviewed guitar riffs and characteristic fragments.",
     "MELODY MODE": "Pitch-specific notes and reviewed melodic sequences.",
     "PHRASE MODE": "Complete musical phrases with preserved source timing.",
@@ -66,11 +66,16 @@ def _candidate_mode_assignments(record: dict[str, Any]) -> list[str]:
     kind = str(record.get("kind") or "").casefold()
     targets = {str(item).upper() for item in (record.get("engine_targets") or [])}
     modes: list[str] = [mode for mode in record.get("mode_assignments", []) if mode in MODE_ORDER]
+    # Whole recorded pattern performances belong to the chord-driven Pattern
+    # Instrument. They are not the one-key/one-note payload of PATTERN MODE.
+    pattern_instrument_target = kind == "rhythm_pattern" or "PATTERN_INSTRUMENT" in targets
+    if pattern_instrument_target:
+        modes = [mode for mode in modes if mode != "PATTERN MODE"]
     if kind in {"sample_note_candidate", "melody_single_note_candidate", "one_shot_sample", "note_event", "chord_sample_candidate", "power_chord_sample_candidate"} or "SAMPLE_MODE" in targets:
         modes.append("SAMPLE MODE")
     if kind in {"melody_phrase_candidate", "melody_single_note_candidate"} or "MELODY_MODE" in targets:
         modes.append("MELODY MODE")
-    if kind == "rhythm_pattern" or "PATTERN_MODE" in targets:
+    if "PATTERN_MODE" in targets and not pattern_instrument_target:
         modes.append("PATTERN MODE")
     # A note-event clip is also the pitch-specific key payload for the approved
     # note-playable Pattern Mode; it is not a whole-loop chord-performance WAV.
@@ -259,6 +264,7 @@ def _manifest_to_asset(
     return {
         "asset_id": asset_id,
         "kind": record.get("kind", "UNKNOWN"),
+        "engine_targets": [str(item).upper() for item in (record.get("engine_targets") or [])],
         "target_modes": target_modes,
         "playable_modes": playable_modes,
         "mode_assignments": [mode for mode in record.get("mode_assignments", []) if mode in MODE_ORDER],
@@ -337,6 +343,13 @@ def validate_plugin_asset_catalog(catalog: dict[str, Any]) -> list[str]:
                 )
             ):
                 errors.append(f"Playable asset does not satisfy review/integrity gates: {asset_id}")
+    for asset in catalog.get("pattern_instrument_assets", []):
+        if "PATTERN_INSTRUMENT" not in asset.get("engine_targets", []):
+            errors.append(f"Pattern Instrument asset has no PATTERN_INSTRUMENT target: {asset.get('asset_id')}")
+        if asset.get("playable") or asset.get("playable_in_pattern_instrument"):
+            errors.append(f"Unreviewed Pattern Instrument asset must not be playable: {asset.get('asset_id')}")
+        if "PATTERN MODE" in asset.get("target_modes", []):
+            errors.append(f"Whole Pattern Instrument asset cannot be assigned to note-playable PATTERN MODE: {asset.get('asset_id')}")
     return errors
 
 
@@ -359,6 +372,7 @@ def build_plugin_asset_catalog(
     mode_candidates = _read_mode_candidates(Path(mode_report_path).resolve() if mode_report_path else None)
     mode_assets = {mode: [] for mode in MODE_ORDER}
     review_queue: list[dict[str, Any]] = []
+    pattern_instrument_assets: list[dict[str, Any]] = []
     source_hash_cache: dict[str, bool] = {}
     manifests_dir = staging_root / "manifests"
     manifest_paths = sorted(manifests_dir.glob("*.json")) if manifests_dir.is_dir() else []
@@ -373,6 +387,15 @@ def build_plugin_asset_catalog(
             continue
         if errors:
             integrity_errors.extend({"manifest": str(manifest_path), "error": error} for error in errors)
+        if "PATTERN_INSTRUMENT" in asset.get("engine_targets", []):
+            performance_asset = dict(asset)
+            performance_asset["playable"] = False
+            performance_asset["playable_in_pattern_instrument"] = False
+            performance_asset["pattern_instrument_blocking_reason"] = (
+                "A coherent pattern candidate is indexed for review; chord/event compatibility "
+                "and a reviewed event timeline are required before runtime use."
+            )
+            pattern_instrument_assets.append(performance_asset)
         if not asset["target_modes"]:
             review_queue.append(asset)
             continue
@@ -442,6 +465,7 @@ def build_plugin_asset_catalog(
         },
         "modes": modes,
         "playable_assets": playable_assets,
+        "pattern_instrument_assets": sorted(pattern_instrument_assets, key=lambda item: item["asset_id"]),
         "unassigned_review_assets": review_queue,
         "integrity_errors": integrity_errors,
         "safety": {
@@ -472,6 +496,7 @@ def build_plugin_asset_catalog(
         "candidate_count": sum(item["candidate_count"] for item in modes),
         "playable_asset_count": len(playable_assets),
         "unassigned_review_asset_count": len(review_queue),
+        "pattern_instrument_asset_count": len(pattern_instrument_assets),
         "integrity_error_count": len(integrity_errors),
         "source_files_modified": False,
         "automatic_factory_promotion": False,
