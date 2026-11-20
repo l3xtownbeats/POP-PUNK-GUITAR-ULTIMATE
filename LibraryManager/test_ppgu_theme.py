@@ -10,6 +10,8 @@ from ppgu_theme import (
     NEON_STAGE_PALETTE,
     NEON_STAGE_THEME,
     PALETTE_KEYS,
+    _FALLBACK_PALETTE,
+    load_neon_stage_theme,
     resource_path,
     configure_neon_stage_ttk,
 )
@@ -42,6 +44,19 @@ class NeonStageThemeTests(unittest.TestCase):
         self.assertTrue(NEON_STAGE_THEME["reduceInEco"])
         self.assertNotEqual(NEON_STAGE_PALETTE["accent"], "#D5FF45")
         self.assertNotEqual(NEON_STAGE_PALETTE["accent_glow"], "#DEFF6E")
+
+    def test_missing_theme_uses_the_same_approved_fallback_palette(self) -> None:
+        from unittest.mock import patch
+        from pathlib import Path
+
+        missing_manifest = Path("/definitely_missing_ppgu_theme/theme.json")
+        with patch("ppgu_theme.resource_path", return_value=missing_manifest):
+            fallback = load_neon_stage_theme()
+        self.assertTrue(fallback.get("_fallback"))
+        self.assertEqual(fallback["id"], CANONICAL_SKIN_ID)
+        self.assertEqual(fallback["name"], CANONICAL_SKIN_NAME)
+        self.assertEqual(fallback["palette"], _FALLBACK_PALETTE)
+        self.assertEqual(fallback["palette"], NEON_STAGE_PALETTE)
 
     def test_theme_is_visual_only(self) -> None:
         compatibility = NEON_STAGE_THEME["compatibility"]
