@@ -360,8 +360,24 @@ def auto_distribute_approved(
         if progress and (index == 1 or index % 10 == 0 or index == len(ready)):
             progress(f"Автораспределение: обработано {index}/{len(ready)} одобренных кандидатов; скопировано {len(results)}; ошибок {len(failed)}.")
 
+    finalization = None
+    finalization_error = None
+    if not cancelled:
+        try:
+            from finalization import finalize_library
+            finalization = finalize_library(
+                samples, staging, progress=progress, cancel_event=cancel_event,
+            )
+        except Exception as exc:
+            # Copies already verified in their own transactions are retained;
+            # report-generation failure must not erase successful distribution.
+            finalization_error = f"{type(exc).__name__}: {exc}"
+            if progress:
+                progress(f"ПРЕДУПРЕЖДЕНИЕ: распределение сохранено, но финальный аудит не завершился: {finalization_error}")
+
     status = "CANCELLED_PARTIAL" if cancelled else (
-        "DISTRIBUTION_COMPLETE_WITH_ERRORS" if failed or rejected else "DISTRIBUTION_COMPLETE"
+        "DISTRIBUTION_COMPLETE_WITH_ERRORS"
+        if failed or rejected or finalization_error else "DISTRIBUTION_COMPLETE"
     )
     return {
         "status": status,
@@ -373,6 +389,8 @@ def auto_distribute_approved(
         "results": results,
         "journal_path": str(journal),
         "transaction_per_asset": True,
+        "finalization": finalization,
+        "finalization_error": finalization_error,
         "source_originals_deleted": False,
     }
 
