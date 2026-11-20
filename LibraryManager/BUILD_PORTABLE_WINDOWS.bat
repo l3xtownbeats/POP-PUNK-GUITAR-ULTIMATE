@@ -10,5 +10,14 @@ if errorlevel 1 exit /b 1
 echo.
 echo Build completed: %~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER
 > "%~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\portable.mode" echo portable
-echo Copy the entire folder to the target Windows PC. User data will be stored in UserData.
+powershell -NoProfile -Command "if (Test-Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip') { Remove-Item 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip' -Force }; Compress-Archive -Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER' -DestinationPath 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip'"
+if errorlevel 1 exit /b 1
+if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
+  "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%~dp0POP_PUNK_GUITAR_LIBRARY_MANAGER.iss"
+  if errorlevel 1 exit /b 1
+) else (
+  echo Inno Setup not found. Portable ZIP is ready; install Inno Setup to build installer EXE.
+)
+echo Portable ZIP: %~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
+echo User data will be stored in UserData for portable mode.
 endlocal
