@@ -112,8 +112,8 @@ jobs:
           }
           if ($entries -match "UserData/") { throw "Portable ZIP must not contain smoke-test user data." }
 
-      - uses: actions/upload-artifact@v4
-        name: upload-portable-zip
+      - name: Upload Portable ZIP artifact
+        uses: actions/upload-artifact@v4
         with:
           name: POP-PUNK-GUITAR-LIBRARY-MANAGER-Portable-Windows-x64
           path: LibraryManager/dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip
