@@ -270,6 +270,113 @@ def distribute_assets(plan: dict[str, Any], *, approve: bool = False,
     }
 
 
+
+def auto_distribute_approved(
+    samples_root: Path,
+    staging_root: Path,
+    *,
+    approve: bool = False,
+    journal_path: Path | None = None,
+    cancel_event: Any = None,
+    progress=None,
+) -> dict[str, Any]:
+    """Process every staging manifest independently; bad assets never block later ones.
+
+    Only manifests that pass the existing musical-review, license, provenance,
+    PCM, bounds and SHA-256 gates are copied. Each asset is its own transaction:
+    a failed item is recorded and the next approved candidate is attempted.
+    Completed transactions are retained if a later item fails or cancellation
+    is requested. Original source files are never modified.
+    """
+    samples = Path(samples_root).resolve()
+    staging = Path(staging_root).resolve()
+    manifests_dir = staging / "manifests"
+    manifests = sorted(manifests_dir.glob("*.json")) if manifests_dir.is_dir() else []
+    journal = journal_path or (
+        samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl"
+    )
+    ready: list[tuple[Path, dict[str, Any]]] = []
+    rejected: list[dict[str, str]] = []
+    for index, manifest in enumerate(manifests, 1):
+        if cancel_event is not None and cancel_event.is_set():
+            return {
+                "status": "CANCELLED_DURING_PREFLIGHT",
+                "manifests_seen": index - 1,
+                "ready_count": len(ready),
+                "copied_count": 0,
+                "rejected": rejected,
+                "results": [],
+                "source_originals_deleted": False,
+            }
+        try:
+            plan = distribution_plan([manifest], samples, staging)
+            if len(plan.get("entries", [])) != 1:
+                raise ValueError("Manifest did not produce exactly one eligible FACTORY asset")
+            ready.append((manifest, plan))
+        except Exception as exc:
+            rejected.append({
+                "manifest_path": str(manifest),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+        if progress and (index == 1 or index % 25 == 0 or index == len(manifests)):
+            progress(f"Автораспределение: проверено манифестов {index}/{len(manifests)}; готово {len(ready)}; пропущено {len(rejected)}.")
+
+    if not approve:
+        return {
+            "status": "DRY_RUN",
+            "manifests_seen": len(manifests),
+            "ready_count": len(ready),
+            "copied_count": 0,
+            "rejected": rejected,
+            "ready_manifest_paths": [str(path) for path, _ in ready],
+            "results": [],
+            "source_originals_deleted": False,
+        }
+
+    results: list[dict[str, Any]] = []
+    failed: list[dict[str, str]] = []
+    cancelled = False
+    for index, (manifest, plan) in enumerate(ready, 1):
+        if cancel_event is not None and cancel_event.is_set():
+            cancelled = True
+            break
+        try:
+            result = distribute_assets_transactional(
+                plan,
+                staging_root=staging,
+                approve=True,
+                journal_path=journal,
+                cancel_event=cancel_event,
+            )
+            results.extend(result.get("results", []))
+        except Exception as exc:
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                break
+            failed.append({
+                "manifest_path": str(manifest),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+        if progress and (index == 1 or index % 10 == 0 or index == len(ready)):
+            progress(f"Автораспределение: обработано {index}/{len(ready)} одобренных кандидатов; скопировано {len(results)}; ошибок {len(failed)}.")
+
+    status = "CANCELLED_PARTIAL" if cancelled else (
+        "DISTRIBUTION_COMPLETE_WITH_ERRORS" if failed or rejected else "DISTRIBUTION_COMPLETE"
+    )
+    return {
+        "status": status,
+        "manifests_seen": len(manifests),
+        "ready_count": len(ready),
+        "copied_count": len(results),
+        "rejected": rejected,
+        "failed": failed,
+        "results": results,
+        "journal_path": str(journal),
+        "transaction_per_asset": True,
+        "source_originals_deleted": False,
+    }
+
+
 def cleanup_original_sources(distributed_manifest_paths: list[Path], *,
                              samples_root: Path, confirm_delete: bool = False,
                              confirm_all_dependents_accounted_for: bool = False,
