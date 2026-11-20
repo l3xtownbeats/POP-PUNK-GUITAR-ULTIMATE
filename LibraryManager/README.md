@@ -1,6 +1,6 @@
 # POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
 
-## Library Manager 3.0.0-dev7 — integrated multi-mode library preparation
+## Library Manager 3.0.0-dev8 — integrated multi-mode library preparation
 
 This release line contains the six-stage Manager workflow: IMPORT GUITAR, SCAN LIBRARY, START HUNTING, REVIEW QUEUE, BUILD LIBRARY and VERIFY / RECOVERY. Source audio remains read-only during import, scan and analysis; approved Factory distribution is a separate, explicit, verified copy operation.
 
