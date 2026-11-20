@@ -62,6 +62,33 @@ class UnifiedManagerTests(unittest.TestCase):
                          self.original_hash)
 
 
+    def test_quick_and_deep_scan_ignore_interrupted_import_temp_directories(self) -> None:
+        temp_dir = self.incoming / ".manager-import-tmp-interrupted"
+        temp_dir.mkdir()
+        partial = temp_dir / "partial.wav"
+        make_test_wav(partial)
+
+        quick = quick_scan(self.samples, reports_root=self.reports)
+        quick_csv = (
+            Path(quick["report_directory"]) / "quick_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertEqual(quick["files_found"], 1)
+        self.assertIn("guitar.wav", quick_csv)
+        self.assertNotIn("partial.wav", quick_csv)
+        self.assertTrue(partial.is_file())
+
+        deep = run_manager(
+            self.samples, reports_root=self.reports,
+            analyze_audio=False, guitar_source_confirmed=False,
+            write_virtual=False, workers=1,
+        )
+        deep_csv = (
+            Path(deep["report_directory"]) / "unified_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertIn("guitar.wav", deep_csv)
+        self.assertNotIn("partial.wav", deep_csv)
+        self.assertTrue(partial.is_file())
+
     def test_quick_scan_default_reports_to_runtime_data_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             data_root = Path(tmp) / "UserData"
