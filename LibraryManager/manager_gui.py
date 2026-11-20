@@ -193,7 +193,7 @@ class LibraryManagerApp:
         ])
         add_menu("01  IMPORT GUITAR", [
             ("Импортировать гитарные материалы", self.import_guitar),
-            ("Sample Browser / VST3", self.open_plugin_browser),
+            ("Браузер подготовленных ассетов для VST3", self.open_plugin_browser),
         ])
         add_menu("02  SCAN LIBRARY", [
             ("Быстрое сканирование — только файловая инвентаризация", self.quick_scan_only),
@@ -213,7 +213,7 @@ class LibraryManagerApp:
         add_menu("05  BUILD LIBRARY", [
             ("Собрать каталог ассетов PPGU", self.build_plugin_catalog),
             ("Pattern Song Manager", self.open_pattern_song_library),
-            ("12 нот / Auto Chords", self.open_chromatic_pitch_map),
+            ("12-нотная карта (для AutoChords в PATTERN)", self.open_chromatic_pitch_map),
             ("Распределить одобренные ассеты", self.distribute),
         ])
         add_menu("06  VERIFY / RECOVERY", [
@@ -831,7 +831,7 @@ class LibraryManagerApp:
             mode_counts = analysis_result.get("mode_candidate_counts", {})
             mode_report_path = Path(analysis_result["report_directory"]) / "mode_sorting_report.json"
             report_progress(
-                "СОРТИРОВКА ПО 10 РЕЖИМАМ VST3: "
+                 "КЛАССИФИКАЦИЯ ПО 10 КАТЕГОРИЯМ ПОДГОТОВКИ БИБЛИОТЕКИ ДЛЯ VST3: "
                 + "; ".join(f"{name}: {count}" for name, count in mode_counts.items())
                 + f". Отчёт: {mode_report_path}"
             )
@@ -1171,16 +1171,16 @@ class LibraryManagerApp:
         self._background("Сборка каталога VST3", work)
 
     def open_chromatic_pitch_map(self) -> None:
-        """Show the shared 12-tone map and explain Auto Chords enharmonic aliases."""
+        """Show the 12-tone data map used by AutoChords inside the VST3 PATTERN mode."""
         sharp = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="sharp"))
         flat = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="flat"))
         messagebox.showinfo(
-            "PPGU — 12 нот / Auto Chords",
+            "PPGU — 12-нотная карта для AutoChords внутри PATTERN",
             "Все 12 хроматических высот сохраняются и доступны для исполнения.\n\n"
             f"Диезы: {sharp}\n\nБемоли: {flat}\n\n"
             "Энгармонические названия объединяются в один pitch class: C# = Db, D# = Eb, F# = Gb и т. д.\n"
             "E и F — разные ноты.\n\n"
-            "Auto Chords использует ту же карту высот. Названия-дубликаты объединяются, "
+             "В VST3 AutoChords открывается внутри PATTERN и использует ту же карту высот. Названия-дубликаты объединяются, "
             "но хроматические ноты не удаляются. Непроверенные WAV и fallback не допускаются автоматически."
         )
 
@@ -1212,7 +1212,7 @@ class LibraryManagerApp:
             return
 
         window = tk.Toplevel(self.root)
-        window.title("POP PUNK GUITAR ULTIMATE — Sample Browser / VST3 Modes")
+        window.title("POP PUNK GUITAR ULTIMATE — Sample Browser / подготовленные категории библиотеки")
         window.geometry("1120x650")
         window.configure(bg=NEON_STAGE_THEME["palette"]["window_bg"])
         window.transient(self.root)
@@ -1221,7 +1221,7 @@ class LibraryManagerApp:
 
         top = ttk.Frame(frame)
         top.pack(fill="x")
-        ttk.Label(top, text="Режим VST3:").pack(side="left")
+        ttk.Label(top, text="Категория назначения для VST3:").pack(side="left")
         mode_var = tk.StringVar(value=MODE_ORDER[0])
         mode_box = ttk.Combobox(
             top, textvariable=mode_var, values=list(MODE_ORDER),
@@ -1297,7 +1297,7 @@ class LibraryManagerApp:
                 item_records[row_id] = asset
             details.delete("1.0", "end")
             details.insert("end", json.dumps({
-                "mode": selected_mode.get("mode"),
+                "plugin_target_category": selected_mode.get("mode"),
                 "status": selected_mode.get("status"),
                 "assets": selected_mode.get("asset_count", 0),
                 "playable_assets": selected_mode.get("playable_asset_count", 0),
