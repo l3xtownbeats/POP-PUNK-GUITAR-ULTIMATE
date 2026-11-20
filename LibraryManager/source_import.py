@@ -6,9 +6,13 @@ rewrites, or deletes user assets. Expensive hashing/decoding belongs to later st
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
+import shutil
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -60,6 +64,8 @@ def _walk(path: Path, errors: list[dict] | None = None):
 def register_sources(
     selected_paths: Iterable[str | Path],
     registry_path: str | Path,
+    *,
+    imported_paths: dict[str, str | Path] | None = None,
 ) -> dict:
     """Register multiple files/folders, retaining exact original paths and hierarchy."""
     selections = [Path(item).expanduser().resolve() for item in selected_paths]
@@ -81,8 +87,15 @@ def register_sources(
     else:
         records = []
 
-    known = {record["identity"] for record in records if "identity" in record}
-    added, duplicates, errors = [], [], []
+    records_by_identity = {
+        record["identity"]: record for record in records if "identity" in record
+    }
+    known = set(records_by_identity)
+    imported_map = {
+        _identity(Path(source)): str(Path(destination).expanduser().resolve())
+        for source, destination in (imported_paths or {}).items()
+    }
+    added, duplicates, updated, errors = [], [], [], []
     sfz_roots: dict[str, Path] = {}
     for selected in selections:
         root = selected if selected.is_dir() else selected.parent
@@ -92,6 +105,12 @@ def register_sources(
                 stat = resolved.stat()
                 identity = _identity(resolved)
                 if identity in known:
+                    existing = records_by_identity.get(identity)
+                    imported_path = imported_map.get(identity)
+                    if existing is not None and imported_path:
+                        existing["imported_path"] = imported_path
+                        existing["import_status"] = "COPIED_AND_VERIFIED"
+                        updated.append(existing)
                     duplicates.append(str(resolved))
                     continue
                 suffix = resolved.suffix.lower()
@@ -115,7 +134,11 @@ def register_sources(
                     "registered_at": datetime.now(timezone.utc).isoformat(),
                     "source_modified_by_manager": False,
                 }
+                if identity in imported_map:
+                    record["imported_path"] = imported_map[identity]
+                    record["import_status"] = "COPIED_AND_VERIFIED"
                 records.append(record)
+                records_by_identity[identity] = record
                 known.add(identity)
                 added.append(record)
                 if suffix == ".sfz":
@@ -203,6 +226,7 @@ def register_sources(
         "selected_sources": len(selections),
         "registered_files": len(added),
         "already_registered": len(duplicates),
+        "registry_records_updated": len(updated),
         "errors": errors,
         "registered_by_format": {
             key: sum(1 for item in added if item["format_group"] == key)
@@ -216,3 +240,223 @@ def register_sources(
         "source_files_deleted": False,
         "next_stage": "SCAN_LIBRARY",
     }
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest().upper()
+
+
+def _safe_folder_name(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._ -]+", "_", value).strip(" ._")
+    return cleaned[:80] or "Source"
+
+
+def _copy_verified(
+    source: Path,
+    destination: Path,
+    *,
+    cancel_event=None,
+    progress=None,
+) -> tuple[str, int]:
+    """Copy one source without modifying it; verify the completed destination hash."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    size = 0
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with source.open("rb") as src, destination.open("xb") as dst:
+        while True:
+            if cancel_event is not None and cancel_event.is_set():
+                raise InterruptedError("IMPORT GUITAR остановлен пользователем.")
+            block = src.read(1024 * 1024)
+            if not block:
+                break
+            dst.write(block)
+            digest.update(block)
+            size += len(block)
+            if progress:
+                progress(f"Копирование: {source.name} — {size:,} байт…")
+        dst.flush()
+        os.fsync(dst.fileno())
+    source_digest = digest.hexdigest().upper()
+    try:
+        stat = source.stat()
+        os.utime(destination, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    except OSError:
+        pass
+    destination_digest = _sha256(destination)
+    if destination_digest != source_digest:
+        raise IOError(f"SHA-256 копии не совпадает с оригиналом: {source}")
+    return source_digest, size
+
+
+def import_sources_to_library(
+    selected_paths: Iterable[str | Path],
+    incoming_root: str | Path,
+    registry_path: str | Path,
+    *,
+    progress=None,
+    cancel_event=None,
+) -> dict:
+    """Copy selected libraries into Import Sample Guitar, verify and register provenance.
+
+    The original source paths are read-only. Every batch is first copied into a
+    hidden temporary directory inside the incoming library, verified file by
+    file, then atomically renamed into place. If any step fails, this batch is
+    rolled back and the original sources remain untouched.
+    """
+    selections = [Path(item).expanduser().resolve() for item in selected_paths]
+    if not selections:
+        raise ValueError("Не выбраны файлы или папки для импорта.")
+    incoming = Path(incoming_root).expanduser().resolve()
+    if not incoming.is_dir():
+        raise NotADirectoryError(f"Папка Import Sample Guitar не найдена: {incoming}")
+    for item in selections:
+        if not item.exists() or not (item.is_file() or item.is_dir()):
+            raise FileNotFoundError(f"Источник не найден или не поддерживается: {item}")
+        if item.is_dir():
+            try:
+                incoming.relative_to(item)
+            except ValueError:
+                pass
+            else:
+                if item != incoming:
+                    raise ValueError(
+                        f"Нельзя импортировать папку-родитель самой Import Sample Guitar: {item}"
+                    )
+
+    registry = Path(registry_path).expanduser().resolve()
+    existing_records = {}
+    if registry.exists():
+        data = json.loads(registry.read_text(encoding="utf-8"))
+        if data.get("registry_version") not in {1, REGISTRY_VERSION}:
+            raise ValueError("Неизвестная версия реестра импорта; оригинальные данные не изменены.")
+        existing_records = {
+            item.get("identity"): item for item in data.get("sources", [])
+            if item.get("identity")
+        }
+
+    token = uuid.uuid4().hex
+    temporary_root = incoming / f".manager-import-tmp-{token}"
+    final_root = incoming / (
+        "IMPORT_BATCH_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + token[:8]
+    )
+    copied_files = 0
+    copied_bytes = 0
+    errors = []
+    imported_paths: dict[str, Path] = {}
+    seen_sources: set[str] = set()
+    has_new_copy = False
+
+    def reusable_existing(source: Path) -> Path | None:
+        record = existing_records.get(_identity(source), {})
+        target = Path(record.get("imported_path", "")) if record else Path()
+        if not target.is_absolute() or not target.is_file():
+            return None
+        try:
+            stat = source.stat()
+            if record.get("size_bytes") == stat.st_size and record.get("modified_ns") == stat.st_mtime_ns:
+                return target.resolve()
+        except OSError:
+            return None
+        return None
+
+    try:
+        temporary_root.mkdir(parents=False, exist_ok=False)
+        for selection_index, selected in enumerate(selections, start=1):
+            if cancel_event is not None and cancel_event.is_set():
+                raise InterruptedError("IMPORT GUITAR остановлен пользователем.")
+            root_is_incoming = selected == incoming
+            if selected.is_dir():
+                if root_is_incoming:
+                    files = list(_walk(selected, errors))
+                else:
+                    files = list(_walk(selected, errors))
+                source_root = selected
+                destination_base = temporary_root / "Sources" / (
+                    f"{selection_index:03d}_{_safe_folder_name(selected.name)}"
+                )
+            else:
+                files = [selected]
+                source_root = selected.parent
+                destination_base = temporary_root / "Selected_Files" / (
+                    f"{selection_index:03d}_{_safe_folder_name(selected.parent.name)}"
+                )
+
+            if errors:
+                first = errors[0]
+                raise OSError(
+                    "Не удалось полностью прочитать выбранную папку; импорт отменён без частичной копии: "
+                    f"{first.get('path')}: {first.get('error')}"
+                )
+
+            for source in files:
+                source = source.resolve()
+                identity = _identity(source)
+                if identity in seen_sources:
+                    continue
+                seen_sources.add(identity)
+
+                # Files already inside the active import root are scanned in place.
+                try:
+                    source.relative_to(incoming)
+                    already_in_library = True
+                except ValueError:
+                    already_in_library = False
+                if already_in_library:
+                    imported_paths[str(source)] = source
+                    continue
+
+                reusable = reusable_existing(source)
+                if reusable is not None:
+                    imported_paths[str(source)] = reusable
+                    continue
+
+                relative = source.relative_to(source_root) if selected.is_dir() else Path(source.name)
+                destination = destination_base / relative
+                digest, size = _copy_verified(
+                    source, destination, cancel_event=cancel_event, progress=progress,
+                )
+                copied_files += 1
+                copied_bytes += size
+                has_new_copy = True
+                # The batch is renamed below; store the final destination now.
+                imported_paths[str(source)] = final_root / destination.relative_to(temporary_root)
+                if progress:
+                    progress(f"Проверена копия: {source.name} — SHA-256 {digest}")
+
+        if cancel_event is not None and cancel_event.is_set():
+            raise InterruptedError("IMPORT GUITAR остановлен пользователем.")
+        if has_new_copy:
+            os.replace(temporary_root, final_root)
+        else:
+            temporary_root.rmdir()
+
+        try:
+            registry_result = register_sources(
+                selections, registry, imported_paths=imported_paths,
+            )
+        except Exception:
+            if has_new_copy:
+                shutil.rmtree(final_root, ignore_errors=True)
+            raise
+
+        return {
+            "imported_library_folder": str(incoming),
+            "import_batch": str(final_root) if has_new_copy else None,
+            "copied_files": copied_files,
+            "copied_bytes": copied_bytes,
+            "registry": registry_result,
+            "source_files_modified": False,
+            "source_files_moved": False,
+            "source_files_deleted": False,
+            "copy_integrity": "SHA256_VERIFIED",
+            "next_stage": "SCAN_LIBRARY",
+        }
+    except Exception:
+        shutil.rmtree(temporary_root, ignore_errors=True)
+        raise
