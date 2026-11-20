@@ -116,7 +116,9 @@ class TransactionalDistributionTests(unittest.TestCase):
         with patch("library_operations.distribution_plan",
                    side_effect=[ValueError("broken manifest"), single_plan]), \\
              patch("library_operations.distribute_assets_transactional",
-                   return_value={"results": [{"status": "VERIFIED_COPIED"}]}) as distribute:
+                   return_value={"results": [{"status": "VERIFIED_COPIED"}]}) as distribute, \
+             patch("finalization.finalize_library",
+                   return_value={"factory_finalized": True}) as finalize:
             result = auto_distribute_approved(
                 self.samples, self.staging, approve=True, journal_path=self.journal,
             )
@@ -128,6 +130,8 @@ class TransactionalDistributionTests(unittest.TestCase):
         self.assertEqual(len(result["rejected"]), 1)
         self.assertEqual(Path(result["rejected"][0]["manifest_path"]), bad)
         distribute.assert_called_once()
+        finalize.assert_called_once()
+        self.assertTrue(result["finalization"]["factory_finalized"])
         self.assertTrue(result["source_originals_deleted"] is False)
 
     def test_existing_destination_blocks_the_entire_batch_before_copy(self) -> None:
