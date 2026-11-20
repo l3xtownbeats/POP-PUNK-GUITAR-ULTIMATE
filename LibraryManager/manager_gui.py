@@ -14,6 +14,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from pathlib import Path
 
+from app_paths import resolve_runtime_paths, resource_file
+
 from unified_manager import AUDIO_EXT, run_manager, quick_scan, resolve_samples_root
 from source_import import register_sources
 from pattern_clip_extractor import extract_pattern_occurrences
@@ -34,10 +36,16 @@ from library_operations import (
 )
 from ppgu_theme import NEON_STAGE_THEME, resource_path
 
-APP_VERSION = "3.0.0-dev7"
-MANAGER_DIR = Path(__file__).resolve().parent
-DEFAULT_SAMPLES = MANAGER_DIR.parent / "Samples"
+APP_VERSION = "3.0.0-dev8"
+BUNDLE_DIR, MANAGER_DIR, PORTABLE_MODE = resolve_runtime_paths(__file__)
+DEFAULT_SAMPLES = (
+    BUNDLE_DIR.parent / "Samples"
+    if PORTABLE_MODE and (BUNDLE_DIR.parent / "Samples").is_dir()
+    else MANAGER_DIR / "Samples"
+)
 STAGING_ROOT = MANAGER_DIR / "staging"
+MANAGER_DIR.mkdir(parents=True, exist_ok=True)
+STAGING_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 class LibraryManagerApp:
@@ -1688,7 +1696,9 @@ class LibraryManagerApp:
 
     def open_user_guide(self) -> None:
         """Open the numbered Russian quick-start guide in the default browser."""
-        guide = MANAGER_DIR / "PORTABLE_USER_GUIDE_RU.md"
+        guide = resource_file(
+            "PORTABLE_USER_GUIDE_RU.md", module_file=__file__, bundle_dir=BUNDLE_DIR
+        )
         if not guide.is_file():
             messagebox.showinfo("Инструкция", "Файл PORTABLE_USER_GUIDE_RU.md не найден рядом с приложением.")
             return
