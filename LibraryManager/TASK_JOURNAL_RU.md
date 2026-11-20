@@ -958,3 +958,14 @@ PPGU использует собственный визуальный язык �
 - Добавлен regression test на portable-mode staging path.
 - Статус: исправление внесено в ветку. Windows CI и runtime smoke tests всё ещё должны подтвердить фактическое поведение.
 
+
+
+## Запись TJ-2026-11-20-MANAGER-CI-022 — статус проверки ревизии dev8
+
+- Дата: 2026-11-20
+- HEAD: `ba3a273da3214ee85f14efb79e84f1eef8e7d056`.
+- GitHub Actions run `44679322170` (Library Manager Tests): `failure`.
+- GitHub Actions run `44679322194` (Library Manager Windows Package): `failure`.
+- Оба job завершились с пустым списком шагов; загрузка логов вернула `BlobNotFound`; artifacts не опубликованы.
+- Вывод: причина отказа на уровне workflow runner/службы по доступным данным не установлена; нельзя утверждать, что это ошибка Python-кода, и нельзя утверждать, что код прошёл тесты.
+- Бинарные Portable ZIP и Installer EXE не созданы/не подтверждены. PR #5 остаётся draft.
