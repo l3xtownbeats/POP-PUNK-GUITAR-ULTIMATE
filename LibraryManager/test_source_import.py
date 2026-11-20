@@ -52,6 +52,29 @@ class SourceImportTests(unittest.TestCase):
         data = json.loads(self.registry.read_text(encoding="utf-8"))
         self.assertEqual(data["source_count"], 2)
 
+    def test_inaccessible_nested_folder_is_reported_not_silently_skipped(self):
+        from unittest.mock import patch
+        import os
+        real_scandir = os.scandir
+
+        def guarded_scandir(path):
+            if Path(path).name == "Nested":
+                raise PermissionError("simulated access denied")
+            return real_scandir(path)
+
+        with patch("source_import.os.scandir", side_effect=guarded_scandir):
+            result = register_sources([self.library], self.registry)
+
+        self.assertTrue(any(
+            item.get("stage") == "IMPORT_DIRECTORY_SCAN"
+            and Path(item["path"]).name == "Nested"
+            for item in result["errors"]
+        ))
+        data = json.loads(self.registry.read_text(encoding="utf-8"))
+        self.assertEqual(data["source_count"], 1)
+        self.assertTrue(self.sfz.exists())
+        self.assertTrue(self.wav.exists())
+
     def test_sfz_dependencies_are_audited_and_saved_to_registry(self):
         result = register_sources([self.library], self.registry)
         data = json.loads(self.registry.read_text(encoding="utf-8"))
