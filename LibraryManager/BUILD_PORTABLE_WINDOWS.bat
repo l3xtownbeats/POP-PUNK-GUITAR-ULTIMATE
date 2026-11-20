@@ -9,5 +9,6 @@ py -3.11 -m PyInstaller --noconfirm --clean --windowed --onedir --name POP_PUNK_
 if errorlevel 1 exit /b 1
 echo.
 echo Build completed: %~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER
-echo Copy the entire folder to the target Windows PC.
+> "%~dp0dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\portable.mode" echo portable
+echo Copy the entire folder to the target Windows PC. User data will be stored in UserData.
 endlocal
