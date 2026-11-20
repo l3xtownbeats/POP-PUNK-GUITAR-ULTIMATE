@@ -797,8 +797,6 @@ class LibraryManagerApp:
                     except Exception as exc:
                         if self._cancel_event.is_set():
                             raise
-                        if self._cancel_event.is_set():
-                            raise
                         extraction_failures.append({
                             "source_path": record.get("source_path"),
                             "stage": "CHORD_SAMPLE_EXTRACTION",
@@ -836,6 +834,8 @@ class LibraryManagerApp:
                                 "error": "Не обнаружены надёжные кандидаты pitch-events; WAV не создан.",
                             })
                     except Exception as exc:
+                        if self._cancel_event.is_set():
+                            raise
                         extraction_failures.append({
                             "source_path": str(source),
                             "stage": "SAMPLE_MELODY_EXTRACTION",
