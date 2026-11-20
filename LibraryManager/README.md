@@ -1,5 +1,12 @@
 # AUTO SOUND HUNTER MANAGER 3.0
 
+## PROJECT BASELINE STATUS — ONE EQUIVALENT MEANING
+
+Throughout this project, **BASE / БАЗА**, **APPROVED / УТВЕРЖДЕНО**, **FIXED / ЗАФИКСИРОВАНО**, **CONFIRMED / ПОДТВЕРЖДЕНО**, **ACCEPTED / ПРИНЯТО**, **FINAL**, and **LOCKED** all mean the same thing: the user has approved and frozen the decision as part of the binding project baseline. Explicit user statements such as “I approve this”, “оставляем так”, and “это окончательный вариант” have the same force.
+
+Do not reinterpret, redesign, replace, or remove a baseline decision without the user's explicit authorization. New approved decisions are added to the baseline. If a new request appears to conflict with an existing baseline decision, pause and ask the user to resolve the conflict before changing it.
+
+
 > **PRODUCT BOUNDARY — APPROVED / FINAL / LOCKED**
 >
 > AUTO SOUND HUNTER MANAGER 3.0 is a standalone Windows application that imports, scans, analyzes, sorts and processes guitar sample sources, then builds a structured sample library for the separate POP PUNK GUITAR ULTIMATE VST3 instrument.
