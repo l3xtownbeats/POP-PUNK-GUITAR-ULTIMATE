@@ -147,7 +147,7 @@ class UnifiedManagerTests(unittest.TestCase):
         real_scandir = os.scandir
 
         def guarded_scandir(path):
-            if Path(path) == locked:
+            if Path(path).resolve() == locked.resolve():
                 raise PermissionError("simulated nested folder access denied")
             return real_scandir(path)
 
