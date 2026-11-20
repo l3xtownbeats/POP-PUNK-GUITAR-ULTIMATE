@@ -428,9 +428,9 @@ class LibraryManagerApp:
         self._cancel_button.pack(side="right", padx=(8, 0))
 
         self._write(
-            "NEON STAGE DEFAULT / SKIN-1 загружена из темы PPGU.\\n"
-            "На главном экране — шесть рабочих этапов; вспомогательные инструменты находятся в меню своих разделов.\\n"
-            "Оригиналы read-only. В FACTORY допускаются только REVIEWED + LICENSE_APPROVED + VERIFIED материалы.\\n"
+            "NEON STAGE DEFAULT / SKIN-1 загружена из темы PPGU.\n"
+            "На главном экране — шесть рабочих этапов; вспомогательные инструменты находятся в меню своих разделов.\n"
+            "Оригиналы read-only. В FACTORY допускаются только REVIEWED + LICENSE_APPROVED + VERIFIED материалы.\n"
         )
 
     def _copy_log_text(self, value: str) -> None:
@@ -699,7 +699,7 @@ class LibraryManagerApp:
             guitar_confirmed = messagebox.askyesno(
                 "Подтверждение гитарного источника",
                 "Подтверждаете, что выбранная библиотека предназначена для гитарного плагина "
-                "и уже очищена от Piano / Bell / Drum материалов?\\n\\n"
+                "и уже очищена от Piano / Bell / Drum материалов?\n\n"
                 "При ответе «Нет» Manager всё равно завершит инвентаризацию и акустический анализ, "
                 "но не будет запускать гитарное извлечение Pattern / Chord / Sample / Melody.",
             )
@@ -1049,7 +1049,7 @@ class LibraryManagerApp:
                 "plugin_asset_catalog", "plugin_library_coverage"
             ) + ".json")
             structure_result = write_library_structure(output, structure_output, coverage_output)
-            chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+            chromatic_output.write_text(json.dumps(chromatic_map, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             return {
                 "plugin_asset_catalog": catalog_result,
                 "performance_manifest": performance_result,
@@ -1075,10 +1075,10 @@ class LibraryManagerApp:
         flat = "  ".join(item["canonical_name"] for item in chromatic_note_table(spelling="flat"))
         messagebox.showinfo(
             "PPGU — 12 нот / Auto Chords",
-            "Все 12 хроматических высот сохраняются и доступны для исполнения.\\n\\n"
-            f"Диезы: {sharp}\\n\\nБемоли: {flat}\\n\\n"
-            "Энгармонические названия объединяются в один pitch class: C# = Db, D# = Eb, F# = Gb и т. д.\\n"
-            "E и F — разные ноты.\\n\\n"
+            "Все 12 хроматических высот сохраняются и доступны для исполнения.\n\n"
+            f"Диезы: {sharp}\n\nБемоли: {flat}\n\n"
+            "Энгармонические названия объединяются в один pitch class: C# = Db, D# = Eb, F# = Gb и т. д.\n"
+            "E и F — разные ноты.\n\n"
             "Auto Chords использует ту же карту высот. Названия-дубликаты объединяются, "
             "но хроматические ноты не удаляются. Непроверенные WAV и fallback не допускаются автоматически."
         )
@@ -1649,11 +1649,11 @@ class LibraryManagerApp:
             return
         if not messagebox.askyesno(
             "Автоматическое распределение FACTORY",
-            f"Менеджер автоматически проверит все {manifest_count} манифестов.\\n"
+            f"Менеджер автоматически проверит все {manifest_count} манифестов.\n"
             "Будут скопированы только кандидаты с подтверждённой музыкальной проверкой, "
-            "разрешённой лицензией, целыми SHA-256 и корректными PCM WAV/границами.\\n"
+            "разрешённой лицензией, целыми SHA-256 и корректными PCM WAV/границами.\n"
             "Повреждённые, недоступные и неподтверждённые записи будут внесены в отчёт, "
-            "а обработка продолжится со следующими. Каждый WAV копируется отдельной транзакцией.\\n"
+            "а обработка продолжится со следующими. Каждый WAV копируется отдельной транзакцией.\n"
             "Оригиналы не перемещаются и не удаляются. Продолжить?",
         ):
             self.status.set("Автоматическое распределение отменено")
