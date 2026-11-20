@@ -72,6 +72,35 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertEqual(summary["directories_scanned"], 1)
         self.assertTrue(any("БЫСТРОЕ СКАНИРОВАНИЕ ЗАВЕРШЕНО" in item for item in messages))
 
+    def test_quick_scan_skips_unreadable_nested_folder_and_finishes(self) -> None:
+        locked = self.incoming / "locked"
+        locked.mkdir()
+        make_test_wav(locked / "hidden.wav")
+        healthy = self.incoming / "healthy.wav"
+        make_test_wav(healthy)
+        import os
+        real_scandir = os.scandir
+
+        def guarded_scandir(path):
+            if Path(path) == locked:
+                raise PermissionError("simulated nested folder access denied")
+            return real_scandir(path)
+
+        with patch("unified_manager.os.scandir", side_effect=guarded_scandir):
+            summary = quick_scan(
+                self.samples, reports_root=self.reports,
+            )
+
+        self.assertEqual(summary["files_found"], 1)
+        self.assertEqual(summary["directory_errors"], 1)
+        self.assertEqual(summary["directory_error_details"][0]["path"], str(locked))
+        report_dir = Path(summary["report_directory"])
+        errors = json.loads((report_dir / "quick_errors.json").read_text(encoding="utf-8"))
+        self.assertEqual(errors["directory_errors"][0]["stage"], "QUICK_DIRECTORY_SCAN")
+        inventory = (report_dir / "quick_inventory.csv").read_text(encoding="utf-8-sig")
+        self.assertIn("healthy.wav", inventory)
+        self.assertNotIn("hidden.wav", inventory)
+
     def test_quick_scan_fails_clearly_when_import_root_is_unreadable(self) -> None:
         import os
 
