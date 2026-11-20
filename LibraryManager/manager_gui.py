@@ -831,7 +831,7 @@ class LibraryManagerApp:
             mode_counts = analysis_result.get("mode_candidate_counts", {})
             mode_report_path = Path(analysis_result["report_directory"]) / "mode_sorting_report.json"
             report_progress(
-                 "КЛАССИФИКАЦИЯ ПО 10 КАТЕГОРИЯМ ПОДГОТОВКИ БИБЛИОТЕКИ ДЛЯ VST3: "
+                "КЛАССИФИКАЦИЯ ПО 10 КАТЕГОРИЯМ ПОДГОТОВКИ БИБЛИОТЕКИ ДЛЯ VST3: "
                 + "; ".join(f"{name}: {count}" for name, count in mode_counts.items())
                 + f". Отчёт: {mode_report_path}"
             )
@@ -1167,7 +1167,7 @@ class LibraryManagerApp:
             }
 
         self._write("=== СБОРКА КАТАЛОГА ДЛЯ VST3 ===")
-        self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и все 10 режимов. Непроверенные WAV не становятся playable.")
+        self._write("Проверяются SHA-256 источников и WAV-кандидатов, source offsets, статусы review/license и 10 категорий назначения ассетов для VST3. Непроверенные WAV не становятся playable.")
         self._background("Сборка каталога VST3", work)
 
     def open_chromatic_pitch_map(self) -> None:
