@@ -90,7 +90,8 @@ jobs:
           if (!(Test-Path $setup) -or (Get-Item $setup).Length -lt 1024) { throw "Installer EXE is missing or unexpectedly small." }
           $installDir = Join-Path $env:TEMP "PPGU-Manager-Installer-Smoke"
           if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force }
-          Start-Process -FilePath (Resolve-Path $setup) -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir" -Wait
+          $installArgs = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=`"$installDir`""
+          Start-Process -FilePath (Resolve-Path $setup) -ArgumentList $installArgs -Wait
           $installedExe = Join-Path $installDir "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
           if (!(Test-Path $installedExe)) { throw "Silent installer did not place the GUI executable." }
           $oldPath = $env:PATH
