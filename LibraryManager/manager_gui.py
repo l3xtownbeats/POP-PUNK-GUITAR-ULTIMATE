@@ -1075,7 +1075,7 @@ class LibraryManagerApp:
             if self._cancel_event.is_set():
                 raise RuntimeError("Полный цикл остановлен до сборки каталога; исходные файлы не изменены.")
 
-            report_progress("ЭТАП 8/8: проверка и сборка plugin_asset_catalog для всех 10 режимов VST3.")
+            report_progress("ЭТАП 8/8: проверка и сборка каталога по 10 категориям подготовленной библиотеки для VST3.")
             catalog_path = Path(analysis_result["report_directory"]) / "plugin_asset_catalog.json"
             catalog_result = build_plugin_asset_catalog(
                 STAGING_ROOT,
