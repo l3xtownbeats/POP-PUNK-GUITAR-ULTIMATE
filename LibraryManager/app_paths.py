@@ -55,3 +55,9 @@ def resource_file(name: str, *, module_file: str | Path,
         if candidate.is_file():
             return candidate
     return roots[0] / name if roots else module_dir / name
+
+
+def runtime_staging_root(module_file: str | Path) -> Path:
+    """Return the same writable staging root used by the GUI in every build mode."""
+    _bundle, data_dir, _portable = resolve_runtime_paths(module_file)
+    return (data_dir / "staging").resolve()
