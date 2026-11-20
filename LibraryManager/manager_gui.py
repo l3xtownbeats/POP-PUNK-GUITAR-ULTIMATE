@@ -56,7 +56,7 @@ class LibraryManagerApp:
         self.root.geometry("980x680")
         self.root.minsize(760, 520)
         self.samples_root = tk.StringVar(value=str(DEFAULT_SAMPLES))
-        self.analyze_audio = tk.BooleanVar(value=False)
+        self.analyze_audio = tk.BooleanVar(value=True)
         self.guitar_confirmed = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Готов. Выберите Samples или непосредственно Import Sample Guitar.")
         # Worker threads must never call Tkinter methods. They only enqueue events;
@@ -214,7 +214,7 @@ class LibraryManagerApp:
             selectcolor=accent, bd=0, relief="flat",
         )
         settings_menu.add_checkbutton(
-            label="Тяжёлый аудиоанализ (медленнее)",
+            label="Полный аудиоанализ и извлечение кандидатов (рекомендуется)",
             variable=self.analyze_audio,
         )
         settings_menu.add_checkbutton(
@@ -695,6 +695,16 @@ class LibraryManagerApp:
             return
         analyze_audio = self.analyze_audio.get()
         guitar_confirmed = self.guitar_confirmed.get()
+        if analyze_audio and not guitar_confirmed:
+            guitar_confirmed = messagebox.askyesno(
+                "Подтверждение гитарного источника",
+                "Подтверждаете, что выбранная библиотека предназначена для гитарного плагина "
+                "и уже очищена от Piano / Bell / Drum материалов?\\n\\n"
+                "При ответе «Нет» Manager всё равно завершит инвентаризацию и акустический анализ, "
+                "но не будет запускать гитарное извлечение Pattern / Chord / Sample / Melody.",
+            )
+            if guitar_confirmed:
+                self.guitar_confirmed.set(True)
 
         def work():
             def report_progress(message: str) -> None:
