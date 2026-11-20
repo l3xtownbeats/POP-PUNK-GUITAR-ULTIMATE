@@ -97,6 +97,8 @@ class LibraryManagerApp:
         disabled = palette["text_disabled"]
         accent = palette["accent"]
         accent_glow = palette["accent_glow"]
+        accent_purple = palette["accent_purple"]
+        accent_magenta = palette["accent_magenta"]
         green = palette["success"]
         amber = palette["warning"]
         red = palette["danger"]
@@ -128,7 +130,7 @@ class LibraryManagerApp:
         )
         style.map(
             "PPGU.Primary.TButton",
-            background=[("disabled", control_face), ("pressed", "#A9C936"), ("active", accent_glow)],
+            background=[("disabled", control_face), ("pressed", accent_glow), ("active", accent_glow)],
             foreground=[("disabled", disabled)],
             bordercolor=[("active", accent_glow)],
         )
@@ -256,7 +258,7 @@ class LibraryManagerApp:
         ).pack(anchor="w", pady=(2, 0))
         tk.Label(
             brand,
-            text="SKIN-1  •  CARBON STUDIO  •  ECO-FRIENDLY VISUAL LAYER",
+            text="SKIN-1  •  NEON STAGE  •  BLUE / PURPLE / MAGENTA",
             bg=bg, fg=disabled, font=("Consolas", 8),
         ).pack(anchor="w", pady=(7, 0))
 
@@ -287,7 +289,7 @@ class LibraryManagerApp:
             font=("Consolas", 11, "bold"),
         ).pack(anchor="e", pady=(3, 0))
         tk.Label(
-            version, text="PPGU  /  SKIN-1", bg=panel_alt, fg=green,
+            version, text="PPGU  /  SKIN-1", bg=panel_alt, fg=accent_magenta,
             font=("Segoe UI", 8, "bold"),
         ).pack(anchor="e", pady=(5, 0))
 
@@ -356,7 +358,7 @@ class LibraryManagerApp:
                 highlightthickness=1, padx=14, pady=12,
             )
             card.grid(row=row, column=column, sticky="nsew", padx=5, pady=5)
-            tk.Frame(card, bg=accent, height=3).pack(fill="x", pady=(0, 10))
+            tk.Frame(card, bg=(accent, accent_purple, accent_magenta)[index % 3], height=3).pack(fill="x", pady=(0, 10))
             top = tk.Frame(card, bg=panel)
             top.pack(fill="x")
             tk.Label(
