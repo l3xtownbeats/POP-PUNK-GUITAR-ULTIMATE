@@ -441,12 +441,15 @@ def import_sources_to_library(
         file_groups.setdefault(drive_key, []).append(item)
 
     file_plan: dict[str, tuple[Path, Path]] = {}
-    for group in file_groups.values():
-        common = Path(os.path.commonpath([str(item.parent) for item in group])).resolve()
+    file_group_key_by_identity: dict[str, str] = {}
+    for drive_group in file_groups.values():
+        common = Path(os.path.commonpath([str(item.parent) for item in drive_group])).resolve()
         group_key = hashlib.sha256(str(common).encode("utf-8")).hexdigest()[:10]
         destination_base = temporary_root / "Selected_Files" / group_key
-        for item in group:
-            file_plan[_identity(item)] = (common, destination_base)
+        for item in drive_group:
+            identity = _identity(item)
+            file_plan[identity] = (common, destination_base)
+            file_group_key_by_identity[identity] = group_key
 
     def reusable_existing(source: Path) -> tuple[Path, str] | None:
         record = existing_records.get(_identity(source), {})
@@ -475,6 +478,37 @@ def import_sources_to_library(
             raise
         return None
 
+    # A library is a dependency set, not a bag of independent files. If even
+    # one item in a previously imported folder has changed, refresh the entire
+    # selected folder so SFZ sample/include paths resolve within one versioned
+    # package rather than mixing old and new batches.
+    force_copy_directories: set[str] = set()
+    for directory in selected_directories:
+        try:
+            directory.relative_to(incoming)
+            continue
+        except ValueError:
+            pass
+        for source in _walk(directory, errors):
+            if reusable_existing(source) is None:
+                force_copy_directories.add(_identity(directory))
+                break
+
+    force_copy_file_groups: set[str] = set()
+    for group_key, group in file_groups.items():
+        if any(reusable_existing(source) is None for source in group):
+            common = Path(os.path.commonpath([str(item.parent) for item in group])).resolve()
+            force_copy_file_groups.add(
+                hashlib.sha256(str(common).encode("utf-8")).hexdigest()[:10]
+            )
+
+    if errors:
+        first = errors[0]
+        raise OSError(
+            "Не удалось полностью проверить выбранные источники до импорта: "
+            f"{first.get('path')}: {first.get('error')}"
+        )
+
     try:
         temporary_root.mkdir(parents=False, exist_ok=False)
         for selection_index, selected in enumerate(selections, start=1):
@@ -484,18 +518,23 @@ def import_sources_to_library(
                 if selected not in selected_directories:
                     # A nested directory is already included by a selected parent.
                     continue
+                force_refresh_group = _identity(selected) in force_copy_directories
                 files = _walk(selected, errors)
                 source_root = selected
                 destination_base = temporary_root / "Sources" / (
                     f"{selection_index:03d}_{_safe_folder_name(selected.name)}"
                 )
             else:
-                if _identity(selected) not in file_plan:
+                selected_identity = _identity(selected)
+                if selected_identity not in file_plan:
                     # A separately selected file already included by a selected
                     # directory is copied as part of that directory instead.
                     continue
+                force_refresh_group = (
+                    file_group_key_by_identity[selected_identity] in force_copy_file_groups
+                )
                 files = [selected]
-                source_root, destination_base = file_plan[_identity(selected)]
+                source_root, destination_base = file_plan[selected_identity]
 
             for source in files:
                 source = source.resolve()
@@ -514,7 +553,7 @@ def import_sources_to_library(
                     imported_paths[str(source)] = source
                     continue
 
-                reusable = reusable_existing(source)
+                reusable = None if force_refresh_group else reusable_existing(source)
                 if reusable is not None:
                     imported_paths[str(source)] = reusable[0]
                     imported_hashes[str(source)] = reusable[1]
