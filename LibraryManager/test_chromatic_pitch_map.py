@@ -50,7 +50,9 @@ class ChromaticPitchMapTests(unittest.TestCase):
         manifest = build_chromatic_pitch_map(catalog, midi_min=60, midi_max=61)
         self.assertEqual(manifest["midi_note_map"][0]["status"], "EXACT_APPROVED_SAMPLE")
         self.assertEqual(manifest["midi_note_map"][0]["asset_ids"], ["OK"])
-        self.assertEqual(manifest["midi_note_map"][1]["status"], "SOURCE_MISSING")
+        self.assertEqual(manifest["midi_note_map"][1]["status"], "FALLBACK_PROPOSAL_REQUIRES_QA")
+        self.assertFalse(manifest["midi_note_map"][1]["runtime_ready_in_catalog"])
+        self.assertEqual(manifest["midi_note_map"][1]["source_midi_note"], 60)
 
     def test_autochords_deduplicates_aliases_not_distinct_notes(self):
         self.assertEqual(canonical_pitch_classes(["C#", "Db", "D#", "Eb", "E", "F"]),
