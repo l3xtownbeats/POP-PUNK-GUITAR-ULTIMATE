@@ -94,12 +94,18 @@ def build_mode_assignment_index(staging_root: Path) -> dict[str, Any]:
         derived = Path(str(manifest.get("derived_path") or ""))
         if not derived.is_absolute():
             derived = (manifest_path.parent / derived).resolve()
-        wav_valid = (
-            _inside(derived, root) and derived.is_file()
-            and derived.suffix.lower() in {".wav", ".wave"}
-            and bool(manifest.get("derived_sha256"))
-            and _sha256(derived) == str(manifest.get("derived_sha256")).upper()
-        )
+        # A file can disappear or become unreadable between is_file() and
+        # hashing (for example, removable/network drives or concurrent changes).
+        # Treat that asset as invalid and continue indexing the remaining queue.
+        try:
+            wav_valid = (
+                _inside(derived, root) and derived.is_file()
+                and derived.suffix.lower() in {".wav", ".wave"}
+                and bool(manifest.get("derived_sha256"))
+                and _sha256(derived) == str(manifest.get("derived_sha256")).upper()
+            )
+        except OSError:
+            wav_valid = False
         for mode in dict.fromkeys(assignments):
             runtime_status, reasons = _runtime_gate(mode, manifest, wav_valid)
             queues[mode].append({
