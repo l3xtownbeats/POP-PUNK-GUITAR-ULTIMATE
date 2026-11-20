@@ -922,7 +922,7 @@ class LibraryManagerApp:
                             "error": f"{type(exc).__name__}: {exc}",
                         })
 
-                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV для SAMPLE MODE / Chord / Auto Chords.")
+                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV-кандидатов для SAMPLE MODE и AutoChords внутри PATTERN.")
                 from chord_clip_extractor import extract_chord_samples
                 for record in records:
                     if self._cancel_event.is_set():
@@ -1034,7 +1034,7 @@ class LibraryManagerApp:
                 "deep_analysis": analysis_result,
                 "physical_extraction": {
                     "long_recording_region_wav_count": extracted_region,
-                    "pattern_mode_wav_count": extracted_pattern,
+                    "pattern_instrument_wav_count": extracted_pattern,
                     "chord_and_power_chord_wav_count": extracted_chord,
                     "sample_mode_wav_count": extracted_sample,
                     "melody_mode_single_note_bindings": extracted_melody_notes,
