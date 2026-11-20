@@ -597,11 +597,19 @@ class LibraryManagerApp:
         def runner():
             try:
                 result = work()
-                self._task_journal.finish(task_id, title, result=result)
-                self._worker_events.put(("finish", title, result))
+                if self._cancel_event.is_set():
+                    self._task_journal.cancel(task_id, title)
+                    self._worker_events.put(("cancelled", title, result))
+                else:
+                    self._task_journal.finish(task_id, title, result=result)
+                    self._worker_events.put(("finish", title, result))
             except Exception as exc:
-                self._task_journal.fail(task_id, title, f"{type(exc).__name__}: {exc}")
-                self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
+                if self._cancel_event.is_set():
+                    self._task_journal.cancel(task_id, title, f"{type(exc).__name__}: {exc}")
+                    self._worker_events.put(("cancelled", title, {"error": f"{type(exc).__name__}: {exc}"}))
+                else:
+                    self._task_journal.fail(task_id, title, f"{type(exc).__name__}: {exc}")
+                    self._worker_events.put(("error", title, f"{type(exc).__name__}: {exc}", traceback.format_exc()))
 
         worker = threading.Thread(target=runner, name="LibraryManagerWorker", daemon=True)
         self._worker_thread = worker
@@ -640,6 +648,15 @@ class LibraryManagerApp:
                     for button in self._action_buttons:
                         button.configure(state="normal")
                     self._finish(title, result)
+                elif kind == "cancelled":
+                    _, title, result = event
+                    self._job_running = False
+                    self._worker_thread = None
+                    self._cancel_button.configure(state="disabled")
+                    for button in self._action_buttons:
+                        button.configure(state="normal")
+                    self._write("[ОСТАНОВЛЕНО] " + json.dumps(result, ensure_ascii=False, indent=2, default=str))
+                    self.status.set(title + ": остановлено; частичные отчёты сохранены")
                 elif kind == "error":
                     _, title, error_text, details = event
                     self._job_running = False
@@ -751,14 +768,14 @@ class LibraryManagerApp:
                 write_virtual=False,
                 progress=report_progress,
                 cancel_event=self._cancel_event,
-                workers=2,
+                workers=1,
             )
             return {
                 "quick_scan": quick_result,
                 "deep_inventory": deep_result,
                 "acoustic_analysis_performed": False,
                 "physical_extraction_performed": False,
-                "workers": 2,
+                "workers": 1,
                 "source_files_modified": False,
             }
 
