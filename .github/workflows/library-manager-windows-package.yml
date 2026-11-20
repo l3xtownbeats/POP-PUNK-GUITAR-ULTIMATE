@@ -3,6 +3,8 @@ name: Library Manager Windows Package
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "release/3.0-final"
     paths:
       - "LibraryManager/**"
       - ".github/workflows/library-manager-windows-package.yml"
