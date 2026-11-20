@@ -54,6 +54,50 @@ class RuntimePathTests(unittest.TestCase):
                  patch("app_paths.sys.executable", str(exe)):
                 self.assertEqual(runtime_staging_root(exe), Path(directory) / "UserData" / "staging")
 
+    def test_portable_fallback_uses_stable_profile_outside_read_only_bundle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            exe = base / "ReadOnly" / "Manager.exe"
+            exe.parent.mkdir()
+            exe.touch()
+            (exe.parent / "portable.mode").write_text("portable-profile-123", encoding="utf-8")
+            local = base / "LocalAppData"
+            calls = []
+
+            def probe(path):
+                calls.append(path)
+                if path == exe.parent / "UserData":
+                    return False
+                path.mkdir(parents=True, exist_ok=True)
+                return True
+
+            bundle, data, portable = resolve_runtime_paths(
+                exe, executable=exe, frozen=True,
+                environ={"LOCALAPPDATA": str(local)},
+                writable_probe=probe,
+            )
+            self.assertEqual(bundle, exe.parent)
+            self.assertEqual(
+                data,
+                local / APP_FOLDER_NAME / "PortableFallback" / "portable-profile-123",
+            )
+            self.assertTrue(portable)
+            self.assertEqual(calls[0], exe.parent / "UserData")
+
+    def test_portable_can_run_from_arbitrary_parent_folder(self):
+        with tempfile.TemporaryDirectory() as directory:
+            exe = Path(directory) / "D" / "Audio" / "Tools" / "Manager.exe"
+            exe.parent.mkdir(parents=True)
+            exe.touch()
+            (exe.parent / "portable.mode").write_text("relocatable-id", encoding="utf-8")
+            bundle, data, portable = resolve_runtime_paths(
+                exe, executable=exe, frozen=True,
+                environ={},
+            )
+            self.assertEqual(bundle, exe.parent)
+            self.assertEqual(data, exe.parent / "UserData")
+            self.assertTrue(portable)
+
     def test_resource_resolution_uses_bundle(self):
         with tempfile.TemporaryDirectory() as directory:
             module = Path(directory) / "manager_gui.py"
