@@ -33,6 +33,7 @@ from library_operations import (
     cleanup_original_sources,
     distribute_assets_transactional,
     distribution_plan,
+    auto_distribute_approved,
 )
 from ppgu_theme import NEON_STAGE_THEME, resource_path
 
@@ -1604,42 +1605,38 @@ class LibraryManagerApp:
         )
 
     def distribute(self) -> None:
+        """Automatically distribute all independently verified approved assets."""
         try:
             samples = self._samples()
         except Exception as exc:
             messagebox.showerror("Папка Samples", str(exc))
             return
-        selected = filedialog.askopenfilenames(
-            title="Выберите проверенные JSON-манифесты из LibraryManager/staging",
-            initialdir=str(STAGING_ROOT),
-            filetypes=[("JSON manifests", "*.json")],
-        )
-        if not selected:
+        manifests_dir = STAGING_ROOT / "manifests"
+        manifest_count = len(list(manifests_dir.glob("*.json"))) if manifests_dir.is_dir() else 0
+        if manifest_count == 0:
+            messagebox.showinfo("FACTORY", "В staging пока нет манифестов для распределения.")
             return
-        manifests = [Path(item) for item in selected]
-        try:
-            plan = distribution_plan(manifests, samples, STAGING_ROOT)
-        except Exception as exc:
-            messagebox.showerror("План распределения", str(exc))
-            return
-        preview = "\n".join(
-            f'{entry["category_path"]}\n  {entry["source_path"]}\n  → {entry["destination_path"]}'
-            for entry in plan["entries"]
-        )
-        self._write("ПЛАН РАСПРЕДЕЛЕНИЯ (пока без изменений):\n" + preview)
         if not messagebox.askyesno(
-            "Подтверждение копирования",
-            f"Будет скопировано файлов: {len(plan['entries'])}.\n"
-            "Каждый файл и манифест прошёл проверку review/license/SHA-256.\n"
-            "Оригиналы останутся на месте.\n\nВыполнить копирование в FACTORY?"
+            "Автоматическое распределение FACTORY",
+            f"Менеджер автоматически проверит все {manifest_count} манифестов.\\n"
+            "Будут скопированы только кандидаты с подтверждённой музыкальной проверкой, "
+            "разрешённой лицензией, целыми SHA-256 и корректными PCM WAV/границами.\\n"
+            "Повреждённые, недоступные и неподтверждённые записи будут внесены в отчёт, "
+            "а обработка продолжится со следующими. Каждый WAV копируется отдельной транзакцией.\\n"
+            "Оригиналы не перемещаются и не удаляются. Продолжить?",
         ):
-            self.status.set("Распределение отменено пользователем")
+            self.status.set("Автоматическое распределение отменено")
             return
-        self._background("Распределение FACTORY (транзакция)", lambda: distribute_assets_transactional(
-            plan, staging_root=STAGING_ROOT, approve=True,
-            journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
-            cancel_event=self._cancel_event,
-        ))
+
+        def work():
+            return auto_distribute_approved(
+                samples, STAGING_ROOT, approve=True,
+                journal_path=samples / "FACTORY" / "LibraryManagerReports" / "operations.jsonl",
+                cancel_event=self._cancel_event,
+                progress=self._queue_progress,
+            )
+
+        self._background("Автоматическое распределение FACTORY", work)
 
     def audit_cleanup(self) -> None:
         try:
