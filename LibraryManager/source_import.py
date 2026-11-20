@@ -363,6 +363,30 @@ def import_sources_to_library(
     seen_sources: set[str] = set()
     has_new_copy = False
 
+    # Individual files selected from the same library retain their common
+    # relative directory tree. This keeps SFZ sample= and #include references
+    # resolvable when the user selects an SFZ and its samples as separate files.
+    selected_directories = [item for item in selections if item.is_dir()]
+    file_groups: dict[str, list[Path]] = {}
+    for item in selections:
+        if not item.is_file():
+            continue
+        if any(
+            item == directory or directory in item.parents
+            for directory in selected_directories
+        ):
+            continue
+        drive_key = item.drive.casefold()
+        file_groups.setdefault(drive_key, []).append(item)
+
+    file_plan: dict[str, tuple[Path, Path]] = {}
+    for group in file_groups.values():
+        common = Path(os.path.commonpath([str(item.parent) for item in group])).resolve()
+        group_key = hashlib.sha256(str(common).encode("utf-8")).hexdigest()[:10]
+        destination_base = temporary_root / "Selected_Files" / group_key
+        for item in group:
+            file_plan[_identity(item)] = (common, destination_base)
+
     def reusable_existing(source: Path) -> Path | None:
         record = existing_records.get(_identity(source), {})
         target = Path(record.get("imported_path", "")) if record else Path()
@@ -392,11 +416,12 @@ def import_sources_to_library(
                     f"{selection_index:03d}_{_safe_folder_name(selected.name)}"
                 )
             else:
+                if _identity(selected) not in file_plan:
+                    # A separately selected file already included by a selected
+                    # directory is copied as part of that directory instead.
+                    continue
                 files = [selected]
-                source_root = selected.parent
-                destination_base = temporary_root / "Selected_Files" / (
-                    f"{selection_index:03d}_{_safe_folder_name(selected.parent.name)}"
-                )
+                source_root, destination_base = file_plan[_identity(selected)]
 
             if errors:
                 first = errors[0]
