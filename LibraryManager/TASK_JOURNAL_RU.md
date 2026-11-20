@@ -1081,3 +1081,11 @@ PPGU использует собственный визуальный язык �
 - Добавлены регрессионные тесты на Portable UserData reports/cache и чтение индекса из UserData/staging.
 - Изменение не меняет исходники Samples, не меняет классификацию и не открывает FACTORY gate.
 - Полный набор тестов и фактический Windows запуск пока ожидают выполнения.
+
+
+## Дополнение к TJ-2026-11-20-MANAGER-PATTERN-031 — единая вкладка PATTERN и терминология отчёта
+
+- Уточнено в README и Keyboard Playback Spec: у плагина остаются две главные вкладки MELODY и PATTERN. Chord-driven Pattern Instrument, его ритмические клипы и вспомогательное окно AutoChords находятся внутри одной вкладки PATTERN; это не дополнительные главные режимы/вкладки.
+- Внутренние типы данных остаются раздельными: цельные rhythm-pattern performances индексируются как PATTERN_INSTRUMENT assets, а pitch-specific note clips обслуживают одноклавишный режим воспроизведения. Эти данные не смешиваются и не подменяют друг друга.
+- В отчёте полного цикла поле `pattern_mode_wav_count` исправлено на `pattern_instrument_wav_count`, потому что этап 4 физически извлекает цельные ритмические исполнения для Pattern Instrument.
+- Текст этапа 5 уточнён: аккордовые/Power Chord кандидаты идут в SAMPLE MODE и вспомогательную функцию AutoChords внутри PATTERN; отдельного CHORD mode нет.
