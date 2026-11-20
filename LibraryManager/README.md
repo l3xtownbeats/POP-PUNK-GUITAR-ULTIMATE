@@ -460,3 +460,15 @@ The manual review dialog now records explicit technique tags (Downstroke, Upstro
 - Добавлен regression test для отката частично скопированного пакета и защиты уже существующего файла.
 
 Это development build. Скорость зависит от диска, числа файлов и размера библиотеки; числовые гарантии производительности без измерения на конкретном компьютере не заявляются. Windows Portable smoke test и полный прогон тестов должны быть подтверждены отдельным успешным CI/локальным запуском.
+
+
+## Manager 3.0 dev8 — устойчивый цикл и Windows delivery
+
+- Portable and installed Windows package definitions are maintained from the same PyInstaller onedir build.
+- Portable mode stores mutable reports, staging, task history and caches in `UserData` beside the executable. Installed mode stores them in `%LOCALAPPDATA%\POP PUNK GUITAR Library Manager`, not in the application bundle or Program Files.
+- START HUNTING enables full audio analysis by default and asks once whether the selected import library is guitar-only before running guitar-specific extraction. If the answer is no, filesystem/deep inventory and acoustic analysis still run; guitar-specific extraction is skipped.
+- Extraction no longer has the old global 500-WAV ceiling. Candidate sets are processed in bounded per-engine chunks; a failure in one source is recorded and the next source is attempted.
+- BUILD LIBRARY can process all staging manifests automatically. Only independently reviewed, license-approved and integrity-verified candidates enter FACTORY. Each asset is copied in its own transaction; a failed asset does not roll back earlier verified copies. A final staging/FACTORY audit report is generated after distribution.
+- Inaccessible nested folders, locked files and unreadable Factory directories are recorded and do not silently turn a partial scan into a successful complete scan.
+
+The two Windows package types are defined in the workflow: Portable ZIP and Inno Setup installer EXE. They are **not considered release artifacts until the latest workflow succeeds and both packages pass startup and functional acceptance**. Manager 3.0 remains a development build while that verification is blocked.
