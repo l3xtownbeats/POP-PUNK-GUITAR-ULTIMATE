@@ -1,6 +1,14 @@
-# POP PUNK GUITAR LIBRARY MANAGER ULTIMATE
+# AUTO SOUND HUNTER MANAGER 3.0
 
-## Library Manager 3.0.0-dev9 — integrated multi-mode library preparation
+> **PRODUCT BOUNDARY — APPROVED / FINAL / LOCKED**
+>
+> AUTO SOUND HUNTER MANAGER 3.0 is a standalone Windows application that imports, scans, analyzes, sorts and processes guitar sample sources, then builds a structured sample library for the separate POP PUNK GUITAR ULTIMATE VST3 instrument.
+>
+> The VST3 plugin consumes the prepared library and performs guitar playback. MELODY and PATTERN are the plugin's two main modes; AutoChords is an auxiliary window inside PATTERN. These are **plugin features only**. They are not Manager modes, tabs or dashboard actions. Manager only prepares the library data needed by the plugin.
+>
+> This boundary must not be changed without the user's explicit approval.
+
+## Manager 3.0.0-dev9 — six primary dashboard actions and supporting tools
 
 This release line contains the six-stage Manager workflow: IMPORT GUITAR, SCAN LIBRARY, START HUNTING, REVIEW QUEUE, BUILD LIBRARY and VERIFY / RECOVERY. Source audio remains read-only during import, scan and analysis; approved Factory distribution is a separate, explicit, verified copy operation.
 
@@ -22,7 +30,7 @@ Keep this as the single approved Samples root. Put new incoming WAV, SFZ and arc
 3. Put incoming WAV, SFZ and archive files inside `Samples/Import Sample Guitar`.
 4. Double-click `RUN_LIBRARY_MANAGER.bat`.
 
-Python 3.10+ is required. The scanner uses only the Python standard library.
+Windows 10 x64 is the target platform. For source development, use Python 3.11 and install `requirements.txt`; the Windows packaging workflow also installs `requirements-build.txt`. The packaged application is intended to include its runtime and must not require a separate Python installation.
 
 ### Reports
 
@@ -45,7 +53,7 @@ Reports are written beside the tool in `reports/`:
 
 ### Tests
 
-The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compiles the Python modules and runs SFZ regression tests on Windows with Python 3.11.
+The GitHub Actions workflow `.github/workflows/library-manager-tests.yml` compiles the Manager Python modules and runs the full `unittest` regression suite on Ubuntu with Python 3.11. The separate Windows workflow builds and smoke-tests Portable ZIP and Installer EXE. A workflow definition is not proof of a successful run; check the latest CI result before calling a build verified.
 
 ### Safety
 
@@ -62,7 +70,7 @@ The Library Manager must distinguish exact file duplicates from similar guitar t
 
 The current exact-duplicate report uses SHA-256 identity and reports identical bytes; it does not delete anything. Any future perceptual near-duplicate detector must produce review-only candidates and must not perform automatic cleanup. Timbre similarity, rhythmic similarity, melodic/interval similarity, chord-sequence similarity and performance similarity must be represented as separate relationship dimensions. See [DUPLICATE_AND_SIMILARITY_POLICY.md](../docs/DUPLICATE_AND_SIMILARITY_POLICY.md) for the mandatory rules.
 
-## Required preparation for MELODY MODE and PATTERN MODE
+## Preparing the library consumed by the VST3 plugin
 
 The Library Manager is responsible for preparing pitch-specific playable note material for the plugin; it must not merely catalogue a long source recording or assign one identical clip to every MIDI key.
 
@@ -114,7 +122,7 @@ The Manager must prepare both kinds of content: pitch-specific note assets/mappi
 
 
 
-### Main plugin mode selector — fixed UI contract
+### VST3 consumer contract — reference only, not Manager UI
 
 The PPGU instrument has exactly two main player-facing mode selectors: **MELODY** and **PATTERN**. **AutoChords is a supporting panel inside PATTERN**, opened from PATTERN with its additional-window button; it is not a third mode and must not appear as a standalone CHORD mode. The Manager's ten library-preparation categories remain unchanged and are not the plugin's main mode selector.
 
