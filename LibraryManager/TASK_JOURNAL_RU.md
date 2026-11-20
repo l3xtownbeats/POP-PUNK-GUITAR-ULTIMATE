@@ -1069,3 +1069,15 @@ PPGU использует собственный визуальный язык �
 - Обычные note_event с target PATTERN_MODE остаются в соответствующей очереди и не теряют одноклавишную нотную семантику.
 - Обновлены тесты extractor/catalog и описание PATTERN MODE в README. Десять категорий Manager не меняются; третьего CHORD режима не добавляется.
 - Проверка тестов и Windows-сборки ожидает исполнения CI/локального Windows builder.
+
+
+## Запись TJ-2026-11-20-MANAGER-PORTABLE-032 — единые runtime-пути отчётов и staging index
+
+- Дата: 2026-11-20
+- Тип: **ФАКТИЧЕСКАЯ ЗАПИСЬ О ИСПРАВЛЕНИИ PORTABLE/INSTALLER RUNTIME**
+- Обнаружено: `quick_scan()` и `run_manager()` по умолчанию писали отчёты и SQLite hash/audio cache в папку рядом с исходным Python-модулем; дополнительно `run_manager()` строил индекс ручных назначений из статического `LibraryManager/staging`. Для Portable/Installer это могло обращаться к read-only папке программы вместо `UserData` / LocalAppData и не видеть фактические staged review manifests.
+- Исправлено: оба сканера получают persistent data directory через `resolve_runtime_paths(__file__)`; SQLite cache и отчёты создаются в runtime reports directory. Индекс review assignments строится из `runtime_staging_root(__file__)`, то есть из того же staging, что и GUI/extractors/catalog.
+- В source checkout поведение сохраняется: runtime data directory остаётся папкой LibraryManager.
+- Добавлены регрессионные тесты на Portable UserData reports/cache и чтение индекса из UserData/staging.
+- Изменение не меняет исходники Samples, не меняет классификацию и не открывает FACTORY gate.
+- Полный набор тестов и фактический Windows запуск пока ожидают выполнения.
