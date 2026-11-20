@@ -43,8 +43,16 @@ if errorlevel 1 exit /b 1
 if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
   "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%~dp0POP_PUNK_GUITAR_LIBRARY_MANAGER.iss"
   if errorlevel 1 exit /b 1
+  if not exist "dist\installer\POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe" (
+    echo ERROR: Installer compiler exited without producing the expected EXE.
+    exit /b 1
+  )
+  for %%A in ("dist\installer\POP-PUNK-GUITAR-LIBRARY-MANAGER-Setup-Windows-x64.exe") do if %%~zA LSS 1048576 (
+    echo ERROR: Installer EXE is unexpectedly small.
+    exit /b 1
+  )
 ) else (
-  echo Inno Setup not found. Portable ZIP is ready; install Inno Setup to build installer EXE.
+echo Inno Setup not found. Portable ZIP is ready; install Inno Setup to build installer EXE.
 )
 echo.
 echo BUILD FINISHED.
