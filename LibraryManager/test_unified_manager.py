@@ -141,6 +141,29 @@ class UnifiedManagerTests(unittest.TestCase):
         self.assertTrue(broken.exists())
         self.assertTrue(healthy.exists())
 
+    def test_deep_scan_path_key_does_not_resolve_offline_files(self) -> None:
+        locked = self.incoming / "offline.wav"
+        shutil.copyfile(self.wav, locked)
+        healthy = self.incoming / "healthy.wav"
+        shutil.copyfile(self.wav, healthy)
+        real_resolve = Path.resolve
+
+        def guarded_resolve(path, *args, **kwargs):
+            if path.name == "offline.wav":
+                raise OSError("simulated offline path resolution failure")
+            return real_resolve(path, *args, **kwargs)
+
+        with patch.object(Path, "resolve", guarded_resolve):
+            summary = run_manager(self.samples, reports_root=self.reports)
+
+        inventory = (
+            Path(summary["report_directory"]) / "unified_inventory.csv"
+        ).read_text(encoding="utf-8-sig")
+        self.assertIn("offline.wav", inventory)
+        self.assertIn("FILE_READ_ERROR", inventory)
+        self.assertIn("healthy.wav", inventory)
+        self.assertEqual(summary["files_scanned"], 3)
+
     def test_inventory_sfz_and_exact_duplicates(self) -> None:
         duplicate = self.incoming / "copy.wav"
         shutil.copyfile(self.wav, duplicate)
