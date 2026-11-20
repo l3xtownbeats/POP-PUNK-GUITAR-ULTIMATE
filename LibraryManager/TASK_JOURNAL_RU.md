@@ -1120,3 +1120,21 @@ PPGU использует собственный визуальный язык �
 - В workflow регрессионных тестов runner переключён с Windows на Ubuntu Latest: этот набор проверяет Python-логику, парсинг, каталоги, WAV и FakeStyle, а не нативную установку Windows. Это снижает зависимость unit tests от доступности Windows runner pool.
 - Windows Package workflow оставлен на Windows Latest, поскольку PyInstaller onedir, Inno Setup, Portable/Installer startup smoke tests являются Windows-специфичными.
 - Это изменение workflow-конфигурации, а не подтверждение успешного CI. Требуется дождаться новых run results.
+
+
+## Запись TJ-2026-11-20-MANAGER-CLEAN-TRANSFER-035 — перенос проверенных улучшений из отдельного clean Manager snapshot
+
+- Дата: 2026-11-20
+- Тип: **ФАКТИЧЕСКАЯ ЗАПИСЬ О ПЕРЕНОСЕ И СВЕРКЕ**
+- Источник: l3xtownbeats/MANAGER-3.0-AUTO-SOUND-HUNTER-, ветка integration/manager-3.0-clean.
+- Назначение: l3xtownbeats/POP-PUNK-GUITAR-ULTIMATE, ветка integration/manager-clean-transfer-20261120, созданная от текущего fix/manager-3-neon-stage-default-skin1.
+- Перенесены только изменения, отсутствовавшие в актуальной целевой ветке и подтверждённые сравнением исходников:
+  1. SFZ include/sample path traversal guard: внешние относительно корня библиотеки SFZ и sample paths получают явный блокирующий статус и не читаются как внутренние зависимости.
+  2. Regression test для INCLUDE_OUTSIDE_LIBRARY.
+  3. playable_modes в структуре подготовленной библиотеки сохраняется в каждой записи asset.
+  4. Уточнена диагностика Pattern loop boundaries: отдельно фиксируются отсутствующие/некорректные start/end и выход end за frame_count.
+  5. Windows runtime path assertions в regression tests нормализованы через Path.resolve() для независимости от формы абсолютного пути.
+  6. Исправлена проверка ожидаемого числа файлов в quick-scan regression и сохранена проверка присутствия guitar.wav.
+- Уже имеющееся в цели изменение source.relative_to(source_root) для сохранения структуры SFZ dependencies повторно не переносилось, поскольку оно уже присутствовало в целевой ветке.
+- Не переносились устаревшие workflow-only настройки исходного clean snapshot и не откатывались более новые целевые изменения.
+- Acceptance: эта запись подтверждает перенос кода, но **не** подтверждает успешный полный CI, Windows Portable/Installer build или реальный Windows 10 x64 smoke/functional test. PR остаётся проверочным до отдельного прохождения соответствующих gate.
