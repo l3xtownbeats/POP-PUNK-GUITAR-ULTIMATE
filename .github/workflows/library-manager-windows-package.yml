@@ -74,7 +74,7 @@ jobs:
           $exe = Join-Path $app "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
           $oldPath = $env:PATH
           try {
-            $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
+            $env:PATH = $oldPath
             $p = Start-Process -FilePath (Resolve-Path $exe) -PassThru
             Start-Sleep -Seconds 5
             $p.Refresh()
@@ -82,7 +82,7 @@ jobs:
             Stop-Process -Id $p.Id -Force
             Wait-Process -Id $p.Id -ErrorAction SilentlyContinue
           } finally {
-            $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
+            $env:PATH = $oldPath
           }
 
           $userData = Join-Path $app "UserData"
@@ -142,7 +142,7 @@ jobs:
 
           $oldPath = $env:PATH
           try {
-            $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
+            $env:PATH = $oldPath
             $p = Start-Process -FilePath $installedExe -PassThru
             Start-Sleep -Seconds 5
             $p.Refresh()
@@ -150,7 +150,7 @@ jobs:
             Stop-Process -Id $p.Id -Force
             Wait-Process -Id $p.Id -ErrorAction SilentlyContinue
           } finally {
-            $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
+            $env:PATH = $oldPath
           }
 
           $installedData = Join-Path $env:LOCALAPPDATA "POP PUNK GUITAR Library Manager"
