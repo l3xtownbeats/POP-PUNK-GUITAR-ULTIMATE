@@ -430,11 +430,17 @@ def import_sources_to_library(
             ):
                 return None
             source_digest = _sha256(source)
+            if source_digest != expected_digest:
+                return None
             destination_digest = _sha256(target)
-            if source_digest == expected_digest == destination_digest:
-                return target.resolve(), source_digest
+            if destination_digest != expected_digest:
+                raise IOError(
+                    "Ранее импортированная копия была изменена или повреждена; "
+                    f"повторный импорт остановлен для безопасной проверки: {target}"
+                )
+            return target.resolve(), source_digest
         except OSError:
-            return None
+            raise
         return None
 
     try:
