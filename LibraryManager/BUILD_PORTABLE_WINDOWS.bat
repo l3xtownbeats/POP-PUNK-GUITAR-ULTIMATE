@@ -33,7 +33,7 @@ if not exist "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\POP_PUNK_GUITAR_LIBRARY_MANAG
 echo [4/5] Mark and smoke-test relocatable Portable mode...
 powershell -NoProfile -Command "[guid]::NewGuid().ToString('N') | Set-Content -NoNewline 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\portable.mode'"
 if errorlevel 1 exit /b 1
-powershell -NoProfile -Command "$exe='dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\POP_PUNK_GUITAR_LIBRARY_MANAGER.exe'; $p=Start-Process -FilePath $exe -PassThru; Start-Sleep -Seconds 5; $p.Refresh(); if($p.HasExited){throw ('Portable startup failed: '+$p.ExitCode)}; Stop-Process -Id $p.Id -Force; if(!(Test-Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData')){throw 'Portable UserData was not created'}"
+powershell -NoProfile -Command "$exe='dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\POP_PUNK_GUITAR_LIBRARY_MANAGER.exe'; $p=Start-Process -FilePath (Resolve-Path $exe).Path -PassThru; Start-Sleep -Seconds 5; $p.Refresh(); if($p.HasExited){throw ('Portable startup failed: '+$p.ExitCode)}; Stop-Process -Id $p.Id -Force; if(!(Test-Path 'dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData')){throw 'Portable UserData was not created'}"
 if errorlevel 1 exit /b 1
 if exist "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData" rmdir /s /q "dist\POP_PUNK_GUITAR_LIBRARY_MANAGER\UserData"
 
