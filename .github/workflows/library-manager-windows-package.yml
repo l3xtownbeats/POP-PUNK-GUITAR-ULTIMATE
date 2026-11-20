@@ -48,25 +48,33 @@ jobs:
             if ($p.HasExited) { throw "Portable app exited during startup (code $($p.ExitCode))." }
             Stop-Process -Id $p.Id -Force
           } finally { $env:PATH = $oldPath }
-          $zip = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip"
-          Compress-Archive -Path dist/POP_PUNK_GUITAR_LIBRARY_MANAGER -DestinationPath $zip
-          if (!(Test-Path $zip) -or (Get-Item $zip).Length -lt 1024) { throw "Portable ZIP is missing or unexpectedly small." }
-          $entries = tar -tf $zip
-          if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
-          if (!($entries -match "python311.dll")) { throw "Portable ZIP does not contain its bundled Python runtime." }
-          if (!($entries -match "PORTABLE_USER_GUIDE_RU.md")) { throw "Portable ZIP does not contain the Russian user guide." }
-          if (!($entries -match "ppgu_skin/theme.json")) { throw "Portable ZIP does not contain the PPGU theme manifest." }
-          if (!($entries -match "ppgu_skin/assets/hero.png")) { throw "Portable ZIP does not contain the PPGU theme hero asset." }
-          if (!($entries -match "ppgu_skin/theme.json")) { throw "Portable ZIP does not contain the PPGU theme manifest." }
-          if (!($entries -match "ppgu_skin/assets/hero.png")) { throw "Portable ZIP does not contain the PPGU theme hero asset." }
+          # ZIP is created after portable.mode is added below, so extracted copies
+          # persist reports/staging beside the executable rather than in _MEIPASS.
       - name: Mark portable data mode and create portable archive
         shell: pwsh
         run: |
           New-Item -ItemType File -Path "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/portable.mode" -Force | Out-Null
+          $exe = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER/POP_PUNK_GUITAR_LIBRARY_MANAGER.exe"
+          $oldPath = $env:PATH
+          try {
+            $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+            $p = Start-Process -FilePath (Resolve-Path $exe) -PassThru
+            Start-Sleep -Seconds 5
+            $p.Refresh()
+            if ($p.HasExited) { throw "Portable-mode app startup failed (code $($p.ExitCode))." }
+            Stop-Process -Id $p.Id -Force
+          } finally { $env:PATH = $oldPath }
           $zip = "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER-windows-x64.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path "dist/POP_PUNK_GUITAR_LIBRARY_MANAGER" -DestinationPath $zip
           if (!(Test-Path $zip) -or (Get-Item $zip).Length -lt 1024) { throw "Portable ZIP is missing or unexpectedly small." }
+          $entries = tar -tf $zip
+          if ($LASTEXITCODE -ne 0 -or !($entries -match "POP_PUNK_GUITAR_LIBRARY_MANAGER.exe")) { throw "Portable ZIP does not contain the GUI executable." }
+          if (!($entries -match "python311.dll")) { throw "Portable ZIP does not contain its bundled Python runtime." }
+          if (!($entries -match "portable.mode")) { throw "Portable ZIP is missing its portable data marker." }
+          if (!($entries -match "PORTABLE_USER_GUIDE_RU.md")) { throw "Portable ZIP does not contain the Russian user guide." }
+          if (!($entries -match "ppgu_skin/theme.json")) { throw "Portable ZIP does not contain the PPGU theme manifest." }
+          if (!($entries -match "ppgu_skin/assets/hero.png")) { throw "Portable ZIP does not contain the PPGU theme hero asset." }
       - name: Install Inno Setup compiler
         shell: pwsh
         run: choco install innosetup --yes --no-progress
