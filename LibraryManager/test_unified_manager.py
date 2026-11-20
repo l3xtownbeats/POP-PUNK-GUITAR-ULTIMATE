@@ -121,7 +121,7 @@ class UnifiedManagerTests(unittest.TestCase):
             ) as build_index:
                 result = run_manager(self.samples)
             report_dir = Path(result["report_directory"])
-            self.assertEqual(report_dir.parent, data_root / "reports")
+            self.assertEqual(report_dir.parent.resolve(), (data_root / "reports").resolve())
             self.assertTrue((data_root / "reports" / "scan_cache.sqlite3").is_file())
             staging_root.assert_called_once()
             build_index.assert_called_once_with(expected_staging)
