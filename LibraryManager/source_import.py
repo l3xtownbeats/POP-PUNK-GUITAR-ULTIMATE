@@ -323,6 +323,9 @@ def _copy_verified(
         )
     except OSError:
         pass
+    source_final_digest = _sha256(source)
+    if source_final_digest != source_digest:
+        raise IOError(f"Исходный файл изменился во время копирования: {source}")
     destination_digest = _sha256(destination)
     if destination_digest != source_digest:
         raise IOError(f"SHA-256 копии не совпадает с оригиналом: {source}")
@@ -344,9 +347,17 @@ def import_sources_to_library(
     file, then atomically renamed into place. If any step fails, this batch is
     rolled back and the original sources remain untouched.
     """
-    selections = [Path(item).expanduser().resolve() for item in selected_paths]
-    if not selections:
+    raw_selections = [Path(item).expanduser() for item in selected_paths]
+    if not raw_selections:
         raise ValueError("Не выбраны файлы или папки для импорта.")
+    symlink_selections = [item for item in raw_selections if item.is_symlink()]
+    if symlink_selections:
+        raise ValueError(
+            "Символические ссылки нельзя импортировать напрямую. "
+            "Выберите реальный файл или папку: "
+            + ", ".join(str(item) for item in symlink_selections[:5])
+        )
+    selections = [item.resolve() for item in raw_selections]
     incoming = Path(incoming_root).expanduser().resolve()
     if not incoming.is_dir():
         raise NotADirectoryError(f"Папка Import Sample Guitar не найдена: {incoming}")
