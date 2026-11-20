@@ -988,7 +988,7 @@ class LibraryManagerApp:
                             "error": f"{type(exc).__name__}: {exc}",
                         })
 
-                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV-кандидатов для SAMPLE MODE и AutoChords внутри PATTERN.")
+                report_progress("ЭТАП 5/8: извлечение аккордовых и Power Chord WAV-кандидатов для категории SAMPLE MODE библиотеки VST3 и AutoChords внутри PATTERN.")
                 from chord_clip_extractor import extract_chord_samples
                 for record in records:
                     if self._cancel_event.is_set():
@@ -1019,7 +1019,7 @@ class LibraryManagerApp:
                             "error": f"{type(exc).__name__}: {exc}",
                         })
 
-                report_progress("ЭТАП 6/8: извлечение одиночных нот для SAMPLE MODE + MELODY MODE и дополнительных фраз MELODY MODE.")
+                report_progress("ЭТАП 6/8: извлечение одиночных нот для категорий SAMPLE MODE и MELODY MODE библиотеки VST3; дополнительные фразы для категории MELODY MODE.")
                 for record in records:
                     if self._cancel_event.is_set():
                         raise RuntimeError("Извлечение остановлено; созданные staging-кандидаты сохранены.")
@@ -1671,8 +1671,9 @@ class LibraryManagerApp:
         if evidence is None:
             return
         mode_text = simpledialog.askstring(
-            "Назначение режимов Manager / VST3",
-            "Укажите только подтверждённые вами разделы через запятую. "
+            "Категории назначения библиотеки для VST3",
+            "Укажите только подтверждённые категории подготовленной библиотеки через запятую. "
+            "Это не режимы Manager; музыкальные режимы плагина — MELODY и PATTERN. "
             "Можно оставить пустым, если назначение пока неизвестно.\n\n"
             + ", ".join(MODE_ORDER),
             parent=self.root,
@@ -1683,7 +1684,7 @@ class LibraryManagerApp:
         invalid_modes = [item for item in selected_modes if item not in MODE_ORDER]
         if invalid_modes:
             messagebox.showerror(
-                "Назначение режимов",
+                "Категории библиотеки VST3",
                 "Неизвестные разделы: " + ", ".join(invalid_modes)
                 + "\nДопустимые значения: " + ", ".join(MODE_ORDER),
                 parent=self.root,
@@ -1692,7 +1693,7 @@ class LibraryManagerApp:
         if not messagebox.askyesno(
             "Подтверждение REVIEWED",
             "Подтверждаете, что лично прослушали WAV, проверили музыкальное содержимое и границы, "
-            "а также корректность выбранных назначений режимов?",
+            "а также корректность выбранных категорий назначения для библиотеки VST3?",
             parent=self.root,
         ):
             return
