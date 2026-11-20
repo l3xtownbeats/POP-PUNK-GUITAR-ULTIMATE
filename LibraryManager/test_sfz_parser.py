@@ -31,6 +31,7 @@ class SfzParserTests(unittest.TestCase):
             rows=parse_sfz_file(main,root)
             self.assertTrue(any(r["status"]=="INCLUDE_CYCLE" for r in rows))
 
+
     def test_include_outside_library_is_blocked(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
