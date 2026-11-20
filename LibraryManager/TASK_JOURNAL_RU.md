@@ -1002,3 +1002,12 @@ PPGU использует собственный визуальный язык �
 - Повторный запуск failed jobs предыдущего workflow не помог: runner снова не выделен, `runner_id=0`, `runner_name=""`, `steps=[]`, логи отсутствуют.
 - GitHub Status на 2026-11-20 показывает Actions Operational. При этом в GitHub Community от 2026-11-15 опубликован случай с практически теми же симптомами для private repository на GitHub Free: runner_id=0, пустые steps/logs и мгновенный failure; автор того случая сообщил, что included Actions compute исчерпан и Actions budget заблокирован. Это возможный сценарий для текущего проекта, но фактический billing status аккаунта владельца этого репозитория мне недоступен и я его не утверждаю.
 - В локальный `BUILD_PORTABLE_WINDOWS.bat` включены compileall, полный unittest, smoke-start Portable и упаковка; это альтернативный проверяемый путь, если hosted runners блокируются на уровне аккаунта. Успех этого BAT ещё должен быть фактически получен на Windows.
+
+
+## Запись TJ-2026-11-20-MANAGER-PATHS-026 — локальная проверка путей Portable/Installer
+
+- Дата: 2026-11-20
+- Проверил в изолированной локальной Python-среде код runtime path helper на 7 сценариях: source checkout, произвольная Portable-папка, LocalAppData установленной версии, read-only Portable fallback, ошибка если оба хранилища недоступны, staging root и packaged resource resolution.
+- Результат изолированного тестового запуска: **7/7 passed**. Это проверка только модуля путей, не полный Manager regression suite и не Windows EXE.
+- В репозиторный набор добавлен отдельный тест, что невозможность записи одновременно в соседний UserData и LocalAppData выдаёт ясную PermissionError, а не скрытый сбой позже.
+- Полный Windows build и GUI smoke test по-прежнему ожидают Windows runner или фактический запуск локального BAT на Windows.
